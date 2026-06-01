@@ -90,3 +90,17 @@ class RankedSlate:
     ideas: list[tuple[TradeIdea, RiskDecision]]
     generated_at: datetime
     cycle_number: int
+
+
+@dataclass
+class SignalEstimate:
+    source: str             # e.g. "noaa_gfs", "nws_discussion", "polymarket"
+    probability: float      # 0.0–1.0
+    uncertainty: float      # ± band in probability units, e.g. 0.08 = ±8pp
+    weight: float           # source trustworthiness, 0.0–1.0
+    data_issued_at: datetime  # from API response, NOT fetch time
+    metadata: dict = field(default_factory=dict)
+
+    @property
+    def staleness_minutes(self) -> float:
+        return (datetime.utcnow() - self.data_issued_at).total_seconds() / 60
