@@ -230,3 +230,44 @@ class PolymarketClient:
             async with session.get(f"{_GAMMA_BASE}/markets", params=params) as resp:
                 raw: list[dict] = await resp.json()
         return [m for m in raw if m.get("active") and not m.get("closed")]
+
+    async def bootstrap_whale_targets(
+        self,
+        min_score: float = 0.6,
+        top_n: int = 50,
+        market_limit: int = 100,
+        trade_min_size: float = 500.0,
+    ) -> list[str]:
+        """Build initial target wallet list by scanning markets for profitable large traders.
+
+        Steps:
+        1. Fetch market_limit active markets.
+        2. For each market, fetch large trades (above trade_min_size).
+        3. Collect all unique wallet addresses from those trades.
+        4. For each unique wallet, fetch positions and score profitability.
+        5. Keep wallets with score >= min_score.
+        6. Sort by score descending, return top N wallet addresses.
+        """
+        markets = await self.get_markets(limit=market_limit)
+
+        # Collect unique wallets across all markets
+        unique_wallets: set[str] = set()
+        for market in markets:
+            condition_id = market.get("conditionId", "")
+            trades = await self.get_large_trades(condition_id, min_size_usd=trade_min_size)
+            for trade in trades:
+                wallet = trade.get("proxyWallet")
+                if wallet:
+                    unique_wallets.add(wallet)
+
+        # Score each wallet
+        scored: list[tuple[float, str]] = []
+        for wallet in unique_wallets:
+            positions = await self.get_wallet_positions(wallet)
+            score = self.score_wallet_profitability(positions)
+            if score >= min_score:
+                scored.append((score, wallet))
+
+        # Sort by score descending, return top N addresses
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [wallet for _, wallet in scored[:top_n]]

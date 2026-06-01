@@ -200,3 +200,136 @@ async def test_get_wallet_positions_returns_position_list():
 
     assert len(positions) == 2
     assert positions[0]["proxyWallet"] == "0xabc"
+
+
+# ---------------------------------------------------------------------------
+# bootstrap_whale_targets (async, methods mocked via AsyncMock side_effect)
+# ---------------------------------------------------------------------------
+
+def _make_mock_client(markets, trades_by_call, positions_by_wallet):
+    """Return a PolymarketClient whose async IO methods are fully mocked.
+
+    Args:
+        markets: list of market dicts returned by get_markets
+        trades_by_call: list of lists — each inner list is the trades returned
+                        for the corresponding sequential get_large_trades call
+        positions_by_wallet: dict mapping wallet address -> list of position dicts
+    """
+    client = PolymarketClient()
+
+    # get_markets always returns the same single list
+    client.get_markets = AsyncMock(return_value=markets)
+
+    # get_large_trades is called once per market — side_effect drives sequence
+    client.get_large_trades = AsyncMock(side_effect=trades_by_call)
+
+    # get_wallet_positions is called once per unique wallet
+    async def _positions(address, limit=100):
+        return positions_by_wallet.get(address, [])
+
+    client.get_wallet_positions = AsyncMock(side_effect=_positions)
+
+    return client
+
+
+def _make_market(condition_id):
+    return {"conditionId": condition_id, "active": True, "closed": False,
+            "question": f"Will market {condition_id} resolve Yes?"}
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_returns_only_wallets_above_min_score():
+    """Wallets whose profitability score falls below min_score are excluded."""
+    markets = [_make_market("0xcond1")]
+    # Two wallets appear in trades for this market
+    trades = [
+        _make_trade(wallet="0xgood", size=600.0, condition_id="0xcond1"),
+        _make_trade(wallet="0xbad", size=600.0, condition_id="0xcond1"),
+    ]
+    # good wallet: 2 winning positions → score 1.0 (above 0.6)
+    good_positions = [_make_position(cash_pnl=10.0), _make_position(cash_pnl=5.0)]
+    # bad wallet: 2 losing positions → score 0.0 (below 0.6)
+    bad_positions = [_make_position(cash_pnl=-10.0), _make_position(cash_pnl=-5.0)]
+
+    client = _make_mock_client(
+        markets=markets,
+        trades_by_call=[trades],
+        positions_by_wallet={"0xgood": good_positions, "0xbad": bad_positions},
+    )
+
+    result = await client.bootstrap_whale_targets(min_score=0.6)
+
+    assert "0xgood" in result
+    assert "0xbad" not in result
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_deduplicates_wallets_across_markets():
+    """A wallet appearing in multiple markets is only scored once."""
+    markets = [_make_market("0xcond1"), _make_market("0xcond2")]
+    # Same wallet appears in both markets
+    trades_market1 = [_make_trade(wallet="0xshared", size=600.0, condition_id="0xcond1")]
+    trades_market2 = [_make_trade(wallet="0xshared", size=700.0, condition_id="0xcond2")]
+
+    positions = [_make_position(cash_pnl=20.0), _make_position(cash_pnl=10.0)]
+
+    client = _make_mock_client(
+        markets=markets,
+        trades_by_call=[trades_market1, trades_market2],
+        positions_by_wallet={"0xshared": positions},
+    )
+
+    result = await client.bootstrap_whale_targets(min_score=0.6)
+
+    # Appears once in result, get_wallet_positions called exactly once
+    assert result.count("0xshared") == 1
+    client.get_wallet_positions.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_respects_top_n_limit():
+    """Only the top N wallets by score are returned."""
+    markets = [_make_market("0xcond1")]
+    # Three wallets, all above min_score
+    trades = [
+        _make_trade(wallet="0xw1", size=600.0),
+        _make_trade(wallet="0xw2", size=600.0),
+        _make_trade(wallet="0xw3", size=600.0),
+    ]
+    # w1: 3/3 wins (score 1.0), w2: 2/3 wins (score ~0.67), w3: 1/1 win (score 1.0)
+    positions_by_wallet = {
+        "0xw1": [_make_position(cash_pnl=10.0)] * 3,
+        "0xw2": [_make_position(cash_pnl=10.0), _make_position(cash_pnl=10.0),
+                 _make_position(cash_pnl=-5.0)],
+        "0xw3": [_make_position(cash_pnl=10.0)],
+    }
+
+    client = _make_mock_client(
+        markets=markets,
+        trades_by_call=[trades],
+        positions_by_wallet=positions_by_wallet,
+    )
+
+    result = await client.bootstrap_whale_targets(min_score=0.6, top_n=2)
+
+    assert len(result) == 2
+    # The lowest-scoring qualifying wallet (0xw2, score ~0.67) is dropped
+    assert "0xw2" not in result
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_returns_empty_when_no_qualifying_wallets():
+    """Returns an empty list when no wallet meets the min_score threshold."""
+    markets = [_make_market("0xcond1")]
+    trades = [_make_trade(wallet="0xloser", size=600.0, condition_id="0xcond1")]
+    losing_positions = [_make_position(cash_pnl=-10.0), _make_position(cash_pnl=-5.0)]
+
+    client = _make_mock_client(
+        markets=markets,
+        trades_by_call=[trades],
+        positions_by_wallet={"0xloser": losing_positions},
+    )
+
+    result = await client.bootstrap_whale_targets(min_score=0.6)
+
+    assert result == []
