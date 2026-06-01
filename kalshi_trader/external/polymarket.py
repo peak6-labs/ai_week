@@ -14,9 +14,17 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+import ssl
+
 import aiohttp
+import truststore
 
 from kalshi_trader.models import SignalEstimate
+
+def _ssl_context() -> ssl.SSLContext:
+    """Build an SSL context that trusts the corporate proxy (Zscaler)."""
+    ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    return ctx
 
 _GAMMA_BASE = "https://gamma-api.polymarket.com"
 _POLYMARKET_WEIGHT = 0.75
@@ -77,7 +85,8 @@ class PolymarketClient:
     async def get_markets(self, limit: int = 500) -> list[dict]:
         """Fetch active markets from Polymarket Gamma API."""
         params = {"active": "true", "closed": "false", "limit": str(limit)}
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(ssl=_ssl_context())
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(f"{_GAMMA_BASE}/markets", params=params) as resp:
                 raw: list[dict] = await resp.json()
         return [m for m in raw if m.get("active") and not m.get("closed")]
