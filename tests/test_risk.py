@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta
-from kalshi_trader.models import TradeIdea, Side, OrderAction, AgentId, PortfolioState
+from kalshi_trader.models import TradeIdea, Side, OrderAction, PortfolioState
 from kalshi_trader.risk import RiskManager
 
 
@@ -17,7 +17,7 @@ def empty_portfolio():
 @pytest.fixture
 def sample_idea():
     return TradeIdea(
-        agent_id=AgentId.A1_CONDITIONAL,
+        agent_id="conditional_event",
         ticker="NBA-CELTICS-WIN",
         side=Side.YES,
         action=OrderAction.BUY,
@@ -37,7 +37,7 @@ def test_approved_trade(risk, sample_idea, empty_portfolio):
 
 def test_reject_below_minimum_edge(risk, empty_portfolio):
     idea = TradeIdea(
-        agent_id=AgentId.A1_CONDITIONAL, ticker="X", side=Side.YES,
+        agent_id="conditional_event", ticker="X", side=Side.YES,
         action=OrderAction.BUY, confidence=0.23, market_price=22.0,
         reasoning="", signal_sources=[], category="sports",
     )
@@ -86,7 +86,7 @@ def test_settlement_far_enough_away_is_approved(risk, sample_idea, empty_portfol
 def test_half_kelly_capped_at_max(risk, empty_portfolio):
     # High confidence + cheap price → uncapped Kelly would exceed $100
     idea = TradeIdea(
-        agent_id=AgentId.A1_CONDITIONAL, ticker="X", side=Side.YES,
+        agent_id="conditional_event", ticker="X", side=Side.YES,
         action=OrderAction.BUY, confidence=0.60, market_price=30.0,
         reasoning="", signal_sources=[], category="sports",
     )

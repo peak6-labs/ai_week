@@ -1,6 +1,6 @@
 from datetime import datetime
 from kalshi_trader.models import (
-    Side, OrderAction, AgentId,
+    Side, OrderAction,
     Market, TradeIdea, RiskDecision, OrderResult, Position, PortfolioState, RankedSlate,
 )
 
@@ -23,7 +23,7 @@ def test_market_dataclass():
 
 def test_trade_idea_defaults():
     idea = TradeIdea(
-        agent_id=AgentId.A1_CONDITIONAL, ticker="X", side=Side.YES,
+        agent_id="conditional_event", ticker="X", side=Side.YES,
         action=OrderAction.BUY, confidence=0.45, market_price=22.0,
         reasoning="test", signal_sources=["A1"],
     )

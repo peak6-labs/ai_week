@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class Side(str, Enum):
@@ -13,16 +12,6 @@ class Side(str, Enum):
 class OrderAction(str, Enum):
     BUY = "buy"
     SELL = "sell"
-
-
-class AgentId(str, Enum):
-    A1_CONDITIONAL = "A1_conditional_event"
-    A2_FLOW_VOLUME = "A2_flow_volume"
-    A3_CROSS_PLATFORM = "A3_cross_platform"
-    A4_DATASET_EDGE = "A4_dataset_edge"
-    A5_SENTIMENT_NEWS = "A5_sentiment_news"
-    A6_MARKET_MAKING = "A6_market_making"
-    A7_COORDINATOR = "A7_coordinator"
 
 
 @dataclass
@@ -43,12 +32,12 @@ class Market:
 
 @dataclass
 class TradeIdea:
-    agent_id: AgentId
+    agent_id: str          # set by specialist, e.g. "conditional_event", "flow_volume"
     ticker: str
     side: Side
     action: OrderAction
-    confidence: float     # 0.0-1.0
-    market_price: float   # cents
+    confidence: float      # 0.0-1.0
+    market_price: float    # cents
     reasoning: str
     signal_sources: list[str]
     suggested_size_dollars: float = 0.0
@@ -80,9 +69,9 @@ class Position:
     ticker: str
     side: Side
     quantity: int
-    avg_price: float      # cents
-    current_price: float  # cents
-    unrealized_pnl: float # dollars
+    avg_price: float       # cents
+    current_price: float   # cents
+    unrealized_pnl: float  # dollars
     category: str
     close_time: datetime
 
