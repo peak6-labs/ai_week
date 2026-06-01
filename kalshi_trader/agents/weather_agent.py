@@ -60,15 +60,20 @@ async def _combine_signals(estimates: list[dict]) -> dict:
     w_prob = 0.0
     w_unc = 0.0
     max_staleness = 0.0
+    n = 0
 
     for e in estimates:
-        issued = datetime.fromisoformat(e["data_issued_at"])
+        issued_str = e.get("data_issued_at")
+        if not issued_str:
+            continue
+        issued = datetime.fromisoformat(issued_str)
         staleness = (datetime.utcnow() - issued).total_seconds() / 60
         eff_w = e["weight"] * math.exp(-staleness / 360.0)
         total_w += eff_w
         w_prob += eff_w * e["probability"]
         w_unc += eff_w * e["uncertainty"]
         max_staleness = max(max_staleness, staleness)
+        n += 1
 
     if total_w == 0:
         return {"error": "All estimates have zero effective weight"}
@@ -76,8 +81,8 @@ async def _combine_signals(estimates: list[dict]) -> dict:
     combined_prob = w_prob / total_w
     combined_unc = w_unc / total_w
 
-    if len(estimates) > 1:
-        probs = [e["probability"] for e in estimates]
+    if n > 1:
+        probs = [e["probability"] for e in estimates if e.get("data_issued_at")]
         spread = max(probs) - min(probs)
         if spread > 0.10:
             combined_unc += spread * 0.5
@@ -86,7 +91,7 @@ async def _combine_signals(estimates: list[dict]) -> dict:
         "combined_probability": round(combined_prob, 4),
         "uncertainty": round(combined_unc, 4),
         "staleness_minutes": round(max_staleness, 1),
-        "n_sources": len(estimates),
+        "n_sources": n,
     }
 
 
@@ -280,9 +285,9 @@ class WeatherAgent:
             for m in filtered
         ]
 
-    async def _get_noaa_forecast(self, lat: float, lon: float, date: str) -> dict:
-        from datetime import date as date_type
-        target = date_type.fromisoformat(date)
+    async def _get_noaa_forecast(self, lat: float, lon: float, date_str: str) -> dict:
+        from datetime import date
+        target = date.fromisoformat(date_str)
         result = await self._noaa.get_forecast(lat, lon, target)
         age = (datetime.utcnow() - result["generated_at"]).total_seconds() / 60
         return {

@@ -99,3 +99,46 @@ async def test_calculate_edge_not_worth_trading():
     result = await _calculate_edge(combined_probability=0.42, market_price_cents=40.0)
     assert result["fee_adjusted_edge"] < 5.0
     assert result["worth_trading"] is False
+
+
+@pytest.mark.asyncio
+async def test_estimate_probability_temp_below():
+    # mean=77.5, std=3.75 → P(X<80) ≈ 0.748
+    forecast = {"temp_high": 85.0, "temp_low": 70.0, "precip_pct": 10, "data_age_minutes": 30}
+    result = await _estimate_probability(
+        metric="temp_low", threshold=80.0, operator="below", forecast=forecast
+    )
+    assert 0.6 < result["probability"] < 0.9
+    assert result["source"] == "noaa_gfs"
+
+
+@pytest.mark.asyncio
+async def test_combine_signals_disagreement_penalty():
+    now = datetime.utcnow()
+    estimates = [
+        {
+            "source": "a",
+            "probability": 0.80,
+            "uncertainty": 0.08,
+            "weight": 0.85,
+            "data_issued_at": (now - timedelta(minutes=10)).isoformat(),
+        },
+        {
+            "source": "b",
+            "probability": 0.50,
+            "uncertainty": 0.08,
+            "weight": 0.85,
+            "data_issued_at": (now - timedelta(minutes=10)).isoformat(),
+        },
+    ]
+    result = await _combine_signals(estimates=estimates)
+    # spread=0.30 > 0.10 → penalty applied; uncertainty should be > base 0.08
+    assert result["uncertainty"] > 0.08
+
+
+@pytest.mark.asyncio
+async def test_calculate_edge_fee_adjusted():
+    result = await _calculate_edge(combined_probability=0.65, market_price_cents=40.0)
+    # fee = 0.07 * 0.40 * 0.60 * 100 = 1.68
+    expected_fee_adj = 25.0 - 0.07 * 0.40 * 0.60 * 100
+    assert result["fee_adjusted_edge"] == pytest.approx(expected_fee_adj, abs=0.01)
