@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -83,6 +83,20 @@ class PortfolioState:
     daily_realized_pnl: float = 0.0
     total_exposure_dollars: float = 0.0
     exposure_by_category: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class SignalEstimate:
+    source: str
+    probability: float       # 0.0–1.0
+    uncertainty: float       # ± band
+    weight: float            # source trustworthiness, 0.0–1.0
+    data_issued_at: datetime
+    metadata: dict = field(default_factory=dict)
+
+    @property
+    def staleness_minutes(self) -> float:
+        return (datetime.now(tz=timezone.utc) - self.data_issued_at).total_seconds() / 60
 
 
 @dataclass
