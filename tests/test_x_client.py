@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import pytest
+import aiohttp
 from unittest.mock import AsyncMock, MagicMock
 from kalshi_trader.external.x_client import XClient, GrokSearchResult, _empty_result
 
@@ -91,7 +92,7 @@ async def test_returns_empty_result_on_network_error(monkeypatch):
     monkeypatch.setattr("kalshi_trader.config.XAI_API_KEY", "test-key")
 
     mock_session = MagicMock()
-    mock_session.post = MagicMock(side_effect=Exception("Network error"))
+    mock_session.post = MagicMock(side_effect=aiohttp.ClientConnectionError("Network error"))
 
     client = XClient()
     client._session = mock_session
@@ -114,3 +115,23 @@ async def test_returns_empty_result_on_invalid_json(monkeypatch):
 
     result = await client.live_search("query", "market")
     assert result["uncertainty"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_returns_empty_result_on_partial_json(monkeypatch):
+    """Partial response missing required keys must fall through to _empty_result."""
+    monkeypatch.setattr("kalshi_trader.config.XAI_API_KEY", "test-key")
+
+    partial = {"probability": 0.8}  # missing 9 required keys
+    api_response = {"choices": [{"message": {"content": json.dumps(partial)}}]}
+    mock_resp = _MockResponse(api_response)
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_resp)
+
+    client = XClient()
+    client._session = mock_session
+
+    result = await client.live_search("query", "market")
+    assert result["probability"] == 0.5
+    assert result["uncertainty"] == 1.0
+    assert result["summary"] == ""

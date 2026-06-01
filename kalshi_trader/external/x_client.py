@@ -1,6 +1,7 @@
 from __future__ import annotations
+import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TypedDict
 import aiohttp
 from kalshi_trader import config
@@ -19,6 +20,13 @@ class GrokSearchResult(TypedDict):
     issued_at: str
 
 
+_REQUIRED_KEYS = {
+    "probability", "uncertainty", "summary", "key_quotes",
+    "sentiment_breakdown", "source_quality", "velocity",
+    "key_entities", "contrarian_signal", "issued_at",
+}
+
+
 def _empty_result() -> GrokSearchResult:
     return GrokSearchResult(
         probability=0.5,
@@ -30,7 +38,7 @@ def _empty_result() -> GrokSearchResult:
         velocity={"1h": 0, "6h": 0, "24h": 0},
         key_entities=[],
         contrarian_signal="",
-        issued_at=datetime.utcnow().isoformat(),
+        issued_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     )
 
 
@@ -47,8 +55,10 @@ def _parse_grok_response(text: str) -> GrokSearchResult:
                 break
     try:
         data = json.loads(text)
+        if not isinstance(data, dict) or not _REQUIRED_KEYS.issubset(data):
+            return _empty_result()
         if not data.get("issued_at"):
-            data["issued_at"] = datetime.utcnow().isoformat()
+            data["issued_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         return data  # type: ignore[return-value]
     except (json.JSONDecodeError, ValueError):
         return _empty_result()
@@ -108,8 +118,14 @@ class XClient:
                 data = await resp.json()
                 text = data["choices"][0]["message"]["content"]
                 return _parse_grok_response(text)
-        except Exception:
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError, KeyError, IndexError):
             return _empty_result()
+
+    async def __aenter__(self) -> "XClient":
+        return self
+
+    async def __aexit__(self, *_) -> None:
+        await self.close()
 
     async def close(self) -> None:
         if self._session:
