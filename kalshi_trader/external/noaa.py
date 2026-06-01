@@ -8,10 +8,11 @@ _HEADERS = {"User-Agent": "kalshi-trader/1.0 scorley@peak6.com", "Accept": "appl
 
 
 def _parse_wind_mph(wind_str: str) -> float:
-    nums = re.findall(r"\d+", wind_str)
-    if not nums:
-        return 0.0
-    return sum(float(n) for n in nums) / len(nums)
+    range_match = re.search(r"(\d+)\s+to\s+(\d+)", wind_str)
+    if range_match:
+        return (float(range_match.group(1)) + float(range_match.group(2))) / 2
+    single = re.search(r"(\d+)", wind_str)
+    return float(single.group(1)) if single else 0.0
 
 
 class NOAAClient:

@@ -87,3 +87,21 @@ async def test_get_discussion_returns_text_and_time():
     assert "confidence" in result["text"].lower()
     assert isinstance(result["issuance_time"], datetime)
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_get_discussion_empty_graph_returns_fallback():
+    points_response = {
+        "properties": {
+            "forecast": "https://api.weather.gov/gridpoints/OKX/33,37/forecast",
+            "forecastHourly": "https://api.weather.gov/gridpoints/OKX/33,37/forecast/hourly",
+            "cwa": "OKX",
+        }
+    }
+    products_response = {"@graph": []}
+    client = NOAAClient()
+    with patch.object(client, "_get", new=AsyncMock(side_effect=[points_response, products_response])):
+        result = await client.get_discussion(40.7128, -74.0060)
+    assert result["text"] == ""
+    assert isinstance(result["issuance_time"], datetime)
+    await client.close()
