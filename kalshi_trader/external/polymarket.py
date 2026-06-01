@@ -17,15 +17,29 @@ from datetime import datetime, timezone
 import aiohttp
 import truststore
 
-from kalshi_trader.models import SignalEstimate, WhaleSignal
+from kalshi_trader.models import SignalEstimate
 
 def _ssl_context() -> ssl.SSLContext:
     ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     return ctx
 
+from dataclasses import dataclass, field as _field
+
 _GAMMA_BASE = "https://gamma-api.polymarket.com"
 _DATA_BASE = "https://data-api.polymarket.com"
 _POLYMARKET_WEIGHT = 0.75
+
+
+@dataclass
+class WhaleSignal:
+    wallet_address: str
+    condition_id: str
+    market_question: str
+    side: str              # "YES" or "NO"
+    size_usd: float
+    entry_price: float
+    timestamp: datetime
+    metadata: dict = _field(default_factory=dict)
 
 _STOPWORDS = frozenset({
     "will", "the", "a", "an", "in", "of", "by", "is", "be", "on", "at",

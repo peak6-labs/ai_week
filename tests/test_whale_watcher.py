@@ -9,8 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from kalshi_trader.external.polymarket import PolymarketClient
-from kalshi_trader.models import WhaleSignal
+from kalshi_trader.external.polymarket import PolymarketClient, WhaleSignal
 
 
 # --- Fixtures ---

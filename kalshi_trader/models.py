@@ -100,18 +100,6 @@ class SignalEstimate:
 
 
 @dataclass
-class WhaleSignal:
-    wallet_address: str
-    condition_id: str
-    market_question: str
-    side: str             # "YES" or "NO"
-    size_usd: float
-    entry_price: float
-    timestamp: datetime
-    metadata: dict = field(default_factory=dict)
-
-
-@dataclass
 class RankedSlate:
     ideas: list[tuple[TradeIdea, RiskDecision]]
     generated_at: datetime
