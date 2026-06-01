@@ -12,9 +12,9 @@ LunarResearcher strategy adaptation:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-
+import re
 import ssl
+from datetime import datetime, timezone
 
 import aiohttp
 import truststore
@@ -22,12 +22,63 @@ import truststore
 from kalshi_trader.models import SignalEstimate
 
 def _ssl_context() -> ssl.SSLContext:
-    """Build an SSL context that trusts the corporate proxy (Zscaler)."""
     ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     return ctx
 
 _GAMMA_BASE = "https://gamma-api.polymarket.com"
 _POLYMARKET_WEIGHT = 0.75
+
+_STOPWORDS = frozenset({
+    "will", "the", "a", "an", "in", "of", "by", "is", "be", "on", "at",
+    "to", "and", "or", "for", "from", "as", "was", "are", "it", "its",
+    "that", "this", "with", "have", "has", "do", "does", "before", "after",
+    "when", "where", "not", "no", "if",
+})
+
+_SUFFIX_MULT = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}
+
+
+def _parse_number(raw: str) -> float | None:
+    """Extract a numeric value from a token, handling $, commas, and k/m/b suffixes."""
+    s = re.sub(r"[$,]", "", raw.lower()).rstrip("%")
+    for suffix, mult in _SUFFIX_MULT.items():
+        if s.endswith(suffix):
+            try:
+                return float(s[:-1]) * mult
+            except ValueError:
+                return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _tokenize(title: str) -> tuple[set[str], list[float]]:
+    """Return (content_words, numbers) after stripping punctuation and stopwords."""
+    words: set[str] = set()
+    numbers: list[float] = []
+    for raw in title.lower().split():
+        clean = raw.strip(".,?!:;\"'()")
+        if not clean:
+            continue
+        n = _parse_number(clean)
+        if n is not None:
+            numbers.append(n)
+        elif clean not in _STOPWORDS and len(clean) > 1:
+            words.add(clean)
+    return words, numbers
+
+
+def _numbers_compatible(a: list[float], b: list[float]) -> bool:
+    """True when both titles have no numbers, or when at least one pair matches within 20%."""
+    if not a or not b:
+        return True
+    return any(
+        abs(x - y) / max(x, y) <= 0.20
+        for x in a
+        for y in b
+        if max(x, y) > 0
+    )
 
 
 class PolymarketClient:
@@ -53,25 +104,31 @@ class PolymarketClient:
         )
 
     def match_market(self, kalshi_title: str, poly_markets: list[dict]) -> dict | None:
-        """Find the best-matching Polymarket market by token overlap (Jaccard)."""
-        kalshi_tokens = set(kalshi_title.lower().split())
+        """Find the best-matching Polymarket market.
+
+        Uses Jaccard similarity on content words (stopwords and punctuation removed).
+        Rejects candidates where numeric thresholds in the two titles disagree by >20%,
+        catching the "$120k vs $1m" class of false positives.
+        Requires ≥2 shared content words and ≥20% Jaccard.
+        """
+        kalshi_words, kalshi_nums = _tokenize(kalshi_title)
         best_score = 0.0
         best_market = None
         for market in poly_markets:
-            poly_tokens = set(market["question"].lower().split())
-            intersection = len(kalshi_tokens & poly_tokens)
-            union = len(kalshi_tokens | poly_tokens)
-            score = intersection / union if union else 0.0
+            poly_words, poly_nums = _tokenize(market["question"])
+            if not _numbers_compatible(kalshi_nums, poly_nums):
+                continue
+            union = len(kalshi_words | poly_words)
+            if not union:
+                continue
+            score = len(kalshi_words & poly_words) / union
             if score > best_score:
                 best_score = score
                 best_market = market
-        # Require at least 2 shared tokens AND >20% Jaccard
         if best_score < 0.20 or not best_market:
             return None
-        kalshi_tokens_list = kalshi_title.lower().split()
-        poly_tokens_list = best_market["question"].lower().split()
-        shared = set(kalshi_tokens_list) & set(poly_tokens_list)
-        if len(shared) < 2:
+        best_words, _ = _tokenize(best_market["question"])
+        if len(kalshi_words & best_words) < 2:
             return None
         return best_market
 

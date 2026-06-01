@@ -99,6 +99,48 @@ def test_match_market_case_insensitive():
     assert result is not None
 
 
+# --- match_market: numeric guard ---
+
+def test_match_market_rejects_different_numeric_threshold():
+    """Core false-positive fix: $120k vs $1m are different events despite sharing 'bitcoin hit'."""
+    client = PolymarketClient()
+    poly_markets = [_make_gamma_market(id="n1", question="Will bitcoin hit $1m before GTA VI?")]
+    result = client.match_market("Will Bitcoin hit $120k?", poly_markets)
+    assert result is None
+
+
+def test_match_market_accepts_same_numeric_threshold():
+    """Same threshold and shared content tokens → valid match."""
+    client = PolymarketClient()
+    poly_markets = [_make_gamma_market(id="n2", question="Will Bitcoin close above $100k in June?")]
+    result = client.match_market("Will Bitcoin close above $100k in July?", poly_markets)
+    assert result is not None
+
+
+def test_match_market_k_suffix_normalised_to_thousands():
+    """$100k and $100,000 should be treated as the same number."""
+    client = PolymarketClient()
+    poly_markets = [_make_gamma_market(id="n3", question="Will Bitcoin close above $100,000?")]
+    result = client.match_market("Will Bitcoin close above $100k?", poly_markets)
+    assert result is not None
+
+
+def test_match_market_allows_match_when_neither_title_has_numbers():
+    """No numbers in either title → numeric guard does not fire."""
+    client = PolymarketClient()
+    poly_markets = [_make_gamma_market(id="n4", question="Will Jerome Powell resign from the Fed?")]
+    result = client.match_market("Will Powell step down as Fed chair?", poly_markets)
+    assert result is not None
+
+
+def test_match_market_stopwords_alone_do_not_match():
+    """Titles sharing only stopwords (will, the, a, in, by) should not match."""
+    client = PolymarketClient()
+    poly_markets = [_make_gamma_market(id="n5", question="Will the deal close by Friday?")]
+    result = client.match_market("Will the Lakers win by Sunday?", poly_markets)
+    assert result is None
+
+
 # --- detect_volume_spike ---
 
 def test_detect_volume_spike_true_when_current_exceeds_2x_average():
