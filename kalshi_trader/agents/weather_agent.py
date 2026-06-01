@@ -148,7 +148,7 @@ _SCHEMAS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation", "wind"]},
+                "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
                 "threshold": {"type": "number"},
                 "operator": {"type": "string", "enum": ["above", "below"]},
                 "forecast": {"type": "object"},
@@ -285,9 +285,9 @@ class WeatherAgent:
             for m in filtered
         ]
 
-    async def _get_noaa_forecast(self, lat: float, lon: float, date_str: str) -> dict:
-        from datetime import date
-        target = date.fromisoformat(date_str)
+    async def _get_noaa_forecast(self, lat: float, lon: float, date: str) -> dict:
+        from datetime import date as date_type
+        target = date_type.fromisoformat(date)
         result = await self._noaa.get_forecast(lat, lon, target)
         age = (datetime.utcnow() - result["generated_at"]).total_seconds() / 60
         return {
