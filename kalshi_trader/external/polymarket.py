@@ -1,31 +1,30 @@
-"""Polymarket Gamma API client.
+"""Polymarket data client.
 
-Provides price signals for Kalshi markets by cross-referencing matching
-Polymarket markets. When Polymarket (larger, more liquid) prices an event
-differently than Kalshi, the gap is a trading edge.
+Two signal layers from the LunarResearcher strategy:
+1. Price comparison (Gamma API) — cross-platform mispricing signal
+2. Whale copy-trading (data-api) — entry signal when top wallets enter
 
-LunarResearcher strategy adaptation:
-- Polymarket prices as probability signal (weight 0.75)
-- Volume-spike detection for exit triggers
-- Title-overlap matching to find the same event across platforms
+Both feed into the Kalshi agent as SignalEstimate / WhaleSignal objects.
 """
 from __future__ import annotations
 
 import json
 import re
 import ssl
+import time
 from datetime import datetime, timezone
 
 import aiohttp
 import truststore
 
-from kalshi_trader.models import SignalEstimate
+from kalshi_trader.models import SignalEstimate, WhaleSignal
 
 def _ssl_context() -> ssl.SSLContext:
     ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     return ctx
 
 _GAMMA_BASE = "https://gamma-api.polymarket.com"
+_DATA_BASE = "https://data-api.polymarket.com"
 _POLYMARKET_WEIGHT = 0.75
 
 _STOPWORDS = frozenset({
@@ -138,6 +137,76 @@ class PolymarketClient:
             return False
         avg = sum(recent_volumes) / len(recent_volumes)
         return current > 2 * avg
+
+    # ------------------------------------------------------------------
+    # Whale copy-trading (data-api.polymarket.com)
+    # ------------------------------------------------------------------
+
+    def detect_whale_entries(
+        self,
+        trades: list[dict],
+        min_size_usd: float = 500.0,
+        lookback_seconds: int = 3600,
+    ) -> list[WhaleSignal]:
+        """Return WhaleSignal for each recent large BUY trade.
+
+        Sells are ignored — we copy entries, not exits.
+        Old trades (beyond lookback_seconds) are ignored — stale signal.
+        """
+        cutoff = time.time() - lookback_seconds
+        signals = []
+        for t in trades:
+            if t.get("side") != "BUY":
+                continue
+            if float(t.get("size", 0)) < min_size_usd:
+                continue
+            if t.get("timestamp", 0) < cutoff:
+                continue
+            side = "NO" if t.get("outcome", "Yes").lower() == "no" else "YES"
+            signals.append(WhaleSignal(
+                wallet_address=t["proxyWallet"],
+                condition_id=t["conditionId"],
+                market_question=t.get("title", ""),
+                side=side,
+                size_usd=float(t["size"]),
+                entry_price=float(t["price"]),
+                timestamp=datetime.fromtimestamp(t["timestamp"], tz=timezone.utc),
+            ))
+        return signals
+
+    def score_wallet_profitability(self, positions: list[dict]) -> float:
+        """Win rate: fraction of positions with positive cash PnL.
+
+        Used to filter out wallets that got lucky on one big trade.
+        Returns 0.0 if no positions.
+        """
+        if not positions:
+            return 0.0
+        wins = sum(1 for p in positions if float(p.get("cashPnl", 0)) > 0)
+        return wins / len(positions)
+
+    async def get_large_trades(
+        self, condition_id: str, min_size_usd: float = 500.0, limit: int = 100
+    ) -> list[dict]:
+        """Fetch recent trades for a market, filtered to large positions only."""
+        params = {"market": condition_id, "limit": str(limit)}
+        connector = aiohttp.TCPConnector(ssl=_ssl_context())
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.get(f"{_DATA_BASE}/trades", params=params) as resp:
+                raw: list[dict] = await resp.json()
+        return [t for t in raw if float(t.get("size", 0)) >= min_size_usd]
+
+    async def get_wallet_positions(self, address: str, limit: int = 100) -> list[dict]:
+        """Fetch current open positions for a wallet address."""
+        params = {"user": address, "limit": str(limit)}
+        connector = aiohttp.TCPConnector(ssl=_ssl_context())
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.get(f"{_DATA_BASE}/positions", params=params) as resp:
+                return await resp.json()
+
+    # ------------------------------------------------------------------
+    # Gamma API
+    # ------------------------------------------------------------------
 
     async def get_markets(self, limit: int = 500) -> list[dict]:
         """Fetch active markets from Polymarket Gamma API."""
