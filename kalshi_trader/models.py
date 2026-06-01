@@ -90,3 +90,13 @@ class RankedSlate:
     ideas: list[tuple[TradeIdea, RiskDecision]]
     generated_at: datetime
     cycle_number: int
+
+
+@dataclass
+class SignalEstimate:
+    source: str
+    probability: float
+    uncertainty: float
+    weight: float
+    data_issued_at: datetime
+    metadata: dict = field(default_factory=dict)
