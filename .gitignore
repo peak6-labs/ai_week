@@ -150,6 +150,9 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Kalshi candle cache (local SQLite, each machine maintains its own)
+kalshi_trader/candle_cache.db
+
 # Secrets / API keys — NEVER commit these
 *.pem
 *.key

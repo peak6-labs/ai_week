@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -57,6 +58,10 @@ class KalshiClient:
         self.base_url = base_url.rstrip("/")
         key_bytes = Path(private_key_path).read_bytes()
         self.private_key = serialization.load_pem_private_key(key_bytes, password=None)
+        self._session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=4, pool_maxsize=64)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
 
     @classmethod
     def from_env(cls, env: str | None = None) -> "KalshiClient":
@@ -99,11 +104,11 @@ class KalshiClient:
     def get(self, endpoint: str, params: dict | None = None) -> dict:
         # The signed path must include the API prefix that follows the host.
         path = "/trade-api/v2" + endpoint
-        resp = requests.get(
+        resp = self._session.get(
             self.base_url + endpoint,
             headers=self._headers("GET", path),
             params=params,
-            timeout=15,
+            timeout=45,
         )
         resp.raise_for_status()
         return resp.json()

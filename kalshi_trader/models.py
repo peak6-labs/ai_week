@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Optional
 
 
 class Side(str, Enum):
@@ -86,6 +87,7 @@ class PortfolioState:
 
 
 @dataclass
+<<<<<<< HEAD
 class SignalEstimate:
     source: str             # e.g. "noaa_gfs", "nws_discussion", "polymarket"
     probability: float      # 0.0–1.0
@@ -97,6 +99,33 @@ class SignalEstimate:
     @property
     def staleness_minutes(self) -> float:
         return (datetime.now(tz=timezone.utc) - self.data_issued_at).total_seconds() / 60
+=======
+class Candle:
+    end_period_ts: int
+    volume: float
+    open_interest: float
+    price_open: Optional[float]     # first trade in period (cents); None = no trades
+    price_high: Optional[float]
+    price_low: Optional[float]
+    price_close: Optional[float]    # last trade in period (cents)
+    price_mean: Optional[float]     # VWAP (cents)
+    price_previous: Optional[float] # prior period's close (cents)
+
+
+@dataclass
+class ScoredMarket:
+    market: Market
+    composite_score: float
+    volume_oi_ratio_score: float
+    relative_historical_volume_score: Optional[float] = None
+    volume_spike_short_term_score: Optional[float] = None
+    oi_change_score: Optional[float] = None
+    momentum_score: Optional[float] = None
+    intraday_hl_score: Optional[float] = None
+    weekly_hl_score: Optional[float] = None
+    ofi_score: Optional[float] = None
+    orderbook_skew_score: Optional[float] = None
+>>>>>>> origin/lle-market-scoring
 
 
 @dataclass

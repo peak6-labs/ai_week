@@ -51,8 +51,19 @@ _SCHEMAS: list[dict] = [
 ]
 
 
+WHALE_SCORERS = ("leaderboard_alltime", "leaderboard_week", "winrate", "harvard")
+
+
 class PolymarketWhaleAgent:
-    def __init__(self, client: PolymarketClient | None = None) -> None:
+    """One instance per scorer key. Run all four in parallel for independent signals."""
+
+    def __init__(
+        self,
+        scorer: str = "leaderboard_alltime",
+        client: PolymarketClient | None = None,
+    ) -> None:
+        assert scorer in WHALE_SCORERS, f"scorer must be one of {WHALE_SCORERS}"
+        self._scorer = scorer
         self._client = client or PolymarketClient()
         system_prompt = (_PROMPTS_DIR / "polymarket_whale.md").read_text()
         self._agent = BaseAgent(
@@ -69,14 +80,18 @@ class PolymarketWhaleAgent:
     async def run(self, ticker: str, title: str) -> list[SignalEstimate]:
         prompt = f"Analyze this Kalshi market:\nticker: {ticker}\ntitle: {title}"
         raw = await self._agent.run(prompt)
-        return self._parse_estimates(raw)
+        estimates = self._parse_estimates(raw)
+        # Tag each estimate with the scorer so the orchestrator can distinguish them
+        for e in estimates:
+            e.source = f"polymarket_whale_{self._scorer}"
+            e.metadata["scorer"] = self._scorer
+        return estimates
 
     def _parse_estimates(self, raw: str) -> list[SignalEstimate]:
         return parse_signal_estimates(raw)
 
     async def _load_whale_targets(self) -> list[str]:
-        # Default to leaderboard_alltime — top 50 by all-time PnL from polymarket-cli
-        return load_whale_targets(scorer="leaderboard_alltime")
+        return load_whale_targets(scorer=self._scorer)
 
     async def _find_polymarket_match(self, kalshi_title: str) -> dict | None:
         # Full paginated market list via Gamma keyset API (38k+ markets)
