@@ -120,8 +120,8 @@ class PolymarketPriceAgent:
         return parse_signal_estimates(raw)
 
     async def _find_polymarket_match(self, kalshi_title: str) -> dict | None:
-        # CLI: fetch live market list
-        markets: list[dict] = _cli(["markets", "list", "--limit", "500"])  # type: ignore[assignment]
+        # Full paginated market list via Gamma keyset API (38k+ markets)
+        markets = await self._client.get_markets()
         result = self._client.match_market_with_score(kalshi_title, markets)
         if result is None:
             return None

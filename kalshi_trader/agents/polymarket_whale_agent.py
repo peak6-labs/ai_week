@@ -1,21 +1,11 @@
 from __future__ import annotations
 import json
-import subprocess
 from pathlib import Path
 from kalshi_trader.models import SignalEstimate
 from kalshi_trader.external.polymarket import PolymarketClient, load_whale_targets
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
 from kalshi_trader.signals.polymarket import build_whale_signal
-
-_CLI = "/tmp/polymarket"
-
-
-def _cli(args: list[str]) -> object:
-    r = subprocess.run([_CLI, "-o", "json"] + args, capture_output=True, text=True, timeout=30)
-    if r.returncode != 0:
-        raise RuntimeError(r.stderr.strip())
-    return json.loads(r.stdout)
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -89,8 +79,8 @@ class PolymarketWhaleAgent:
         return load_whale_targets(scorer="leaderboard_alltime")
 
     async def _find_polymarket_match(self, kalshi_title: str) -> dict | None:
-        # CLI: fetch live market list (same source as price agent)
-        markets: list[dict] = _cli(["markets", "list", "--limit", "500"])  # type: ignore[assignment]
+        # Full paginated market list via Gamma keyset API (38k+ markets)
+        markets = await self._client.get_markets()
         result = self._client.match_market_with_score(kalshi_title, markets)
         if result is None:
             return None
