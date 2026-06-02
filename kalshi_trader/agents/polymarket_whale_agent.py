@@ -83,7 +83,10 @@ class PolymarketWhaleAgent:
         if result is None:
             return None
         market, score = result
-        poly_prob = float(json.loads(market["outcomePrices"])[0])
+        try:
+            poly_prob = float(json.loads(market["outcomePrices"])[0])
+        except (KeyError, json.JSONDecodeError, IndexError, ValueError):
+            return None
         return {
             "condition_id": market["conditionId"],
             "poly_prob": poly_prob,

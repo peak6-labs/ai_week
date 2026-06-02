@@ -98,7 +98,10 @@ class XAgent:
         async with self._semaphore:
             strategy = strategy_cls()
             result = await strategy.run(market_title, self._client)
-        return estimate_to_dict(strategy.to_signal_estimate(result))
+        try:
+            return estimate_to_dict(strategy.to_signal_estimate(result))
+        except Exception:
+            return None
 
     async def _search_x_signal(
         self, ticker: str, category: str, market_title: str
