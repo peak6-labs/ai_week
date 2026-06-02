@@ -181,7 +181,7 @@ All pipeline agents return a `list[SignalEstimate]` JSON block. Empty list is va
 1. Call `search_x_signal(ticker, category, market_title)` — runs all default strategies for the category
 2. **Judgment point A:** If all estimates have `uncertainty > 0.15`, also call `override_x_strategies(ticker, market_title, ["experts", "news"])` for higher-quality signal
 3. **Judgment point B:** If estimates spread > 0.20 (contradictory signals), note in narrative as high-disagreement
-4. Synthesize `sentiment_direction` qualitatively from the actual post summaries and content — this is Claude's judgment, not a threshold rule
+4. Synthesize `sentiment_direction` and `sentiment_reasoning` qualitatively from the actual post summaries and content — this is Claude's judgment, not a threshold rule. The reasoning should explain what specific signals (accounts, themes, volume of posts, expert consensus, etc.) led to the assessment.
 5. Add metadata to each estimate and return the full list — one `SignalEstimate` per strategy that produced a result
 
 **Additional metadata fields:**
@@ -190,6 +190,7 @@ All pipeline agents return a `list[SignalEstimate]` JSON block. Empty list is va
 |-------|------|-------------|
 | `post_count` | `int` | Total relevant posts found across all strategies |
 | `sentiment_direction` | `str` | Claude's qualitative assessment of direction — e.g. `"bullish"`, `"bearish"`, `"mixed"`, `"neutral"` |
+| `sentiment_reasoning` | `str` | Explanation of what drove the sentiment assessment — which signals, accounts, or themes were most influential |
 | `strategies_used` | `str` | Comma-separated names of strategies that ran |
 
 ---
