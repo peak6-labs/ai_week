@@ -110,7 +110,7 @@ _SCHEMAS: list[dict] = [
 ]
 
 
-class OrchestratorAgent:
+class DataOrchestratorAgent:
     """Coordinates all signal agents and produces a ranked trade slate.
 
     Receives pre-collected SignalEstimates per market, synthesizes them
