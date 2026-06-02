@@ -1,11 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
-from kalshi_trader.agents.weather_agent import (
-    _parse_weather_market,
-    _estimate_probability,
-    _combine_signals,
-    _calculate_edge,
-)
+from kalshi_trader.agents.weather_agent import _parse_weather_market
 
 
 @pytest.mark.asyncio
@@ -25,120 +19,30 @@ async def test_parse_weather_market_returns_none_for_unparseable():
     assert result is None
 
 
-@pytest.mark.asyncio
-async def test_estimate_probability_temp_above():
-    # mean=(90+75)/2=82.5, std=(90-75)/4=3.75 → P(X>80) ≈ 0.748
-    forecast = {"temp_high": 90.0, "temp_low": 75.0, "precip_pct": 10, "data_age_minutes": 30}
-    result = await _estimate_probability(
-        metric="temp_high", threshold=80.0, operator="above", forecast=forecast
-    )
-    assert "probability" in result
-    assert 0.6 < result["probability"] < 0.9
-    assert result["source"] == "noaa_gfs"
-    assert "data_issued_at" in result
+def test_parse_estimates_valid_response():
+    from kalshi_trader.agents.weather_agent import WeatherAgent
+    agent = WeatherAgent.__new__(WeatherAgent)
+    raw = '''```json
+[
+  {
+    "source": "noaa_gfs",
+    "probability": 0.73,
+    "uncertainty": 0.08,
+    "weight": 0.85,
+    "data_issued_at": "2026-06-02T10:00:00+00:00",
+    "metadata": {"ticker": "WEATHER-NYC-RAIN", "data_quality": "fresh"}
+  }
+]
+```'''
+    from kalshi_trader.models import SignalEstimate
+    results = agent._parse_estimates(raw)
+    assert len(results) == 1
+    assert isinstance(results[0], SignalEstimate)
+    assert results[0].source == "noaa_gfs"
+    assert results[0].probability == 0.73
 
 
-@pytest.mark.asyncio
-async def test_estimate_probability_precip():
-    forecast = {"temp_high": 75.0, "temp_low": 60.0, "precip_pct": 70, "data_age_minutes": 60}
-    result = await _estimate_probability(
-        metric="precipitation", threshold=0, operator="above", forecast=forecast
-    )
-    assert result["probability"] == pytest.approx(0.70)
-    assert result["uncertainty"] == pytest.approx(0.05)
-
-
-@pytest.mark.asyncio
-async def test_combine_signals_weighted_average():
-    now = datetime.utcnow()
-    estimates = [
-        {
-            "source": "noaa_gfs",
-            "probability": 0.70,
-            "uncertainty": 0.08,
-            "weight": 0.85,
-            "data_issued_at": (now - timedelta(minutes=30)).isoformat(),
-        },
-        {
-            "source": "noaa_gfs_2",
-            "probability": 0.60,
-            "uncertainty": 0.10,
-            "weight": 0.70,
-            "data_issued_at": (now - timedelta(minutes=120)).isoformat(),
-        },
-    ]
-    result = await _combine_signals(estimates=estimates)
-    assert 0.60 < result["combined_probability"] < 0.70
-    assert result["n_sources"] == 2
-    assert "uncertainty" in result
-
-
-@pytest.mark.asyncio
-async def test_combine_signals_single():
-    now = datetime.utcnow()
-    estimates = [{
-        "source": "noaa_gfs",
-        "probability": 0.65,
-        "uncertainty": 0.08,
-        "weight": 0.85,
-        "data_issued_at": (now - timedelta(minutes=10)).isoformat(),
-    }]
-    result = await _combine_signals(estimates=estimates)
-    assert result["combined_probability"] == pytest.approx(0.65, abs=0.01)
-
-
-@pytest.mark.asyncio
-async def test_calculate_edge_worth_trading():
-    result = await _calculate_edge(combined_probability=0.65, market_price_cents=40.0)
-    assert result["edge_cents"] == pytest.approx(25.0)
-    assert result["worth_trading"] is True
-
-
-@pytest.mark.asyncio
-async def test_calculate_edge_not_worth_trading():
-    result = await _calculate_edge(combined_probability=0.42, market_price_cents=40.0)
-    assert result["fee_adjusted_edge"] < 5.0
-    assert result["worth_trading"] is False
-
-
-@pytest.mark.asyncio
-async def test_estimate_probability_temp_below():
-    # mean=77.5, std=3.75 → P(X<80) ≈ 0.748
-    forecast = {"temp_high": 85.0, "temp_low": 70.0, "precip_pct": 10, "data_age_minutes": 30}
-    result = await _estimate_probability(
-        metric="temp_low", threshold=80.0, operator="below", forecast=forecast
-    )
-    assert 0.6 < result["probability"] < 0.9
-    assert result["source"] == "noaa_gfs"
-
-
-@pytest.mark.asyncio
-async def test_combine_signals_disagreement_penalty():
-    now = datetime.utcnow()
-    estimates = [
-        {
-            "source": "a",
-            "probability": 0.80,
-            "uncertainty": 0.08,
-            "weight": 0.85,
-            "data_issued_at": (now - timedelta(minutes=10)).isoformat(),
-        },
-        {
-            "source": "b",
-            "probability": 0.50,
-            "uncertainty": 0.08,
-            "weight": 0.85,
-            "data_issued_at": (now - timedelta(minutes=10)).isoformat(),
-        },
-    ]
-    result = await _combine_signals(estimates=estimates)
-    # spread=0.30 > 0.10 → penalty applied; uncertainty should be > base 0.08
-    assert result["uncertainty"] > 0.08
-
-
-@pytest.mark.asyncio
-async def test_calculate_edge_fee_adjusted():
-    result = await _calculate_edge(combined_probability=0.65, market_price_cents=40.0)
-    # fee = 0.07 * 0.40 * 0.60 * 100 = 1.68
-    expected_fee_adj = 25.0 - 0.07 * 0.40 * 0.60 * 100
-    assert result["fee_adjusted_edge"] == pytest.approx(expected_fee_adj, abs=0.01)
+def test_parse_estimates_empty():
+    from kalshi_trader.agents.weather_agent import WeatherAgent
+    agent = WeatherAgent.__new__(WeatherAgent)
+    assert agent._parse_estimates("```json\n[]\n```") == []
