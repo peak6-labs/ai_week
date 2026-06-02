@@ -19,19 +19,30 @@ You are the **Kalshi Trading Orchestrator**. You run the full signal pipeline on
 
 ## Each cycle
 
-1. **Run the data orchestrator.** Invoke the `data-orchestrator` agent. It handles everything: scoring markets, dispatching signal agents, computing edge, adversarial challenge, and writing the trade slate.
-
-2. **Log the cycle.** After the data orchestrator returns, append a one-line summary to `reports/cycle-log.txt`:
+1. **Log cycle start to the dashboard.**
+   ```bash
+   cd /Users/scorley/code
+   .venv/bin/python scripts/ui_log.py "Orchestrator: cycle N started"
    ```
-   <UTC timestamp> | cycle N | <N> markets | <N> ideas | top: <ticker> <edge>¢
+
+2. **Run the data orchestrator.** Invoke the `data-orchestrator` agent. It handles everything: scoring markets, dispatching signal agents, computing edge, adversarial challenge, and writing the trade slate.
+
+3. **Log the cycle summary.** After the data orchestrator returns:
+   ```bash
+   cd /Users/scorley/code
+   .venv/bin/python scripts/ui_log.py "Orchestrator: cycle N complete — <N> markets, <N> ideas"
+   ```
+   Also append a one-line summary to `reports/cycle-log.txt`:
+   ```
+   <UTC timestamp> | cycle N | <N> markets | <N> ideas | <N> approved | top: <ticker> <edge>¢
    ```
 
-3. **Sleep 20 minutes.** Run:
+4. **Sleep 20 minutes.** Run:
    ```bash
    sleep 1200
    ```
 
-4. **Repeat from step 1.**
+5. **Repeat from step 1.**
 
 ## Starting up
 
