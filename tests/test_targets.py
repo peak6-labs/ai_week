@@ -22,14 +22,14 @@ def test_load_returns_legacy_wallets_key(tmp_path):
 def test_load_named_scorer_key(tmp_path):
     """Named scorer keys take precedence over legacy 'wallets' fallback."""
     p = tmp_path / "targets.json"
-    p.write_text(json.dumps({"winrate": ["0xwr"], "composite": ["0xcp"], "wallets": ["0xlegacy"]}))
+    p.write_text(json.dumps({"winrate": ["0xwr"], "harvard": ["0xhv"], "wallets": ["0xlegacy"]}))
     assert load_whale_targets(scorer="winrate", path=p) == ["0xwr"]
-    assert load_whale_targets(scorer="composite", path=p) == ["0xcp"]
+    assert load_whale_targets(scorer="harvard", path=p) == ["0xhv"]
 
 
 def test_load_empty_scorer_key(tmp_path):
     p = tmp_path / "targets.json"
-    p.write_text(json.dumps({"v1": []}))
+    p.write_text(json.dumps({"winrate": []}))
     assert load_whale_targets(scorer="winrate", path=p) == []
 
 
@@ -44,9 +44,9 @@ def test_save_does_not_overwrite_other_scorer(tmp_path):
     """Saving v2 must not erase the v1 list."""
     p = tmp_path / "targets.json"
     save_whale_targets(["0xv1"], scorer="winrate", path=p)
-    save_whale_targets(["0xv2"], scorer="composite", path=p)
+    save_whale_targets(["0xv2"], scorer="harvard", path=p)
     assert load_whale_targets(scorer="winrate", path=p) == ["0xv1"]
-    assert load_whale_targets(scorer="composite", path=p) == ["0xv2"]
+    assert load_whale_targets(scorer="harvard", path=p) == ["0xv2"]
 
 
 def test_save_creates_parent_dir(tmp_path):
@@ -57,11 +57,11 @@ def test_save_creates_parent_dir(tmp_path):
 
 def test_save_preserves_comment_field(tmp_path):
     p = tmp_path / "targets.json"
-    p.write_text(json.dumps({"_comment": "keep me", "v1": []}))
+    p.write_text(json.dumps({"_comment": "keep me", "winrate": []}))
     save_whale_targets(["0xnew"], scorer="winrate", path=p)
     data = json.loads(p.read_text())
     assert data["_comment"] == "keep me"
-    assert data["v1"] == ["0xnew"]
+    assert data["winrate"] == ["0xnew"]
 
 
 def test_default_targets_file_is_loadable():

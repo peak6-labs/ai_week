@@ -8,7 +8,7 @@ Usage:
     WHALE_SCORER_V2=true python -m kalshi_trader.refresh_targets
 
 Both commands save under separate keys so neither overwrites the other.
-Load with: load_whale_targets(scorer="winrate") or scorer="composite".
+Load with: load_whale_targets(scorer="winrate") or scorer="harvard".
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from kalshi_trader.external.polymarket import (
 
 
 async def _run(min_score: float, top_n: int) -> None:
-    scorer_key = "composite" if config.WHALE_SCORER_V2 else "winrate"
+    scorer_key = "harvard" if config.WHALE_SCORER_V2 else "winrate"
     print(
         f"Scanning Polymarket for top-{top_n} wallets "
         f"(scorer={scorer_key}, min_score={min_score})…"
