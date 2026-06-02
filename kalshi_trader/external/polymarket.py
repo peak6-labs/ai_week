@@ -9,6 +9,7 @@ Both feed into the Kalshi agent as SignalEstimate / WhaleSignal objects.
 from __future__ import annotations
 
 import asyncio
+import csv
 import json
 import re
 import ssl
@@ -23,6 +24,37 @@ _TARGETS_DEFAULT = Path(__file__).parent.parent / "data" / "targets.json"
 
 # SSL context created once per process — truststore.SSLContext is expensive to construct
 _SSL_CTX: ssl.SSLContext | None = None
+
+# In-process cache of active markets from CSV — 4 columns only, ~5-10MB.
+# Loaded once on first use; falls back to live API if file absent.
+_MARKETS_CSV_CACHE: list[dict] | None = None
+_CSV_KEEP = {"question", "conditionId", "clobTokenIds", "outcomePrices"}
+
+
+def _load_markets_csv() -> list[dict]:
+    """Return active markets from the local CSV, keeping only matching-relevant columns.
+
+    Cached after first call. Returns empty list if the CSV path is not configured
+    or the file doesn't exist yet — callers should fall back to get_markets().
+    """
+    global _MARKETS_CSV_CACHE
+    if _MARKETS_CSV_CACHE is not None:
+        return _MARKETS_CSV_CACHE
+
+    from kalshi_trader import config
+    csv_path = Path(config.POLYMARKET_MARKETS_CSV)
+    if not csv_path.exists():
+        _MARKETS_CSV_CACHE = []
+        return _MARKETS_CSV_CACHE
+
+    markets: list[dict] = []
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row.get("active") == "True" and row.get("closed") != "True":
+                markets.append({k: row[k] for k in _CSV_KEEP if k in row})
+
+    _MARKETS_CSV_CACHE = markets
+    return markets
 
 
 def load_whale_targets(
@@ -358,6 +390,17 @@ class PolymarketClient:
             if not cursor or not batch:
                 break
         return markets
+
+    async def get_markets_cached(self) -> list[dict]:
+        """Return active markets from the local CSV cache, falling back to live API.
+
+        Use this instead of get_markets() in per-market agent calls — the CSV
+        avoids ~77 paginated Gamma API requests per invocation.
+        """
+        cached = _load_markets_csv()
+        if cached:
+            return cached
+        return await self.get_markets()
 
     async def bootstrap_whale_targets(
         self,

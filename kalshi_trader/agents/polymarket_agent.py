@@ -37,7 +37,7 @@ class PolymarketAgent:
         max_conf = cfg.get("poly_max_confidence")
         gap_scale = cfg.get("poly_gap_scale")
 
-        poly_markets = await self._client.get_markets()
+        poly_markets = await self._client.get_markets_cached()
         ideas: list[TradeIdea] = []
 
         for km in markets:

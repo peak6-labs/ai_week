@@ -122,7 +122,7 @@ class PolymarketPriceAgent:
 
     async def _find_polymarket_match(self, kalshi_title: str) -> dict | None:
         # Full paginated market list via Gamma keyset API (38k+ markets)
-        markets = await self._client.get_markets()
+        markets = await self._client.get_markets_cached()
         result = self._client.match_market_with_score(kalshi_title, markets)
         if result is None:
             return None
