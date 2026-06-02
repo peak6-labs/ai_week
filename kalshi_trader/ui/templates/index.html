@@ -1647,6 +1647,7 @@ function renderPendingIdeas(ideas) {
         <span class="idea-agent">${escHtml(idea.agent_id ?? '')}</span>
       </div>
       <div class="idea-card-body">
+        ${idea.selection_summary ? `<div class="idea-selection-summary">${escHtml(idea.selection_summary)}</div>` : ''}
         <div class="idea-reasoning">${escHtml(idea.reasoning ?? '')}</div>
         ${sources ? `<div class="idea-signals">${sources}</div>` : ''}
         ${marketPrice ? `<div class="idea-market-price">${escHtml(marketPrice)}</div>` : ''}
