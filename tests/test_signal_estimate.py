@@ -1,9 +1,9 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from kalshi_trader.models import SignalEstimate
 
 
 def test_staleness_minutes_is_dynamic():
-    issued = datetime.utcnow() - timedelta(minutes=30)
+    issued = datetime.now(tz=timezone.utc) - timedelta(minutes=30)
     est = SignalEstimate(
         source="noaa_gfs",
         probability=0.65,
@@ -16,7 +16,7 @@ def test_staleness_minutes_is_dynamic():
 
 
 def test_staleness_increases_over_time():
-    issued = datetime.utcnow() - timedelta(minutes=60)
+    issued = datetime.now(tz=timezone.utc) - timedelta(minutes=60)
     est = SignalEstimate(
         source="noaa_gfs",
         probability=0.65,
