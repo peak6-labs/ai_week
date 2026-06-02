@@ -233,13 +233,27 @@ class SnapshotStore:
         batches = [tickers[i:i + self.BATCH_SIZE] for i in range(0, len(tickers), self.BATCH_SIZE)]
         _log.info("Fetching %s candles in %d parallel batches...", label, len(batches))
 
+        sem = asyncio.Semaphore(8)
+
         async def _fetch_one(batch: list[str], batch_num: int) -> dict[str, list[Candle]]:
             _log.debug("Fetching %s batch %d/%d (%d tickers)", label, batch_num, len(batches), len(batch))
-            try:
-                resp = await client.get_market_candlesticks_batch(batch, start_ts, now, period)
-            except Exception as exc:
-                _log.warning("%s batch %d/%d failed: %s", label, batch_num, len(batches), exc)
-                return {}
+            async with sem:
+                for attempt in range(4):
+                    try:
+                        resp = await client.get_market_candlesticks_batch(batch, start_ts, now, period)
+                        break
+                    except Exception as exc:
+                        status = getattr(getattr(exc, "response", None), "status_code", None)
+                        if status == 429:
+                            wait = 2 ** attempt
+                            _log.debug("%s batch %d/%d: 429, retrying in %ds", label, batch_num, len(batches), wait)
+                            await asyncio.sleep(wait)
+                        else:
+                            _log.warning("%s batch %d/%d failed: %s", label, batch_num, len(batches), exc)
+                            return {}
+                else:
+                    _log.warning("%s batch %d/%d: giving up after retries", label, batch_num, len(batches))
+                    return {}
             by_ticker: dict[str, list[Candle]] = defaultdict(list)
             for entry in (resp.get("candles") or []):
                 ticker = entry.get("market_ticker") or entry.get("ticker", "")

@@ -61,6 +61,20 @@ class KalshiClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def get_series(self) -> list[dict]:
+        """Return all series objects (ticker + category)."""
+        resp = await self.get("/series")
+        return resp.get("series") or []
+
+    async def get_events(self, status: str = "open", cursor: str = "",
+                         limit: int = 200, **kwargs) -> dict:
+        params: dict[str, Any] = {"status": status, "limit": limit,
+                                   "with_nested_markets": "true"}
+        if cursor:
+            params["cursor"] = cursor
+        params.update(kwargs)
+        return await self.get("/events", params=params)
+
     async def get_markets(self, status: str = "open", cursor: str = "",
                           limit: int = 1000, **kwargs) -> dict:
         params: dict[str, Any] = {"status": status, "limit": limit}

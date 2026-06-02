@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -58,6 +59,9 @@ class KalshiClient:
         key_bytes = Path(private_key_path).read_bytes()
         self.private_key = serialization.load_pem_private_key(key_bytes, password=None)
         self._session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=4, pool_maxsize=64)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
 
     @classmethod
     def from_env(cls, env: str | None = None) -> "KalshiClient":
