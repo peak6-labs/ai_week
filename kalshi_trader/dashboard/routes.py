@@ -19,8 +19,8 @@ from fastapi import APIRouter, Request
 
 from kalshi_trader.dashboard import portfolio_mapping
 from kalshi_trader.dashboard.state import DashboardState
-from kalshi_trader.models import Market, ScoredMarket
-from kalshi_trader.web_links import kalshi_market_url
+from kalshi_trader.grouping import serialize_event_group
+from kalshi_trader.models import Market
 
 _log = logging.getLogger(__name__)
 
@@ -76,43 +76,6 @@ async def _resolve_markets(state: DashboardState, tickers: list[str]) -> dict[st
     return lookup
 
 
-def _serialize_signals(scored_market: ScoredMarket) -> dict:
-    return {
-        "volume_oi_ratio": scored_market.volume_oi_ratio_score,
-        "relative_historical_volume": scored_market.relative_historical_volume_score,
-        "volume_spike_short_term": scored_market.volume_spike_short_term_score,
-        "oi_change": scored_market.oi_change_score,
-        "momentum": scored_market.momentum_score,
-        "intraday_hl": scored_market.intraday_hl_score,
-        "weekly_hl": scored_market.weekly_hl_score,
-        "ofi": scored_market.ofi_score,
-        "orderbook_skew": scored_market.orderbook_skew_score,
-    }
-
-
-def _serialize_idea(average_score: float, market_count: int, best_market: ScoredMarket) -> dict:
-    market = best_market.market
-    return {
-        "event_ticker": market.event_ticker or market.ticker,
-        "avg_score": round(average_score, 3),
-        "market_count": market_count,
-        "best_market": {
-            "ticker": market.ticker,
-            "title": market.title,
-            "category": market.category,
-            "composite_score": round(best_market.composite_score, 3),
-            "yes_bid_cents": market.yes_bid,
-            "yes_ask_cents": market.yes_ask,
-            "last_price_cents": market.last_price,
-            "volume_24h": market.volume_24h,
-            "open_interest": market.open_interest,
-            "close_time": market.close_time.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "signals": _serialize_signals(best_market),
-            "kalshi_url": kalshi_market_url(market.ticker),
-        },
-    }
-
-
 @router.get("/health")
 async def health(request: Request) -> dict:
     state = _state(request)
@@ -146,7 +109,7 @@ async def ideas(request: Request, top: int = 10) -> dict:
         ),
         "age_seconds": _age_seconds(state.scored_slate_generated_at),
         "ideas": [
-            _serialize_idea(average_score, market_count, best_market)
+            serialize_event_group(average_score, market_count, best_market)
             for average_score, market_count, best_market in grouped[:max(top, 0)]
         ],
     }
