@@ -9,6 +9,7 @@ Usage:
 import argparse
 import asyncio
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from kalshi_trader.actionability import MarketScorer, SnapshotStore
@@ -17,8 +18,8 @@ from kalshi_trader.models import ScoredMarket
 from kalshi_trader.scanner import MarketScanner
 
 
-def _fmt(score_value: float | None) -> str:
-    return f"{score_value:.2f}" if score_value is not None else "  -- "
+def _fmt(signal_value: float | None) -> str:
+    return f"{signal_value:.2f}" if signal_value is not None else "  -- "
 
 
 def _coverage(scored_market: ScoredMarket) -> float:
@@ -50,6 +51,21 @@ def _print_debug_block(scored_market: ScoredMarket, rank: int) -> None:
     )
 
 
+def _group_by_event(ranked: list[ScoredMarket]) -> list[tuple[float, int, ScoredMarket]]:
+    """Group markets by event_ticker, average scores. Returns (avg_score, market_count, best_market)."""
+    groups: dict[str, list[ScoredMarket]] = defaultdict(list)
+    for scored_market in ranked:
+        event_key = scored_market.market.event_ticker or scored_market.market.ticker
+        groups[event_key].append(scored_market)
+    result = []
+    for event_markets in groups.values():
+        avg_score = sum(scored_market.composite_score for scored_market in event_markets) / len(event_markets)
+        best_market = max(event_markets, key=lambda s: s.composite_score)
+        result.append((avg_score, len(event_markets), best_market))
+    result.sort(key=lambda x: x[0], reverse=True)
+    return result
+
+
 async def run(top: int, category: str | None, markets_file: str | None, debug: bool) -> None:
     client  = KalshiClient()
     scanner = MarketScanner(client)
@@ -60,32 +76,35 @@ async def run(top: int, category: str | None, markets_file: str | None, debug: b
         scorer, store, category=category, markets_file=markets_file
     )
 
+    grouped = _group_by_event(ranked)
+
     header = (
-        f"{'TICKER':<42} {'SCORE':>5}  "
+        f"{'EVENT':<42} {'AVG':>5}  {'N':>2}  "
         f"{'OI%':>5}  {'HIST':>5}  {'SPIKE':>5}  "
         f"{'MOM':>5}  {'OFI':>5}  TITLE"
     )
     print(f"\n{header}")
-    print("-" * 115)
+    print("-" * 120)
 
-    for scored_market in ranked[:top]:
+    for avg_score, count, best in grouped[:top]:
         print(
-            f"{scored_market.market.ticker:<42} "
-            f"{scored_market.composite_score:>5.3f}  "
-            f"{_fmt(scored_market.volume_oi_ratio_score):>5}  "
-            f"{_fmt(scored_market.relative_historical_volume_score):>5}  "
-            f"{_fmt(scored_market.volume_spike_short_term_score):>5}  "
-            f"{_fmt(scored_market.momentum_score):>5}  "
-            f"{_fmt(scored_market.ofi_score):>5}  "
-            f"{scored_market.market.title[:55]}"
+            f"{best.market.event_ticker or best.market.ticker:<42} "
+            f"{avg_score:>5.3f}  {count:>2}  "
+            f"{_fmt(best.volume_oi_ratio_score):>5}  "
+            f"{_fmt(best.relative_historical_volume_score):>5}  "
+            f"{_fmt(best.volume_spike_short_term_score):>5}  "
+            f"{_fmt(best.momentum_score):>5}  "
+            f"{_fmt(best.ofi_score):>5}  "
+            f"{best.market.title[:50]}"
         )
 
-    print(f"\n{len(ranked)} markets scored total. Top {min(top, len(ranked))} shown.")
+    unique_events = len(grouped)
+    print(f"\n{len(ranked)} markets → {unique_events} events. Top {min(top, unique_events)} shown.")
 
     if debug:
-        print("\n\n=== DEBUG: full signal breakdown ===")
-        for rank_index, scored_market in enumerate(ranked[:top], 1):
-            _print_debug_block(scored_market, rank_index)
+        print("\n\n=== DEBUG: full signal breakdown (best market per event) ===")
+        for rank_index, (_, _, best) in enumerate(grouped[:top], 1):
+            _print_debug_block(best, rank_index)
 
 
 if __name__ == "__main__":
