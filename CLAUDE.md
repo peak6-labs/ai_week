@@ -43,10 +43,6 @@ Single-letter lambda parameters in `sorted()` / `.sort()` calls are acceptable P
 
 ## Referring to Markets
 
-Whenever you refer to a specific Kalshi market in a response, include a clickable markdown link to the market page using the ticker as the link text. Use the URL format:
+When referring to a specific Kalshi market ticker in a response, format it in backticks: `KXELEC-PRES-2028`. Do not attempt to construct clickable *deep* links — the full Kalshi URL is `kalshi.com/markets/<series_ticker>/<series_slug>/<event_ticker>`, and the middle slug is a human-readable string that cannot be derived from the ticker alone.
 
-```
-[TICKER](https://kalshi.com/markets/TICKER)
-```
-
-Example: [KXELEC-PRES-2028](https://kalshi.com/markets/KXELEC-PRES-2028)
+The one safe exception (verified by probing kalshi.com): `https://kalshi.com/markets/<series_ticker lowercased>` always resolves — the site redirects to the full canonical, filling in the slug and featured event itself. An event or market ticker used as a single path segment does NOT resolve. Build this link with the `kalshi_market_url(ticker)` helper in [kalshi_trader/web_links.py](kalshi_trader/web_links.py), which reduces any ticker to its series prefix; do not hand-assemble URLs elsewhere.
