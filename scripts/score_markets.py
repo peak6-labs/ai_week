@@ -17,36 +17,36 @@ from kalshi_trader.models import ScoredMarket
 from kalshi_trader.scanner import MarketScanner
 
 
-def _fmt(val: float | None) -> str:
-    return f"{val:.2f}" if val is not None else "  -- "
+def _fmt(score_value: float | None) -> str:
+    return f"{score_value:.2f}" if score_value is not None else "  -- "
 
 
-def _coverage(s: ScoredMarket) -> float:
+def _coverage(scored_market: ScoredMarket) -> float:
     """Fraction of total weight that actually contributed to the composite."""
     weights = MarketScorer.WEIGHTS
     present = sum(
-        w for key, w in weights.items()
-        if MarketScorer._scores_dict(s).get(key) is not None
+        weight for signal_name, weight in weights.items()
+        if MarketScorer._scores_dict(scored_market).get(signal_name) is not None
     )
     return present / sum(weights.values()) * 100
 
 
-def _print_debug_block(s: ScoredMarket, rank: int) -> None:
-    cov = _coverage(s)
+def _print_debug_block(scored_market: ScoredMarket, rank: int) -> None:
+    signal_coverage = _coverage(scored_market)
     print(
-        f"\n#{rank:>2}  {s.market.ticker}  score={s.composite_score:.3f}  "
-        f"cov={cov:.0f}%  [{s.market.title[:60]}]"
+        f"\n#{rank:>2}  {scored_market.market.ticker}  score={scored_market.composite_score:.3f}  "
+        f"cov={signal_coverage:.0f}%  [{scored_market.market.title[:60]}]"
     )
     print(
-        f"     OI%={_fmt(s.volume_oi_ratio_score)}"
-        f"  HIST={_fmt(s.relative_historical_volume_score)}"
-        f"  SPIKE={_fmt(s.volume_spike_short_term_score)}"
-        f"  MOM={_fmt(s.momentum_score)}"
-        f"  OI-Δ={_fmt(s.oi_change_score)}"
-        f"  IH-HL={_fmt(s.intraday_hl_score)}"
-        f"  WK-HL={_fmt(s.weekly_hl_score)}"
-        f"  OFI={_fmt(s.ofi_score)}"
-        f"  SKEW={_fmt(s.orderbook_skew_score)}"
+        f"     OI%={_fmt(scored_market.volume_oi_ratio_score)}"
+        f"  HIST={_fmt(scored_market.relative_historical_volume_score)}"
+        f"  SPIKE={_fmt(scored_market.volume_spike_short_term_score)}"
+        f"  MOM={_fmt(scored_market.momentum_score)}"
+        f"  OI-Δ={_fmt(scored_market.oi_change_score)}"
+        f"  IH-HL={_fmt(scored_market.intraday_hl_score)}"
+        f"  WK-HL={_fmt(scored_market.weekly_hl_score)}"
+        f"  OFI={_fmt(scored_market.ofi_score)}"
+        f"  SKEW={_fmt(scored_market.orderbook_skew_score)}"
     )
 
 
@@ -68,24 +68,24 @@ async def run(top: int, category: str | None, markets_file: str | None, debug: b
     print(f"\n{header}")
     print("-" * 115)
 
-    for s in ranked[:top]:
+    for scored_market in ranked[:top]:
         print(
-            f"{s.market.ticker:<42} "
-            f"{s.composite_score:>5.3f}  "
-            f"{_fmt(s.volume_oi_ratio_score):>5}  "
-            f"{_fmt(s.relative_historical_volume_score):>5}  "
-            f"{_fmt(s.volume_spike_short_term_score):>5}  "
-            f"{_fmt(s.momentum_score):>5}  "
-            f"{_fmt(s.ofi_score):>5}  "
-            f"{s.market.title[:55]}"
+            f"{scored_market.market.ticker:<42} "
+            f"{scored_market.composite_score:>5.3f}  "
+            f"{_fmt(scored_market.volume_oi_ratio_score):>5}  "
+            f"{_fmt(scored_market.relative_historical_volume_score):>5}  "
+            f"{_fmt(scored_market.volume_spike_short_term_score):>5}  "
+            f"{_fmt(scored_market.momentum_score):>5}  "
+            f"{_fmt(scored_market.ofi_score):>5}  "
+            f"{scored_market.market.title[:55]}"
         )
 
     print(f"\n{len(ranked)} markets scored total. Top {min(top, len(ranked))} shown.")
 
     if debug:
         print("\n\n=== DEBUG: full signal breakdown ===")
-        for i, s in enumerate(ranked[:top], 1):
-            _print_debug_block(s, i)
+        for rank_index, scored_market in enumerate(ranked[:top], 1):
+            _print_debug_block(scored_market, rank_index)
 
 
 if __name__ == "__main__":

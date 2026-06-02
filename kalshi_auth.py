@@ -41,15 +41,15 @@ BASE_URLS = {
 def _load_dotenv(path: str = ".env") -> None:
     """Minimal .env loader (no external dependency). Does not overwrite vars
     already set in the real environment."""
-    p = Path(path)
-    if not p.exists():
+    dotenv_path = Path(path)
+    if not dotenv_path.exists():
         return
-    for line in p.read_text().splitlines():
+    for line in dotenv_path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+        variable_name, _, variable_value = line.partition("=")
+        os.environ.setdefault(variable_name.strip(), variable_value.strip())
 
 
 class KalshiClient:
@@ -104,14 +104,14 @@ class KalshiClient:
     def get(self, endpoint: str, params: dict | None = None) -> dict:
         # The signed path must include the API prefix that follows the host.
         path = "/trade-api/v2" + endpoint
-        resp = self._session.get(
+        http_response = self._session.get(
             self.base_url + endpoint,
             headers=self._headers("GET", path),
             params=params,
             timeout=45,
         )
-        resp.raise_for_status()
-        return resp.json()
+        http_response.raise_for_status()
+        return http_response.json()
 
 
 if __name__ == "__main__":

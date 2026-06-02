@@ -24,6 +24,21 @@ SCORED_CATEGORIES: frozenset[str] = frozenset({
     "science and technology",
 })
 
+# Ticker prefixes for US-listed equity markets. Blocked unconditionally —
+# even when a --category override is passed — because equity markets require
+# separate regulatory treatment.
+BLOCKED_EQUITY_PREFIXES: tuple[str, ...] = (
+    "KXINX",            # S&P 500 intraday/daily
+    "KXNASDAQ",         # Nasdaq 100 intraday/daily/positional
+    "KXNDQ",            # Nasdaq short-form (e.g. KXNDQDIRY)
+    "KXEARNINGSM",      # Earnings-call mention markets (individual stocks)
+    "KXSNAP",           # Snap Inc.
+    "KXCMG",            # Chipotle Mexican Grill
+    "KXPM-",            # Philip Morris
+    "KXBA-",            # Boeing
+    "KXSTOCKBAN",       # Stock ban/delist markets
+)
+
 
 def filter_markets(
     markets: list[Market],
@@ -31,12 +46,16 @@ def filter_markets(
     now_dt: datetime,
 ) -> list[Market]:
     """Apply the standard pipeline filters (close_time, category, OI/vol)."""
-    markets = [m for m in markets if m.close_time > now_dt]
+    markets = [market for market in markets if market.close_time > now_dt]
     if category:
-        markets = [m for m in markets if m.category == category.lower()]
+        markets = [market for market in markets if market.category == category.lower()]
     else:
-        markets = [m for m in markets if m.category in SCORED_CATEGORIES]
-    markets = [m for m in markets if m.open_interest >= 100 and m.volume_24h >= 10]
+        markets = [market for market in markets if market.category in SCORED_CATEGORIES]
+    markets = [
+        market for market in markets
+        if not market.ticker.startswith(BLOCKED_EQUITY_PREFIXES)
+    ]
+    markets = [market for market in markets if market.open_interest >= 100 and market.volume_24h >= 10]
     return markets
 
 
@@ -56,8 +75,8 @@ class MarketScanner:
             resp = await self._client.get_markets(status="open", cursor=cursor, limit=1000)
             page += 1
             batch = resp.get("markets", [])
-            for m in batch:
-                markets.append(self._parse_market(m))
+            for market_data in batch:
+                markets.append(self._parse_market(market_data))
             cursor = resp.get("cursor", "")
             _log.info("Page %d: %d this page, %d total so far%s",
                       page, len(batch), len(markets),
@@ -69,13 +88,13 @@ class MarketScanner:
                 _log.info("Reached --limit %d, stopping early", limit)
                 break
         if category:
-            markets = [m for m in markets if m.category == category]
+            markets = [market for market in markets if market.category == category]
         return markets
 
     async def get_market_with_orderbook(self, ticker: str) -> tuple[Market, dict]:
-        market_resp = await self._client.get_market(ticker)
-        ob_resp = await self._client.get_orderbook(ticker)
-        return self._parse_market(market_resp["market"]), ob_resp.get("orderbook", {})
+        market_response = await self._client.get_market(ticker)
+        orderbook_response = await self._client.get_orderbook(ticker)
+        return self._parse_market(market_response["market"]), orderbook_response.get("orderbook", {})
 
     async def enrich_categories(self, markets: list[Market]) -> None:
         """Fetch category for each market from the events endpoint and set it in-place.
@@ -84,29 +103,29 @@ class MarketScanner:
         endpoint has the correct category. Fetches unique event_tickers in parallel
         and normalises to lowercase to match SCORED_CATEGORIES.
         """
-        event_tickers = list({m.event_ticker for m in markets if m.event_ticker})
+        event_tickers = list({market.event_ticker for market in markets if market.event_ticker})
         if not event_tickers:
             return
 
         _log.info("Fetching categories for %d unique events...", len(event_tickers))
-        sem = asyncio.Semaphore(20)
+        concurrency_semaphore = asyncio.Semaphore(20)
 
-        async def _fetch(et: str) -> tuple[str, str]:
-            async with sem:
+        async def _fetch(event_ticker: str) -> tuple[str, str]:
+            async with concurrency_semaphore:
                 try:
-                    resp = await self._client.get(f"/events/{et}", {})
-                    cat = resp.get("event", {}).get("category", "") or ""
-                    return et, cat.lower()
+                    resp = await self._client.get(f"/events/{event_ticker}", {})
+                    category = resp.get("event", {}).get("category", "") or ""
+                    return event_ticker, category.lower()
                 except Exception:
-                    return et, "unknown"
+                    return event_ticker, "unknown"
 
-        pairs = await asyncio.gather(*[_fetch(et) for et in event_tickers])
+        pairs = await asyncio.gather(*[_fetch(event_ticker) for event_ticker in event_tickers])
         category_map = dict(pairs)
 
-        for m in markets:
-            cat = category_map.get(m.event_ticker, "")
-            if cat:
-                m.category = cat
+        for market in markets:
+            category = category_map.get(market.event_ticker, "")
+            if category:
+                market.category = category
 
         _log.info("Category enrichment complete")
 
@@ -135,9 +154,9 @@ class MarketScanner:
 
         if markets_file is not None:
             _log.info("Loading markets from snapshot: %s", markets_file)
-            raw = load_snapshot(markets_file, now_dt)
-            _log.info("Loaded %d non-expired markets from snapshot", len(raw))
-            markets = filter_markets(raw, category, now_dt)
+            snapshot_markets = load_snapshot(markets_file, now_dt)
+            _log.info("Loaded %d non-expired markets from snapshot", len(snapshot_markets))
+            markets = filter_markets(snapshot_markets, category, now_dt)
         else:
             _log.info("Fetching all open markets...")
             markets = await self.get_open_markets()
@@ -146,7 +165,7 @@ class MarketScanner:
             _log.info("After filters: %d markets", len(markets))
 
         _log.info("Scoring %d active markets after filters", len(markets))
-        all_tickers = [m.ticker for m in markets]
+        all_tickers = [market.ticker for market in markets]
 
         _log.info("Checking candle cache for %d tickers...", len(all_tickers))
         await store.refresh_stale(all_tickers, self._client, now)
@@ -154,35 +173,35 @@ class MarketScanner:
         _log.info("Scoring all markets from cache...")
         scored = scorer.score_all(markets, store)
 
-        top_trade_tickers = [s.market.ticker for s in scored[:trade_top_n]]
-        top_ob_tickers = [s.market.ticker for s in scored[:orderbook_top_n]]
+        top_trade_tickers = [scored_market.market.ticker for scored_market in scored[:trade_top_n]]
+        top_ob_tickers = [scored_market.market.ticker for scored_market in scored[:orderbook_top_n]]
 
         _log.info(
             "Fetching live trades for top %d markets and orderbooks for top %d...",
             len(top_trade_tickers), len(top_ob_tickers),
         )
-        live_sem = asyncio.Semaphore(10)
+        live_semaphore = asyncio.Semaphore(10)
 
         async def _get_trades(ticker):
-            async with live_sem:
+            async with live_semaphore:
                 return await with_retry(self._client.get_trades, ticker, min_ts=now - 7200)
 
         async def _get_orderbook(ticker):
-            async with live_sem:
+            async with live_semaphore:
                 return await with_retry(self._client.get_orderbook, ticker)
 
-        trade_responses, ob_responses = await asyncio.gather(
-            asyncio.gather(*[_get_trades(t) for t in top_trade_tickers]),
-            asyncio.gather(*[_get_orderbook(t) for t in top_ob_tickers]),
+        trade_responses, orderbook_responses = await asyncio.gather(
+            asyncio.gather(*[_get_trades(ticker) for ticker in top_trade_tickers]),
+            asyncio.gather(*[_get_orderbook(ticker) for ticker in top_ob_tickers]),
         )
 
         trade_data = {
-            t: (r.get("trades") or [])
-            for t, r in zip(top_trade_tickers, trade_responses)
+            ticker: (response.get("trades") or [])
+            for ticker, response in zip(top_trade_tickers, trade_responses)
         }
         orderbook_data = {
-            t: (r.get("orderbook") or {})
-            for t, r in zip(top_ob_tickers, ob_responses)
+            ticker: (response.get("orderbook") or {})
+            for ticker, response in zip(top_ob_tickers, orderbook_responses)
         }
 
         _log.info("Enriching with live signals and finalising ranking...")
@@ -193,33 +212,33 @@ class MarketScanner:
             _log.warning("Scoring complete — no markets passed filters")
         return result
 
-    def _parse_market(self, m: dict) -> Market:
-        raw_close = m.get("close_time", "")
+    def _parse_market(self, market_data: dict) -> Market:
+        raw_close = market_data.get("close_time", "")
         if isinstance(raw_close, str) and raw_close:
             try:
-                dt = datetime.fromisoformat(raw_close.replace("Z", "+00:00"))
+                close_datetime = datetime.fromisoformat(raw_close.replace("Z", "+00:00"))
             except ValueError:
-                dt = datetime.now(timezone.utc)
+                close_datetime = datetime.now(timezone.utc)
         else:
-            dt = datetime.now(timezone.utc)
+            close_datetime = datetime.now(timezone.utc)
 
         # /markets API uses cents integers; /events nested markets use dollar floats.
         def _cents(key_cents: str, key_dollars: str) -> float:
-            if m.get(key_cents) is not None:
-                return float(m[key_cents])
-            return float(m.get(key_dollars) or 0) * 100
+            if market_data.get(key_cents) is not None:
+                return float(market_data[key_cents])
+            return float(market_data.get(key_dollars) or 0) * 100
 
         return Market(
-            ticker=m.get("ticker", ""),
-            event_ticker=m.get("event_ticker", ""),
-            series_ticker=m.get("series_ticker", ""),
-            title=m.get("title", ""),
+            ticker=market_data.get("ticker", ""),
+            event_ticker=market_data.get("event_ticker", ""),
+            series_ticker=market_data.get("series_ticker", ""),
+            title=market_data.get("title", ""),
             yes_bid=_cents("yes_bid", "yes_bid_dollars"),
             yes_ask=_cents("yes_ask", "yes_ask_dollars"),
             last_price=_cents("last_price", "last_price_dollars"),
-            volume_24h=int(float(m.get("volume") or m.get("volume_24h_fp") or 0)),
-            open_interest=int(float(m.get("open_interest") or m.get("open_interest_fp") or 0)),
-            category=(m.get("category") or m.get("series_ticker") or "unknown").lower(),
-            close_time=dt,
-            status=m.get("status", "open"),
+            volume_24h=int(float(market_data.get("volume") or market_data.get("volume_24h_fp") or 0)),
+            open_interest=int(float(market_data.get("open_interest") or market_data.get("open_interest_fp") or 0)),
+            category=(market_data.get("category") or market_data.get("series_ticker") or "unknown").lower(),
+            close_time=close_datetime,
+            status=market_data.get("status", "open"),
         )

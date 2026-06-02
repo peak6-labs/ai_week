@@ -2,13 +2,13 @@ from __future__ import annotations
 import asyncio
 
 
-async def with_retry(coro_fn, *args, attempts: int = 4, **kwargs):
-    """Call coro_fn(*args, **kwargs), retrying on HTTP 429 with exponential backoff."""
+async def with_retry(coroutine_function, *args, attempts: int = 4, **kwargs):
+    """Call coroutine_function(*args, **kwargs), retrying on HTTP 429 with exponential backoff."""
     for attempt in range(attempts):
         try:
-            return await coro_fn(*args, **kwargs)
-        except Exception as exc:
-            status = getattr(getattr(exc, "response", None), "status_code", None)
+            return await coroutine_function(*args, **kwargs)
+        except Exception as caught_exception:
+            status = getattr(getattr(caught_exception, "response", None), "status_code", None)
             if status == 429:
                 await asyncio.sleep(2 ** attempt)
             else:

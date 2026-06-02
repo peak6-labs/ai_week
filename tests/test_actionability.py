@@ -42,15 +42,15 @@ def _market(
 
 
 def _candle(
-    ts: int = 0,
+    timestamp_seconds: int = 0,
     volume: float = 100.0,
-    oi: float = 500.0,
+    open_interest: float = 500.0,
     price_close: float | None = 50.0,
 ) -> Candle:
     return Candle(
-        end_period_ts=ts,
+        end_period_ts=timestamp_seconds,
         volume=volume,
-        open_interest=oi,
+        open_interest=open_interest,
         price_open=price_close,
         price_high=price_close,
         price_low=price_close,
@@ -70,19 +70,19 @@ def _store() -> SnapshotStore:
 # ---------------------------------------------------------------------------
 
 def test_volume_oi_ratio_score_high_turnover():
-    m = _market(volume_24h=2000, open_interest=2000)  # 100% turnover
-    assert volume_oi_ratio_score(m) == 1.0
+    market = _market(volume_24h=2000, open_interest=2000)  # 100% turnover
+    assert volume_oi_ratio_score(market) == 1.0
 
 
 def test_volume_oi_ratio_score_low_turnover():
-    m = _market(volume_24h=10, open_interest=2000)  # 0.5% turnover
-    score = volume_oi_ratio_score(m)
+    market = _market(volume_24h=10, open_interest=2000)  # 0.5% turnover
+    score = volume_oi_ratio_score(market)
     assert score == pytest.approx(0.01, abs=0.001)
 
 
 def test_volume_oi_ratio_score_zero_oi():
-    m = _market(volume_24h=500, open_interest=0)
-    assert volume_oi_ratio_score(m) == 0.0
+    market = _market(volume_24h=500, open_interest=0)
+    assert volume_oi_ratio_score(market) == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -90,19 +90,19 @@ def test_volume_oi_ratio_score_zero_oi():
 # ---------------------------------------------------------------------------
 
 def test_relative_historical_volume_at_baseline():
-    candles = [_candle(ts=i, volume=100.0) for i in range(30)]
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(30)]
     score = relative_historical_volume_score(candles, volume_24h=100)
     assert score == pytest.approx(0.0, abs=0.01)
 
 
 def test_relative_historical_volume_3x_baseline():
-    candles = [_candle(ts=i, volume=100.0) for i in range(30)]
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(30)]
     score = relative_historical_volume_score(candles, volume_24h=300)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
 def test_relative_historical_volume_insufficient_history():
-    candles = [_candle(ts=i, volume=100.0) for i in range(2)]
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(2)]
     assert relative_historical_volume_score(candles, volume_24h=500) is None
 
 
@@ -111,21 +111,21 @@ def test_relative_historical_volume_insufficient_history():
 # ---------------------------------------------------------------------------
 
 def test_volume_spike_flat():
-    candles = [_candle(ts=i, volume=100.0) for i in range(24)]
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(24)]
     score = volume_spike_short_term_score(candles)
     assert score == pytest.approx(0.0, abs=0.01)
 
 
 def test_volume_spike_2_5x():
     # Last candle is 2.5× the baseline average
-    candles = [_candle(ts=i, volume=100.0) for i in range(23)]
-    candles.append(_candle(ts=23, volume=250.0))
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(23)]
+    candles.append(_candle(timestamp_seconds=23, volume=250.0))
     score = volume_spike_short_term_score(candles)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
 def test_volume_spike_insufficient_candles():
-    candles = [_candle(ts=i, volume=100.0) for i in range(3)]
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(3)]
     assert volume_spike_short_term_score(candles) is None
 
 
@@ -134,18 +134,18 @@ def test_volume_spike_insufficient_candles():
 # ---------------------------------------------------------------------------
 
 def test_oi_change_growing():
-    candles = [_candle(ts=0, oi=1000.0), _candle(ts=1, oi=1100.0)]
+    candles = [_candle(timestamp_seconds=0, open_interest=1000.0), _candle(timestamp_seconds=1, open_interest=1100.0)]
     score = oi_change_score(candles)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
 def test_oi_change_flat():
-    candles = [_candle(ts=0, oi=1000.0), _candle(ts=1, oi=1000.0)]
+    candles = [_candle(timestamp_seconds=0, open_interest=1000.0), _candle(timestamp_seconds=1, open_interest=1000.0)]
     assert oi_change_score(candles) == pytest.approx(0.0)
 
 
 def test_oi_change_shrinking():
-    candles = [_candle(ts=0, oi=1000.0), _candle(ts=1, oi=900.0)]
+    candles = [_candle(timestamp_seconds=0, open_interest=1000.0), _candle(timestamp_seconds=1, open_interest=900.0)]
     assert oi_change_score(candles) == pytest.approx(0.0)
 
 
@@ -158,18 +158,18 @@ def test_oi_change_no_candles():
 # ---------------------------------------------------------------------------
 
 def test_momentum_10_cent_move():
-    candles = [_candle(ts=i, price_close=40.0 + i * (10.0 / 3)) for i in range(4)]
+    candles = [_candle(timestamp_seconds=i, price_close=40.0 + i * (10.0 / 3)) for i in range(4)]
     score = momentum_score(candles)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
 def test_momentum_flat():
-    candles = [_candle(ts=i, price_close=50.0) for i in range(4)]
+    candles = [_candle(timestamp_seconds=i, price_close=50.0) for i in range(4)]
     assert momentum_score(candles) == pytest.approx(0.0)
 
 
 def test_momentum_all_none_prices():
-    candles = [_candle(ts=i, price_close=None) for i in range(4)]
+    candles = [_candle(timestamp_seconds=i, price_close=None) for i in range(4)]
     assert momentum_score(candles) == 0.0
 
 
@@ -182,20 +182,20 @@ def test_momentum_insufficient_candles():
 # ---------------------------------------------------------------------------
 
 def test_hl_at_high():
-    candles = [_candle(ts=i, price_close=float(40 + i)) for i in range(10)]  # 40..49
+    candles = [_candle(timestamp_seconds=i, price_close=float(40 + i)) for i in range(10)]  # 40..49
     score = hl_position_score(candles, current_price=50.0)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
 def test_hl_at_midrange():
-    candles = [_candle(ts=0, price_close=40.0), _candle(ts=1, price_close=60.0)]
+    candles = [_candle(timestamp_seconds=0, price_close=40.0), _candle(timestamp_seconds=1, price_close=60.0)]
     score = hl_position_score(candles, current_price=50.0)
     assert score == pytest.approx(0.0, abs=0.01)
 
 
 def test_hl_flat_range():
-    candles = [_candle(ts=i, price_close=50.0) for i in range(5)]
-    assert hl_position_score(candles, current_price=50.0) == 0.5
+    candles = [_candle(timestamp_seconds=i, price_close=50.0) for i in range(5)]
+    assert hl_position_score(candles, current_price=50.0) is None
 
 
 def test_hl_no_candles():
@@ -228,17 +228,17 @@ def test_ofi_empty_trades():
 # ---------------------------------------------------------------------------
 
 def test_orderbook_skew_balanced():
-    ob = {
+    orderbook = {
         "yes": [[45, 100], [44, 50]],
         "no":  [[55, 100], [56, 50]],
     }
-    score = orderbook_skew_score(ob)
+    score = orderbook_skew_score(orderbook)
     assert score == pytest.approx(0.0, abs=0.01)
 
 
 def test_orderbook_skew_all_bids():
-    ob = {"yes": [[45, 200]], "no": []}
-    score = orderbook_skew_score(ob)
+    orderbook = {"yes": [[45, 200]], "no": []}
+    score = orderbook_skew_score(orderbook)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
@@ -260,7 +260,7 @@ def test_score_all_sorted_descending():
     store = _store()
     scorer = MarketScorer()
     result = scorer.score_all(markets, store)
-    scores = [s.composite_score for s in result]
+    scores = [scored_market.composite_score for scored_market in result]
     assert scores == sorted(scores, reverse=True)
 
 
@@ -268,8 +268,8 @@ def test_score_all_composites_in_range():
     markets = [_market(str(i), volume_24h=i * 100, open_interest=1000) for i in range(1, 6)]
     store = _store()
     scorer = MarketScorer()
-    for s in scorer.score_all(markets, store):
-        assert 0.0 <= s.composite_score <= 1.0
+    for scored_market in scorer.score_all(markets, store):
+        assert 0.0 <= scored_market.composite_score <= 1.0
 
 
 def test_score_all_empty_input():
@@ -279,17 +279,17 @@ def test_score_all_empty_input():
 
 
 def test_score_all_no_candle_history_uses_volume_oi_only():
-    m = _market("X", volume_24h=500, open_interest=500)
+    market = _market("X", volume_24h=500, open_interest=500)
     store = _store()
     scorer = MarketScorer()
-    result = scorer.score_all([m], store)
-    s = result[0]
+    result = scorer.score_all([market], store)
+    scored_market = result[0]
     # All candle-based signals should be None (no history in store)
-    assert s.relative_historical_volume_score is None
-    assert s.volume_spike_short_term_score is None
-    assert s.oi_change_score is None
+    assert scored_market.relative_historical_volume_score is None
+    assert scored_market.volume_spike_short_term_score is None
+    assert scored_market.oi_change_score is None
     # Composite must still be valid (re-normalized over volume_oi_ratio only)
-    assert 0.0 <= s.composite_score <= 1.0
+    assert 0.0 <= scored_market.composite_score <= 1.0
 
 
 def test_enrich_with_live_high_ofi_boosts_ranking():
@@ -298,6 +298,14 @@ def test_enrich_with_live_high_ofi_boosts_ranking():
         _market("LOW",  volume_24h=1000, open_interest=1000),
     ]
     store = _store()
+    # Seed candle history so signal coverage exceeds MIN_COVERAGE (30%).
+    # Flat candles at 100 volume give relative_historical + volume_spike + oi_change + momentum.
+    daily_candles = [_candle(timestamp_seconds=i, volume=100.0, open_interest=500.0) for i in range(30)]
+    hourly_candles = [_candle(timestamp_seconds=i, volume=100.0, open_interest=500.0) for i in range(24)]
+    for ticker in ("HIGH", "LOW"):
+        store.update_daily(ticker, daily_candles)
+        store.update_hourly(ticker, hourly_candles)
+
     scorer = MarketScorer()
     scored = scorer.score_all(markets, store)
 
@@ -310,8 +318,8 @@ def test_enrich_with_live_high_ofi_boosts_ranking():
         ),
     }
     result = scorer.enrich_with_live(scored, trade_data, {})
-    high = next(s for s in result if s.market.ticker == "HIGH")
-    low  = next(s for s in result if s.market.ticker == "LOW")
+    high = next(scored_market for scored_market in result if scored_market.market.ticker == "HIGH")
+    low  = next(scored_market for scored_market in result if scored_market.market.ticker == "LOW")
     assert high.composite_score > low.composite_score
 
 
@@ -326,14 +334,14 @@ def test_snapshot_store_is_daily_stale_initially():
 
 def test_snapshot_store_update_daily_clears_staleness():
     store = _store()
-    candles = [_candle(ts=i) for i in range(5)]
+    candles = [_candle(timestamp_seconds=i) for i in range(5)]
     store.update_daily("ABC", candles)
     assert store.is_daily_stale("ABC") is False
 
 
 def test_snapshot_store_update_daily_persists():
     store = _store()
-    candles = [_candle(ts=i, volume=float(i * 10)) for i in range(5)]
+    candles = [_candle(timestamp_seconds=i, volume=float(i * 10)) for i in range(5)]
     store.update_daily("ABC", candles)
     retrieved = store.get_daily("ABC")
     assert len(retrieved) == 5
@@ -348,7 +356,7 @@ def test_snapshot_store_get_daily_unknown_ticker_returns_empty():
 
 def test_snapshot_store_refresh_log_respects_ttl(monkeypatch):
     store = _store()
-    candles = [_candle(ts=i) for i in range(3)]
+    candles = [_candle(timestamp_seconds=i) for i in range(3)]
     store.update_daily("TTL", candles)
     assert store.is_daily_stale("TTL") is False
 

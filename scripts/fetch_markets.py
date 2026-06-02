@@ -20,7 +20,7 @@ from kalshi_trader.market_snapshot import save_snapshot
 
 
 async def run(output: str, limit: int | None) -> None:
-    t0 = time.monotonic()
+    start_time = time.monotonic()
 
     client = KalshiClient()
     scanner = MarketScanner(client)
@@ -33,7 +33,7 @@ async def run(output: str, limit: int | None) -> None:
 
     save_snapshot(markets, output)
 
-    elapsed = time.monotonic() - t0
+    elapsed = time.monotonic() - start_time
     print(f"Saved {len(markets)} markets to {output}  ({elapsed:.1f}s)")
 
 
