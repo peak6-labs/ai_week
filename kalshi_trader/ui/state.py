@@ -15,6 +15,7 @@ from typing import Any, Literal
 class LogLine:
     timestamp: datetime
     message: str
+    level: Literal["info", "warning", "error"] = "info"
 
 
 @dataclass
@@ -42,9 +43,9 @@ class TradingState:
     event_log: deque[LogLine] = field(default_factory=lambda: deque(maxlen=200))
     last_error: str = ""
 
-    def log(self, message: str) -> None:
+    def log(self, message: str, level: Literal["info", "warning", "error"] = "info") -> None:
         """Append a LogLine with the current UTC time to event_log."""
-        self.event_log.append(LogLine(timestamp=datetime.now(tz=timezone.utc), message=message))
+        self.event_log.append(LogLine(timestamp=datetime.now(tz=timezone.utc), message=message, level=level))
 
     def to_dict(self) -> dict:
         """Return a JSON-serializable representation of the full state."""
@@ -70,7 +71,7 @@ class TradingState:
                 for name, agent in self.agent_statuses.items()
             },
             "event_log": [
-                {"timestamp": line.timestamp.isoformat(), "message": line.message}
+                {"timestamp": line.timestamp.isoformat(), "message": line.message, "level": line.level}
                 for line in self.event_log
             ],
             "last_error": self.last_error,

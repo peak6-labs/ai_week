@@ -103,6 +103,27 @@ def create_app(
             return JSONResponse({"errors": errors}, status_code=422)
         return JSONResponse({"ok": True})
 
+    @app.post("/api/log")
+    async def post_log(request: Request) -> JSONResponse:
+        """Append a log line from an external agent or script.
+
+        Accepts ``{"message": "...", "level": "info|warning|error"}``.
+        Level defaults to "info". Always returns 200 — logging must never
+        break the pipeline.
+        """
+        state: TradingState = request.app.state.trading_state
+        try:
+            body: dict = await request.json()
+            message = str(body.get("message", ""))
+            level = body.get("level", "info")
+            if level not in ("info", "warning", "error"):
+                level = "info"
+            if message:
+                state.log(message, level=level)
+        except Exception:
+            pass
+        return JSONResponse({"ok": True})
+
     @app.post("/api/ideas")
     async def post_ideas(request: Request) -> JSONResponse:
         """Accept a list of idea dicts and append them to pending_ideas."""

@@ -103,7 +103,7 @@ class TestToDict:
         d = state.to_dict()
         assert len(d["event_log"]) == 1
         entry = d["event_log"][0]
-        assert set(entry.keys()) == {"timestamp", "message"}
+        assert set(entry.keys()) == {"timestamp", "message", "level"}
         assert entry["message"] == "event one"
         # timestamp must be a parseable ISO string
         parsed = datetime.fromisoformat(entry["timestamp"])

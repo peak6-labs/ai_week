@@ -279,6 +279,8 @@
       flex-shrink: 0;
     }
     .log-msg { color: var(--text-primary); word-break: break-all; }
+    .log-msg.level-warning { color: var(--warning); }
+    .log-msg.level-error { color: var(--error); font-weight: 600; }
 
     /* ------------------------------------------------------------------ */
     /* P&L colours                                                          */
@@ -1336,7 +1338,8 @@ function renderEventLog(lines) {
   const container = document.getElementById('event-log-lines');
   container.innerHTML = lines.map(l => {
     const ts = timeShort(l.timestamp);
-    return `<div class="log-line"><span class="log-ts">${ts}</span><span class="log-msg">${escHtml(l.message)}</span></div>`;
+    const lvl = l.level || 'info';
+    return `<div class="log-line"><span class="log-ts">${ts}</span><span class="log-msg level-${escHtml(lvl)}">${escHtml(l.message)}</span></div>`;
   }).join('');
 
   // Auto-scroll to bottom
