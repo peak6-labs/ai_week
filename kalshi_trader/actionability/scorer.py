@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from kalshi_trader.models import Market, ScoredMarket
+
+_log = logging.getLogger(__name__)
 from kalshi_trader.actionability.signals import (
     hl_position_score,
     momentum_score,
@@ -50,6 +53,7 @@ class MarketScorer:
     def _score_one(self, market: Market, store: "SnapshotStore") -> ScoredMarket:
         daily = store.get_daily(market.ticker)
         hourly = store.get_hourly(market.ticker)
+        _log.debug("%s  daily=%d  hourly=%d", market.ticker, len(daily), len(hourly))
         mid = (market.yes_bid + market.yes_ask) / 2.0
 
         scores: dict[str, float | None] = {
@@ -85,13 +89,21 @@ class MarketScorer:
         orderbook_data: dict[str, dict],
     ) -> list[ScoredMarket]:
         """Add OFI and orderbook skew for markets that have live data, then re-sort."""
+        trade_hits = 0
+        ob_hits = 0
         for s in scored:
             ticker = s.market.ticker
             if ticker in trade_data:
                 s.ofi_score = ofi_score(trade_data[ticker])
+                trade_hits += 1
             if ticker in orderbook_data:
                 s.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
+                ob_hits += 1
             s.composite_score = self._composite(self._scores_dict(s))
+        _log.debug(
+            "live enrichment: %d/%d trade hits, %d/%d orderbook hits",
+            trade_hits, len(scored), ob_hits, len(scored),
+        )
 
         scored.sort(key=lambda s: s.composite_score, reverse=True)
         return scored

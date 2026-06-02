@@ -4,10 +4,10 @@ Run once at the start of the day; pass the output to score_markets.py via --mark
 to skip the slow paginated API fetch on every scoring run.
 
 Usage:
-    python fetch_markets.py
-    python fetch_markets.py --output markets_2026-06-02.json
-    python fetch_markets.py --limit 1000   # sample run
-    python fetch_markets.py --verbose
+    python scripts/fetch_markets.py
+    python scripts/fetch_markets.py --output markets_2026-06-02.json
+    python scripts/fetch_markets.py --limit 1000   # sample run
+    python scripts/fetch_markets.py --verbose
 """
 import argparse
 import asyncio

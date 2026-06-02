@@ -9,7 +9,7 @@ Ranks open Kalshi markets by **actionability** — a composite signal that surfa
 ### Step 1 — Fetch live markets (once per day)
 
 ```bash
-KALSHI_ENV=prod python fetch_markets.py
+KALSHI_ENV=prod python scripts/fetch_markets.py
 ```
 
 Paginates through all ~480k open markets, fetches category data from the events API (~2,500 unique events), and saves to `live_markets.json`. Takes ~7 minutes on first run. Add `--verbose` to see per-page progress.
@@ -23,7 +23,7 @@ Paginates through all ~480k open markets, fetches category data from the events 
 ### Step 2 — Score markets (run as often as you like)
 
 ```bash
-KALSHI_ENV=prod python score_markets.py --markets-file live_markets.json
+KALSHI_ENV=prod python scripts/score_markets.py --markets-file live_markets.json
 ```
 
 Loads the snapshot, refreshes stale candle data (SQLite cache), fetches live trades and orderbooks for top markets, and prints the ranked list. Takes ~15s on a warm cache.
@@ -41,14 +41,14 @@ Loads the snapshot, refreshes stale candle data (SQLite cache), fetches live tra
 
 ```
 Morning (once)
-  fetch_markets.py
+  scripts/fetch_markets.py
        │
        ├── GET /markets  (paginated, ~480 pages × 1000 markets)
        ├── GET /events/{ticker}  (category enrichment, ~2500 unique events, parallel)
        └── live_markets.json
 
 Scoring runs (repeatedly throughout the day)
-  score_markets.py --markets-file live_markets.json
+  scripts/score_markets.py --markets-file live_markets.json
        │
        ├── load_snapshot()          live_markets.json
        ├── filter_markets()         close_time · SCORED_CATEGORIES · OI≥100 · vol≥10

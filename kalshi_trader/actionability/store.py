@@ -58,26 +58,31 @@ def _parse_candle_row(row: tuple) -> Candle:
 
 
 def _candle_from_api(raw: dict) -> Candle:
-    """Parse one raw API candlestick dict. Converts dollar prices to cents."""
-    def _to_cents(v: str | float | None) -> float | None:
-        if v is None:
-            return None
-        try:
-            return round(float(v) * 100, 4)
-        except (ValueError, TypeError):
-            return None
+    """Parse one raw API candlestick dict. Converts dollar prices to cents.
 
-    price = raw.get("price") or {}
+    The API returns prices split into yes_bid / yes_ask sub-objects with
+    *_dollars keys. We compute mid-price (average) for each OHLC field.
+    Volume and OI come as *_fp string fields.
+    """
+    def _mid_cents(bid: dict, ask: dict, field: str) -> float | None:
+        b, a = bid.get(field), ask.get(field)
+        vals = [float(x) for x in (b, a) if x is not None]
+        if not vals:
+            return None
+        return round(sum(vals) / len(vals) * 100, 4)
+
+    yes_bid = raw.get("yes_bid") or {}
+    yes_ask = raw.get("yes_ask") or {}
     return Candle(
         end_period_ts=int(raw["end_period_ts"]),
-        volume=float(raw.get("volume") or 0),
-        open_interest=float(raw.get("open_interest") or 0),
-        price_open=_to_cents(price.get("open")),
-        price_high=_to_cents(price.get("high")),
-        price_low=_to_cents(price.get("low")),
-        price_close=_to_cents(price.get("close")),
-        price_mean=_to_cents(price.get("mean")),
-        price_previous=_to_cents(price.get("previous")),
+        volume=float(raw.get("volume_fp") or raw.get("volume") or 0),
+        open_interest=float(raw.get("open_interest_fp") or raw.get("open_interest") or 0),
+        price_open=_mid_cents(yes_bid, yes_ask, "open_dollars"),
+        price_high=_mid_cents(yes_bid, yes_ask, "high_dollars"),
+        price_low=_mid_cents(yes_bid, yes_ask, "low_dollars"),
+        price_close=_mid_cents(yes_bid, yes_ask, "close_dollars"),
+        price_mean=None,
+        price_previous=None,
     )
 
 
@@ -250,7 +255,7 @@ class SnapshotStore:
                     _log.warning("%s batch %d/%d: giving up after retries", label, batch_num, len(batches))
                     return {}
             by_ticker: dict[str, list[Candle]] = defaultdict(list)
-            for entry in (resp.get("candles") or []):
+            for entry in (resp.get("markets") or []):
                 ticker = entry.get("market_ticker") or entry.get("ticker", "")
                 for raw in (entry.get("candlesticks") or []):
                     try:
