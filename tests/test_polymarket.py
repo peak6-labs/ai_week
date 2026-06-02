@@ -168,10 +168,16 @@ def test_match_market_with_score_no_match_returns_none():
 
 # --- detect_volume_spike ---
 
-def test_detect_volume_spike_true_when_current_exceeds_2x_average():
+def test_detect_volume_spike_true_when_current_exceeds_3x_average():
     client = PolymarketClient()
-    recent = [1000, 1200, 900, 1100, 1050]  # avg ~1050
-    assert client.detect_volume_spike(current=3000, recent_volumes=recent) is True
+    recent = [1000, 1200, 900, 1100, 1050]  # avg ~1050, 3x = ~3150
+    assert client.detect_volume_spike(current=3200, recent_volumes=recent) is True
+
+
+def test_detect_volume_spike_false_below_3x():
+    client = PolymarketClient()
+    recent = [1000, 1200, 900, 1100, 1050]  # avg ~1050, 3x = ~3150
+    assert client.detect_volume_spike(current=3000, recent_volumes=recent) is False
 
 
 def test_detect_volume_spike_false_for_normal_volume():

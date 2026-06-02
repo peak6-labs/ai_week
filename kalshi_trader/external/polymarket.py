@@ -238,11 +238,15 @@ class PolymarketClient:
         return best_market, best_score
 
     def detect_volume_spike(self, current: float, recent_volumes: list[float]) -> bool:
-        """Return True if current volume exceeds 2× the recent average."""
+        """Return True if current volume exceeds 3x the recent average.
+
+        3x matches the LunarResearcher threshold — smart money exiting
+        creates a volume spike signalling the thesis has played out.
+        """
         if not recent_volumes:
             return False
         avg = sum(recent_volumes) / len(recent_volumes)
-        return current > 2 * avg
+        return current > 3 * avg
 
     # ------------------------------------------------------------------
     # Whale copy-trading (data-api.polymarket.com)
