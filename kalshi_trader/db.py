@@ -174,6 +174,44 @@ async def insert_trade(
     return resp.data[0]["id"]
 
 
+async def insert_reviewed_idea(
+    idea: dict,
+    decision: str,
+) -> str:
+    """Save a manually-reviewed trade idea that was NOT executed.
+
+    paper_only is always True — this table records human evaluation of
+    orchestrator output before the executor is wired up. It must never
+    be confused with actual trades.
+
+    Args:
+        idea: Serializable dict with keys: ticker, side, confidence,
+              market_price, suggested_size_dollars, reasoning,
+              signal_sources, category, agent_id.
+        decision: "approved" or "rejected"
+
+    Returns:
+        The new row UUID.
+    """
+    client = await _get_client()
+    row = {
+        "ticker": idea.get("ticker", ""),
+        "side": idea.get("side", ""),
+        "confidence": idea.get("confidence"),
+        "market_price_cents": idea.get("market_price"),
+        "suggested_size_dollars": idea.get("suggested_size_dollars"),
+        "reasoning": idea.get("reasoning", ""),
+        "signal_sources": idea.get("signal_sources", []),
+        "category": idea.get("category", ""),
+        "agent_id": idea.get("agent_id", ""),
+        "decision": decision,
+        "paper_only": True,  # ALWAYS True — reviewed but not executed
+        "reviewed_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+    resp = await client.table("reviewed_ideas").insert(row).execute()
+    return resp.data[0]["id"]
+
+
 async def close_trade(
     trade_id: str,
     exit_reason: str,
