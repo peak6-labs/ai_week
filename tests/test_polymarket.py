@@ -168,10 +168,16 @@ def test_match_market_with_score_no_match_returns_none():
 
 # --- detect_volume_spike ---
 
-def test_detect_volume_spike_true_when_current_exceeds_2x_average():
+def test_detect_volume_spike_true_when_current_exceeds_3x_average():
     client = PolymarketClient()
-    recent = [1000, 1200, 900, 1100, 1050]  # avg ~1050
-    assert client.detect_volume_spike(current=3000, recent_volumes=recent) is True
+    recent = [1000, 1200, 900, 1100, 1050]  # avg ~1050, 3x = ~3150
+    assert client.detect_volume_spike(current=3200, recent_volumes=recent) is True
+
+
+def test_detect_volume_spike_false_below_3x():
+    client = PolymarketClient()
+    recent = [1000, 1200, 900, 1100, 1050]  # avg ~1050, 3x = ~3150
+    assert client.detect_volume_spike(current=3000, recent_volumes=recent) is False
 
 
 def test_detect_volume_spike_false_for_normal_volume():
@@ -189,7 +195,8 @@ def test_detect_volume_spike_false_with_empty_history():
 
 @pytest.mark.asyncio
 async def test_get_markets_returns_parsed_list():
-    raw = [_make_gamma_market(id="m1"), _make_gamma_market(id="m2")]
+    """Keyset endpoint returns {markets: [...], next_cursor: null} — single page."""
+    raw = {"markets": [_make_gamma_market(id="m1"), _make_gamma_market(id="m2")], "next_cursor": None}
     mock_response = AsyncMock()
     mock_response.json = AsyncMock(return_value=raw)
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
@@ -210,10 +217,13 @@ async def test_get_markets_returns_parsed_list():
 
 @pytest.mark.asyncio
 async def test_get_markets_filters_inactive():
-    raw = [
-        _make_gamma_market(id="active1", active=True, closed=False),
-        _make_gamma_market(id="closed1", active=False, closed=True),
-    ]
+    raw = {
+        "markets": [
+            _make_gamma_market(id="active1", active=True, closed=False),
+            _make_gamma_market(id="closed1", active=False, closed=True),
+        ],
+        "next_cursor": None,
+    }
     mock_response = AsyncMock()
     mock_response.json = AsyncMock(return_value=raw)
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)

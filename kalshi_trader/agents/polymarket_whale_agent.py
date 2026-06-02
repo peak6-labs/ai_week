@@ -75,11 +75,13 @@ class PolymarketWhaleAgent:
         return parse_signal_estimates(raw)
 
     async def _load_whale_targets(self) -> list[str]:
-        return load_whale_targets()
+        # Default to leaderboard_alltime — top 50 by all-time PnL from polymarket-cli
+        return load_whale_targets(scorer="leaderboard_alltime")
 
     async def _find_polymarket_match(self, kalshi_title: str) -> dict | None:
-        poly_markets = await self._client.get_markets()
-        result = self._client.match_market_with_score(kalshi_title, poly_markets)
+        # Full paginated market list via Gamma keyset API (38k+ markets)
+        markets = await self._client.get_markets()
+        result = self._client.match_market_with_score(kalshi_title, markets)
         if result is None:
             return None
         market, score = result

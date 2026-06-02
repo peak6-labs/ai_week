@@ -238,11 +238,15 @@ class PolymarketClient:
         return best_market, best_score
 
     def detect_volume_spike(self, current: float, recent_volumes: list[float]) -> bool:
-        """Return True if current volume exceeds 2× the recent average."""
+        """Return True if current volume exceeds 3x the recent average.
+
+        3x matches the LunarResearcher threshold — smart money exiting
+        creates a volume spike signalling the thesis has played out.
+        """
         if not recent_volumes:
             return False
         avg = sum(recent_volumes) / len(recent_volumes)
-        return current > 2 * avg
+        return current > 3 * avg
 
     # ------------------------------------------------------------------
     # Whale copy-trading (data-api.polymarket.com)
@@ -334,12 +338,25 @@ class PolymarketClient:
     # Gamma API
     # ------------------------------------------------------------------
 
-    async def get_markets(self, limit: int = 500) -> list[dict]:
-        """Fetch active markets from Polymarket Gamma API."""
-        raw: list[dict] = await self._get(  # type: ignore[assignment]
-            f"{_GAMMA_BASE}/markets", {"active": "true", "closed": "false", "limit": str(limit)}
-        )
-        return [m for m in raw if m.get("active") and not m.get("closed")]
+    async def get_markets(self, page_size: int = 500) -> list[dict]:
+        """Fetch all active markets using keyset pagination.
+
+        The regular /markets endpoint hard-caps at 100 results regardless of limit.
+        The /markets/keyset endpoint paginates across all 38k+ active markets.
+        """
+        markets: list[dict] = []
+        cursor: str | None = None
+        while True:
+            params: dict = {"active": "true", "closed": "false", "limit": str(page_size)}
+            if cursor:
+                params["after_cursor"] = cursor
+            data: dict = await self._get(f"{_GAMMA_BASE}/markets/keyset", params)  # type: ignore[assignment]
+            batch = data.get("markets", [])
+            markets.extend(m for m in batch if m.get("active") and not m.get("closed"))
+            cursor = data.get("next_cursor")
+            if not cursor or not batch:
+                break
+        return markets
 
     async def bootstrap_whale_targets(
         self,
