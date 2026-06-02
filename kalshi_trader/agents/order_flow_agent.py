@@ -1,10 +1,14 @@
 from __future__ import annotations
-import asyncio
 from collections import deque
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from kalshi_trader.models import SignalEstimate
+from kalshi_trader.agents.base import BaseAgent
+from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
+
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
 def _parse_trade_time(t: dict) -> datetime:
@@ -95,39 +99,160 @@ def _recent_trade_count(trades: list[dict], window_minutes: int = 60) -> int:
     return sum(1 for t in trades if _parse_trade_time(t).timestamp() >= cutoff)
 
 
+_SCHEMAS: list[dict] = [
+    {
+        "name": "get_market_trades",
+        "description": "Fetch recent trades for a Kalshi market. Returns a list of trade dicts with side, count, price, and timestamp.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "limit": {"type": "integer", "default": 200},
+            },
+            "required": ["ticker"],
+        },
+    },
+    {
+        "name": "compute_vpin",
+        "description": "Compute VPIN (Volume-synchronized Probability of Informed Trading) from a list of trades. Returns vpin_score and high_informed_trading flag.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "trades": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "List of trade dicts from get_market_trades",
+                },
+                "n_buckets": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Number of equal-volume buckets to use",
+                },
+            },
+            "required": ["trades"],
+        },
+    },
+    {
+        "name": "compute_ofi",
+        "description": "Compute Order Flow Imbalance from a list of trades. Returns ofi_score, direction (YES/NO/neutral), and buying_fraction.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "trades": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "List of trade dicts from get_market_trades",
+                },
+            },
+            "required": ["trades"],
+        },
+    },
+    {
+        "name": "build_order_flow_signal",
+        "description": "Construct a SignalEstimate dict from VPIN and OFI results. Returns a SignalEstimate dict ready for JSON output.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "vpin_result": {
+                    "type": "object",
+                    "description": "Result from compute_vpin: {vpin_score, high_informed_trading}",
+                },
+                "ofi_result": {
+                    "type": "object",
+                    "description": "Result from compute_ofi: {ofi_score, direction, buying_fraction}",
+                },
+            },
+            "required": ["ticker", "vpin_result", "ofi_result"],
+        },
+    },
+]
+
+
 class OrderFlowAgent:
     """Detects elevated informed trading via VPIN and OFI from Kalshi trade history."""
 
     def __init__(self, client: Any) -> None:
         self._client = client
+        system_prompt = (_PROMPTS_DIR / "order_flow.md").read_text()
+        self._agent = BaseAgent(
+            tools=_SCHEMAS,
+            handlers={
+                "get_market_trades": self._get_market_trades,
+                "compute_vpin": self._compute_vpin,
+                "compute_ofi": self._compute_ofi,
+                "build_order_flow_signal": self._build_order_flow_signal,
+            },
+            system_prompt=system_prompt,
+        )
 
     async def run(self, ticker: str, title: str) -> list[SignalEstimate]:
-        try:
-            trades = await self._client.get_trades(ticker, limit=200)
-        except Exception:
-            return []
+        prompt = f"Analyze order flow for this Kalshi market:\nticker: {ticker}\ntitle: {title}"
+        raw = await self._agent.run(prompt)
+        return parse_signal_estimates(raw)
 
-        trade_list = trades if isinstance(trades, list) else trades.get("trades", [])
+    async def _get_market_trades(self, ticker: str, limit: int = 200) -> list[dict]:
+        result = await self._client.get_trades(ticker, limit)
+        if isinstance(result, list):
+            return result
+        return result.get("trades", [])
 
-        recent_count = _recent_trade_count(trade_list, window_minutes=60)
-        if recent_count < 20:
-            return []
+    async def _compute_vpin(self, trades: list[dict], n_buckets: int = 10) -> dict:
+        # Derive bucket_size_usd from total volume / n_buckets so we get ~n_buckets buckets
+        total_vol = sum(
+            float(t.get("count", t.get("size", 0))) * float(t.get("yes_price", t.get("price", 50))) / 100.0
+            for t in trades
+        )
+        bucket_size_usd = max(total_vol / n_buckets, 1.0) if trades else 1.0
+        vpin_score = compute_vpin(trades, bucket_size_usd=bucket_size_usd)
+        return {
+            "vpin_score": round(vpin_score, 4),
+            "high_informed_trading": vpin_score > 0.4,
+        }
 
-        ofi = compute_ofi(trade_list, window_minutes=30)
-        vpin = compute_vpin(trade_list, bucket_size_usd=5000.0)
+    async def _compute_ofi(self, trades: list[dict]) -> dict:
+        ofi_score = compute_ofi(trades, window_minutes=30)
+        if ofi_score > 0.1:
+            direction = "YES"
+        elif ofi_score < -0.1:
+            direction = "NO"
+        else:
+            direction = "neutral"
+        total_buy = sum(
+            float(t.get("count", t.get("size", 0))) * float(t.get("yes_price", t.get("price", 50))) / 100.0
+            for t in trades
+            if t.get("taker_side", t.get("side", "yes")) == "yes"
+        )
+        total_all = sum(
+            float(t.get("count", t.get("size", 0))) * float(t.get("yes_price", t.get("price", 50))) / 100.0
+            for t in trades
+        )
+        buying_fraction = round(total_buy / total_all, 4) if total_all > 0 else 0.5
+        return {
+            "ofi_score": round(ofi_score, 4),
+            "direction": direction,
+            "buying_fraction": buying_fraction,
+        }
 
-        if vpin < 1.0 or abs(ofi) < 0.20:
-            return []
+    async def _build_order_flow_signal(
+        self,
+        ticker: str,
+        vpin_result: dict,
+        ofi_result: dict,
+    ) -> dict:
+        vpin_score = float(vpin_result.get("vpin_score", 0.0))
+        ofi_score = float(ofi_result.get("ofi_score", 0.0))
+        direction = ofi_result.get("direction", "neutral")
 
-        # Direction: positive OFI → buy pressure → YES more likely
-        base_prob = 0.5 + ofi * 0.25
+        # Probability: 0.5 base, shifted by OFI direction
+        base_prob = 0.5 + ofi_score * 0.25
         prob = max(0.05, min(0.95, base_prob))
 
-        # Uncertainty scales with VPIN level: higher VPIN = more confident signal
-        uncertainty = max(0.05, 0.25 - (vpin - 1.0) * 0.08)
+        # Uncertainty: higher VPIN → more confident (lower uncertainty)
+        uncertainty = max(0.05, 0.25 - max(vpin_score - 0.4, 0.0) * 0.08)
 
-        return [SignalEstimate(
-            source="kalshi_ofi",
+        estimate = SignalEstimate(
+            source="order_flow",
             probability=round(prob, 4),
             uncertainty=round(uncertainty, 4),
             weight=0.70,
@@ -135,13 +260,14 @@ class OrderFlowAgent:
             metadata={
                 "ticker": ticker,
                 "narrative": (
-                    f"VPIN={vpin:.2f} (>1.0 = elevated informed trading). "
-                    f"OFI={ofi:+.3f} ({'buy' if ofi > 0 else 'sell'} pressure). "
-                    f"{recent_count} trades in last 60 min."
+                    f"VPIN of {vpin_score:.2f} indicates "
+                    f"{'active' if vpin_result.get('high_informed_trading') else 'moderate'} informed trading. "
+                    f"OFI {direction}-directional (buying_fraction={ofi_result.get('buying_fraction', 0.5):.2f})."
                 ),
                 "data_quality": "fresh",
-                "vpin": round(vpin, 4),
-                "ofi": round(ofi, 4),
-                "recent_trade_count": recent_count,
+                "vpin_score": vpin_score,
+                "ofi_score": ofi_score,
+                "ofi_direction": direction,
             },
-        )]
+        )
+        return estimate_to_dict(estimate)
