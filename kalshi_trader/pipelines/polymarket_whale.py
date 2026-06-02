@@ -1,6 +1,7 @@
-"""CLI: python -m kalshi_trader.pipelines.polymarket_whale --ticker X --title "..."
+"""CLI: python -m kalshi_trader.pipelines.polymarket_whale --ticker X --title "..." [--scorer winrate]
 
 Prints list[SignalEstimate] JSON to stdout. Empty list [] on no signal or error.
+--scorer: which wallet list to use (winrate, leaderboard_alltime, leaderboard_week, harvard). Default: winrate.
 """
 from __future__ import annotations
 import argparse
@@ -15,10 +16,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Polymarket whale pipeline agent")
     parser.add_argument("--ticker", required=True)
     parser.add_argument("--title", required=True)
+    parser.add_argument("--scorer", default="winrate",
+                        choices=["winrate", "leaderboard_alltime", "leaderboard_week", "harvard"],
+                        help="Which wallet list to use (default: winrate)")
     args = parser.parse_args()
 
     async def run() -> None:
-        agent = PolymarketWhaleAgent()
+        agent = PolymarketWhaleAgent(scorer=args.scorer)
         try:
             estimates = await agent.run(args.ticker, args.title)
             print(json.dumps([estimate_to_dict(e) for e in estimates], default=str))
