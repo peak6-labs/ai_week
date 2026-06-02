@@ -49,6 +49,10 @@ COORDINATOR_MODEL = "claude-opus-4-8"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
+# Polymarket — unauthenticated public API with no published rate limit.
+# Keep concurrent requests low to avoid IP bans. Overrideable via env var.
+POLYMARKET_MAX_CONCURRENT = int(os.environ.get("POLYMARKET_MAX_CONCURRENT", "8"))
+
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"
 XAI_MODEL = "grok-3"

@@ -18,6 +18,7 @@ def _parse_wind_mph(wind_str: str) -> float:
 class NOAAClient:
     def __init__(self) -> None:
         self._session: aiohttp.ClientSession | None = None
+        self._grid_cache: dict[tuple[float, float], dict] = {}
 
     async def _get(self, url: str) -> dict:
         if self._session is None:
@@ -27,13 +28,16 @@ class NOAAClient:
             return await resp.json()
 
     async def _grid(self, lat: float, lon: float) -> dict:
-        data = await self._get(f"{NWS_BASE}/points/{lat:.4f},{lon:.4f}")
-        props = data["properties"]
-        return {
-            "forecast_url": props["forecast"],
-            "hourly_url": props["forecastHourly"],
-            "wfo": props["cwa"],
-        }
+        key = (round(lat, 4), round(lon, 4))
+        if key not in self._grid_cache:
+            data = await self._get(f"{NWS_BASE}/points/{lat:.4f},{lon:.4f}")
+            props = data["properties"]
+            self._grid_cache[key] = {
+                "forecast_url": props["forecast"],
+                "hourly_url": props["forecastHourly"],
+                "wfo": props["cwa"],
+            }
+        return self._grid_cache[key]
 
     async def get_forecast(self, lat: float, lon: float, target_date: date) -> dict:
         grid = await self._grid(lat, lon)
