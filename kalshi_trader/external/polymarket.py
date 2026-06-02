@@ -375,7 +375,7 @@ class PolymarketClient:
         4. Fetch positions for ALL wallets concurrently and score profitability.
         5. Keep wallets with score >= min_score, return top N by score.
         """
-        markets = await self.get_markets(limit=market_limit)
+        markets = await self.get_markets()
         print(f"  Scanning {len(markets)} markets for trades >= ${trade_min_size}…", flush=True)
 
         # Parallel: fetch trades for all markets at once

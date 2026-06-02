@@ -52,6 +52,10 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 # Polymarket — unauthenticated public API with no published rate limit.
 # Keep concurrent requests low to avoid IP bans. Overrideable via env var.
 POLYMARKET_MAX_CONCURRENT = int(os.environ.get("POLYMARKET_MAX_CONCURRENT", "8"))
+POLYMARKET_MARKETS_CSV = os.environ.get(
+    "POLYMARKET_MARKETS_CSV",
+    str(Path(__file__).parent.parent / "poly_data" / "data" / "markets_active_part.csv"),
+)
 # Enable composite 3-signal whale scorer (win rate + direction accuracy + evidence weight).
 WHALE_SCORER_V2: bool = os.environ.get("WHALE_SCORER_V2", "true").lower() not in ("0", "false", "no")
 
@@ -62,3 +66,7 @@ X_GROK_UNCERTAINTY_THRESHOLD = 0.15
 X_MAX_CONCURRENT_SEARCHES = 3
 X_GROK_SIGNAL_WEIGHT = 0.6
 X_CLAUDE_SIGNAL_WEIGHT = 0.75
+
+# Supabase — project ai_week only (xhyqdrhrwgebidvsnwbx)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")

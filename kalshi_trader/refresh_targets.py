@@ -22,14 +22,16 @@ from kalshi_trader.external.polymarket import (
 )
 
 
-async def _run(min_score: float, top_n: int) -> None:
+async def _run(min_score: float, top_n: int, market_limit: int) -> None:
     scorer_key = "harvard" if config.WHALE_SCORER_V2 else "winrate"
     print(
         f"Scanning Polymarket for top-{top_n} wallets "
-        f"(scorer={scorer_key}, min_score={min_score})…"
+        f"(scorer={scorer_key}, min_score={min_score}, market_limit={market_limit})…"
     )
     async with PolymarketClient() as client:
-        wallets = await client.bootstrap_whale_targets(min_score=min_score, top_n=top_n)
+        wallets = await client.bootstrap_whale_targets(
+            min_score=min_score, top_n=top_n, market_limit=market_limit
+        )
     save_whale_targets(wallets, scorer=scorer_key)
     print(f"Saved {len(wallets)} wallet(s) to targets.json under key '{scorer_key}'")
     for w in wallets:
@@ -40,8 +42,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Refresh Polymarket whale targets")
     parser.add_argument("--min-score", type=float, default=0.6)
     parser.add_argument("--top-n", type=int, default=50)
+    parser.add_argument("--market-limit", type=int, default=1000, dest="market_limit",
+                        help="Number of Polymarket markets to scan for large trades (default 1000)")
     args = parser.parse_args()
-    asyncio.run(_run(args.min_score, args.top_n))
+    asyncio.run(_run(args.min_score, args.top_n, args.market_limit))
 
 
 if __name__ == "__main__":
