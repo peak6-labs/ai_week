@@ -5,15 +5,17 @@ Usage:
     python scripts/score_markets.py --top 25
     python scripts/score_markets.py --category sports
     python scripts/score_markets.py --verbose    # show DEBUG-level cache detail
+    python scripts/score_markets.py --json        # emit all events as JSON (for agents)
 """
 import argparse
 import asyncio
+import json
 import logging
-from collections import defaultdict
-from datetime import datetime, timezone
 
 from kalshi_trader.actionability import MarketScorer, SnapshotStore
+from kalshi_trader.agents.market_scout import coverage_fraction, serialize_event_groups
 from kalshi_trader.client import KalshiClient
+from kalshi_trader.grouping import group_by_event
 from kalshi_trader.models import ScoredMarket
 from kalshi_trader.scanner import MarketScanner
 
@@ -22,18 +24,8 @@ def _fmt(signal_value: float | None) -> str:
     return f"{signal_value:.2f}" if signal_value is not None else "  -- "
 
 
-def _coverage(scored_market: ScoredMarket) -> float:
-    """Fraction of total weight that actually contributed to the composite."""
-    weights = MarketScorer.WEIGHTS
-    present = sum(
-        weight for signal_name, weight in weights.items()
-        if MarketScorer._scores_dict(scored_market).get(signal_name) is not None
-    )
-    return present / sum(weights.values()) * 100
-
-
 def _print_debug_block(scored_market: ScoredMarket, rank: int) -> None:
-    signal_coverage = _coverage(scored_market)
+    signal_coverage = coverage_fraction(scored_market) * 100
     print(
         f"\n#{rank:>2}  {scored_market.market.ticker}  score={scored_market.composite_score:.3f}  "
         f"cov={signal_coverage:.0f}%  [{scored_market.market.title[:60]}]"
@@ -51,22 +43,8 @@ def _print_debug_block(scored_market: ScoredMarket, rank: int) -> None:
     )
 
 
-def _group_by_event(ranked: list[ScoredMarket]) -> list[tuple[float, int, ScoredMarket]]:
-    """Group markets by event_ticker, average scores. Returns (avg_score, market_count, best_market)."""
-    groups: dict[str, list[ScoredMarket]] = defaultdict(list)
-    for scored_market in ranked:
-        event_key = scored_market.market.event_ticker or scored_market.market.ticker
-        groups[event_key].append(scored_market)
-    result = []
-    for event_markets in groups.values():
-        avg_score = sum(scored_market.composite_score for scored_market in event_markets) / len(event_markets)
-        best_market = max(event_markets, key=lambda s: s.composite_score)
-        result.append((avg_score, len(event_markets), best_market))
-    result.sort(key=lambda x: x[0], reverse=True)
-    return result
-
-
-async def run(top: int, category: str | None, markets_file: str | None, debug: bool) -> None:
+async def run(top: int, category: str | None, markets_file: str | None,
+              debug: bool, as_json: bool) -> None:
     client  = KalshiClient()
     scanner = MarketScanner(client)
     scorer  = MarketScorer()
@@ -76,7 +54,13 @@ async def run(top: int, category: str | None, markets_file: str | None, debug: b
         scorer, store, category=category, markets_file=markets_file
     )
 
-    grouped = _group_by_event(ranked)
+    grouped = group_by_event(ranked)
+
+    if as_json:
+        # All events, full signal/coverage/liquidity detail, on stdout only
+        # (logging goes to stderr) so agents can parse it cleanly.
+        print(json.dumps(serialize_event_groups(grouped)))
+        return
 
     header = (
         f"{'EVENT':<42} {'AVG':>5}  {'N':>2}  "
@@ -116,6 +100,8 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="Show DEBUG-level cache detail")
     parser.add_argument("--debug", action="store_true",
                         help="Show all 9 signal scores + weight coverage per market")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Emit every event as JSON on stdout (for the market-scout agent); ignores --top")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -124,4 +110,4 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
-    asyncio.run(run(args.top, args.category, args.markets_file, args.debug))
+    asyncio.run(run(args.top, args.category, args.markets_file, args.debug, args.as_json))
