@@ -1614,6 +1614,118 @@ async function poll() {
 })();
 
 // ---------------------------------------------------------------------------
+// Trade Ideas tab
+// ---------------------------------------------------------------------------
+
+function renderPendingIdeas(ideas) {
+  const grid = document.getElementById('pending-ideas-grid');
+  const empty = document.getElementById('pending-ideas-empty');
+  if (!ideas || ideas.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  grid.innerHTML = ideas.map(idea => {
+    const sideBadge = idea.side === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    const confPct = idea.confidence !== undefined ? Math.round(idea.confidence * 100) + '%' : '—';
+    const confBadge = `<span class="badge badge-conf">${confPct}</span>`;
+    const size = idea.suggested_size_dollars !== undefined ? '$' + Number(idea.suggested_size_dollars).toFixed(0) : '—';
+    const sizeBadge = `<span class="badge badge-conf">${escHtml(size)}</span>`;
+    const sources = (idea.signal_sources || []).map(s =>
+      `<span class="signal-tag">${escHtml(String(s))}</span>`
+    ).join('');
+    const marketPrice = idea.market_price !== undefined ? `Market: ${Number(idea.market_price)}¢` : '';
+    return `<div class="idea-card" id="idea-card-${escHtml(idea.id)}">
+      <div class="idea-card-header">
+        <span class="idea-ticker">${escHtml(idea.ticker ?? '')}</span>
+        ${sideBadge}
+        ${confBadge}
+        ${sizeBadge}
+        <span class="idea-agent">${escHtml(idea.agent_id ?? '')}</span>
+      </div>
+      <div class="idea-card-body">
+        <div class="idea-reasoning">${escHtml(idea.reasoning ?? '')}</div>
+        ${sources ? `<div class="idea-signals">${sources}</div>` : ''}
+        ${marketPrice ? `<div class="idea-market-price">${escHtml(marketPrice)}</div>` : ''}
+        <div class="idea-card-actions">
+          <button class="btn-approve" data-id="${escHtml(idea.id)}">Approve</button>
+          <button class="btn-reject" data-id="${escHtml(idea.id)}">Reject</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Attach approve/reject handlers
+  grid.querySelectorAll('.btn-approve').forEach(btn => {
+    btn.addEventListener('click', () => reviewIdea(btn.dataset.id, 'approve'));
+  });
+  grid.querySelectorAll('.btn-reject').forEach(btn => {
+    btn.addEventListener('click', () => reviewIdea(btn.dataset.id, 'reject'));
+  });
+}
+
+async function reviewIdea(ideaId, action) {
+  // Optimistic: remove card immediately
+  const card = document.getElementById('idea-card-' + ideaId);
+  if (card) card.remove();
+
+  // If grid is now empty, show empty state
+  const grid = document.getElementById('pending-ideas-grid');
+  if (grid && grid.children.length === 0) {
+    document.getElementById('pending-ideas-empty').classList.remove('hidden');
+  }
+
+  try {
+    const resp = await fetch(`/api/ideas/${encodeURIComponent(ideaId)}/${action}`, { method: 'POST' });
+    if (!resp.ok) {
+      console.warn('reviewIdea failed, HTTP', resp.status);
+    }
+  } catch (err) {
+    console.warn('reviewIdea fetch error:', err);
+  }
+
+  // Refresh reviewed section from next poll — or force an immediate partial refresh
+  try {
+    const resp = await fetch('/api/state');
+    if (resp.ok) {
+      const state = await resp.json();
+      renderReviewedIdeas(state.reviewed_ideas || []);
+    }
+  } catch (_) {}
+}
+
+function renderReviewedIdeas(ideas) {
+  const tbody = document.getElementById('reviewed-ideas-tbody');
+  if (!ideas || ideas.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No reviewed ideas yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = ideas.map(idea => {
+    const sideBadge = idea.side === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    const confPct = idea.confidence !== undefined ? Math.round(idea.confidence * 100) + '%' : '—';
+    const size = idea.suggested_size_dollars !== undefined ? '$' + Number(idea.suggested_size_dollars).toFixed(0) : '—';
+    const decisionBadge = idea.decision === 'approved'
+      ? '<span class="badge badge-approved">Approved</span>'
+      : '<span class="badge badge-rejected">Rejected</span>';
+    const ts = idea.reviewed_at ? timeShort(idea.reviewed_at) : '—';
+    return `<tr>
+      <td class="text-xs">${escHtml(ts)}</td>
+      <td class="text-mono">${escHtml(idea.ticker ?? '')}</td>
+      <td>${sideBadge}</td>
+      <td>${escHtml(confPct)}</td>
+      <td>${escHtml(size)}</td>
+      <td>${decisionBadge}</td>
+      <td class="text-xs">${escHtml(idea.agent_id ?? '')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
 // Utility: HTML escaping
 // ---------------------------------------------------------------------------
 function escHtml(str) {

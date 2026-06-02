@@ -81,7 +81,8 @@ class TestToDict:
         expected_keys = {
             "system_running", "cycle_number", "last_cycle_at",
             "balance_dollars", "daily_pnl_dollars", "total_exposure_dollars",
-            "positions", "recent_ideas", "agent_statuses", "event_log", "last_error",
+            "positions", "recent_ideas", "pending_ideas", "reviewed_ideas",
+            "agent_statuses", "event_log", "last_error",
         }
         assert set(d.keys()) == expected_keys
 
