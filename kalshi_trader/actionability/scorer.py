@@ -13,6 +13,7 @@ from kalshi_trader.actionability.signals import (
     oi_change_score,
     orderbook_skew_score,
     relative_historical_volume_score,
+    spread_penalty_multiplier,
     volume_oi_ratio_score,
     volume_spike_short_term_score,
 )
@@ -69,11 +70,15 @@ class MarketScorer:
             "ofi":                        None,
             "orderbook_skew":             None,
         }
+        raw_composite_score = self._composite(scores)
+        spread_multiplier = spread_penalty_multiplier(market)
 
         return ScoredMarket(
             market=market,
-            composite_score=self._composite(scores),
+            composite_score=raw_composite_score * spread_multiplier,
             volume_oi_ratio_score=scores["volume_oi_ratio"],  # type: ignore[arg-type]
+            raw_composite_score=raw_composite_score,
+            spread_penalty_multiplier=spread_multiplier,
             relative_historical_volume_score=scores["relative_historical_volume"],
             volume_spike_short_term_score=scores["volume_spike_short_term"],
             oi_change_score=scores["oi_change"],
@@ -101,7 +106,11 @@ class MarketScorer:
             if ticker in orderbook_data:
                 scored_market.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
                 orderbook_hits += 1
-            scored_market.composite_score = self._composite(self._scores_dict(scored_market))
+            raw_composite_score = self._composite(self._scores_dict(scored_market))
+            spread_multiplier = spread_penalty_multiplier(scored_market.market)
+            scored_market.raw_composite_score = raw_composite_score
+            scored_market.spread_penalty_multiplier = spread_multiplier
+            scored_market.composite_score = raw_composite_score * spread_multiplier
         _log.debug(
             "live enrichment: %d/%d trade hits, %d/%d orderbook hits",
             trade_hits, len(scored), orderbook_hits, len(scored),

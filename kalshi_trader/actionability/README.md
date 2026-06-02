@@ -69,7 +69,7 @@ Each signal normalises to **[0.0, 1.0]**. Signals that need candle history retur
 | Signal | Weight | What it measures | Data required |
 |--------|-------:|------------------|---------------|
 | `relative_historical_volume` | **0.25** | Today's volume vs 30-day daily average — detects unusual activity | ≥ 3 daily candles |
-| `volume_spike_short_term` | **0.20** | Last hour's volume vs prior 3h+ average — detects intraday burst | ≥ 4 hourly candles |
+| `volume_spike_short_term` | **0.20** | Latest active hour's volume vs prior active-hour average — detects sparse-market bursts | ≥ 2 hourly candles |
 | `price_momentum` | **0.15** | Absolute price move over the last 4 hours (10¢ move = 1.0) | ≥ 4 hourly candles |
 | `volume_oi_ratio` | **0.10** | Daily turnover rate: `volume_24h / open_interest` (capped at 0.5 = 1.0) | Market object only |
 | `oi_change` | **0.10** | 24h open-interest growth — new money entering the market (10% = 1.0) | ≥ 2 hourly candles |
@@ -82,14 +82,31 @@ Each signal normalises to **[0.0, 1.0]**. Signals that need candle history retur
 
 ## Composite score formula
 
-The composite score is a **weighted average over whichever signals are non-`None`**, re-normalised so absent signals don't artificially lower the score:
+The raw composite score is a **weighted average over whichever signals are non-`None`**, re-normalised so absent signals don't artificially lower the score:
 
 ```
-composite = Σ (signal_value × weight)  /  Σ weight
-              for all non-None signals       for same signals
+raw_composite = Σ (signal_value × weight)  /  Σ weight
+                  for all non-None signals       for same signals
 ```
 
-For example, if a market has no candle history yet (all candle signals are `None`), the composite is computed solely from `volume_oi_ratio` and any live signals available. Once the cache warms up the full set of weights applies.
+For example, if a market has no candle history yet (all candle signals are `None`), the raw composite is computed solely from `volume_oi_ratio` and any live signals available. Once the cache warms up the full set of weights applies.
+
+The ranking score then applies a **spread liquidity penalty**:
+
+```
+rank_score = raw_composite × spread_penalty_multiplier
+```
+
+| YES bid/ask spread | Multiplier |
+|--------------------|-----------:|
+| one-sided book | 0.50 |
+| ≤ 2¢ | 1.00 |
+| ≤ 5¢ | 0.95 |
+| ≤ 10¢ | 0.85 |
+| ≤ 20¢ | 0.70 |
+| > 20¢ | 0.55 |
+
+`ScoredMarket.composite_score` stores the spread-adjusted rank score. The JSON output also includes `raw_best_score` and `spread_penalty_multiplier` so analysts can see the original signal strength and the liquidity adjustment separately.
 
 ---
 

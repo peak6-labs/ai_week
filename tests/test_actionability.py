@@ -17,6 +17,7 @@ from kalshi_trader.actionability import (
     oi_change_score,
     orderbook_skew_score,
     relative_historical_volume_score,
+    spread_penalty_multiplier,
     volume_oi_ratio_score,
     volume_spike_short_term_score,
 )
@@ -86,6 +87,26 @@ def test_volume_oi_ratio_score_zero_oi():
 
 
 # ---------------------------------------------------------------------------
+# spread_penalty_multiplier
+# ---------------------------------------------------------------------------
+
+def test_spread_penalty_multiplier_tight_spread_preserves_score():
+    market = _market(yes_bid=40.0, yes_ask=42.0)
+    assert spread_penalty_multiplier(market) == pytest.approx(1.0)
+
+
+def test_spread_penalty_multiplier_softly_penalizes_wide_spreads():
+    assert spread_penalty_multiplier(_market(yes_bid=40.0, yes_ask=46.0)) == pytest.approx(0.85)
+    assert spread_penalty_multiplier(_market(yes_bid=40.0, yes_ask=55.0)) == pytest.approx(0.70)
+    assert spread_penalty_multiplier(_market(yes_bid=10.0, yes_ask=35.0)) == pytest.approx(0.55)
+
+
+def test_spread_penalty_multiplier_one_sided_book():
+    assert spread_penalty_multiplier(_market(yes_bid=0.0, yes_ask=80.0)) == pytest.approx(0.50)
+    assert spread_penalty_multiplier(_market(yes_bid=20.0, yes_ask=0.0)) == pytest.approx(0.50)
+
+
+# ---------------------------------------------------------------------------
 # relative_historical_volume_score
 # ---------------------------------------------------------------------------
 
@@ -116,16 +137,40 @@ def test_volume_spike_flat():
     assert score == pytest.approx(0.0, abs=0.01)
 
 
-def test_volume_spike_2_5x():
-    # Last candle is 2.5× the baseline average
+def test_volume_spike_2_5x_scores_half():
     candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(23)]
     candles.append(_candle(timestamp_seconds=23, volume=250.0))
+    score = volume_spike_short_term_score(candles)
+    assert score == pytest.approx(0.5, abs=0.01)
+
+
+def test_volume_spike_5x_scores_full():
+    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(23)]
+    candles.append(_candle(timestamp_seconds=23, volume=500.0))
     score = volume_spike_short_term_score(candles)
     assert score == pytest.approx(1.0, abs=0.01)
 
 
+def test_volume_spike_sparse_two_candles_scores_but_caps_confidence():
+    candles = [
+        _candle(timestamp_seconds=0, volume=119.0),
+        _candle(timestamp_seconds=1, volume=1500.0),
+    ]
+    score = volume_spike_short_term_score(candles)
+    assert score == pytest.approx(0.85, abs=0.01)
+
+
+def test_volume_spike_tiny_absolute_volume_is_capped():
+    candles = [
+        _candle(timestamp_seconds=0, volume=1.0),
+        _candle(timestamp_seconds=1, volume=20.0),
+    ]
+    score = volume_spike_short_term_score(candles)
+    assert score == pytest.approx(0.4, abs=0.01)
+
+
 def test_volume_spike_insufficient_candles():
-    candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(3)]
+    candles = [_candle(timestamp_seconds=0, volume=100.0)]
     assert volume_spike_short_term_score(candles) is None
 
 
@@ -270,6 +315,29 @@ def test_score_all_composites_in_range():
     scorer = MarketScorer()
     for scored_market in scorer.score_all(markets, store):
         assert 0.0 <= scored_market.composite_score <= 1.0
+
+
+def test_score_all_applies_spread_penalty_but_preserves_raw_score():
+    markets = [
+        _market("TIGHT", volume_24h=500, open_interest=500, yes_bid=40.0, yes_ask=42.0),
+        _market("WIDE", volume_24h=500, open_interest=500, yes_bid=20.0, yes_ask=45.0),
+    ]
+    store = _store()
+    daily_candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(30)]
+    for ticker in ("TIGHT", "WIDE"):
+        store.update_daily(ticker, daily_candles)
+    scorer = MarketScorer()
+    result = scorer.score_all(markets, store)
+
+    tight = next(scored_market for scored_market in result if scored_market.market.ticker == "TIGHT")
+    wide = next(scored_market for scored_market in result if scored_market.market.ticker == "WIDE")
+
+    assert tight.raw_composite_score == pytest.approx(1.0)
+    assert wide.raw_composite_score == pytest.approx(1.0)
+    assert tight.spread_penalty_multiplier == pytest.approx(1.0)
+    assert wide.spread_penalty_multiplier == pytest.approx(0.55)
+    assert wide.composite_score == pytest.approx(0.55)
+    assert result[0].market.ticker == "TIGHT"
 
 
 def test_score_all_empty_input():

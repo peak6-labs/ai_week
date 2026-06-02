@@ -11,6 +11,26 @@ def volume_oi_ratio_score(market: Market) -> float:
     return min(1.0, ratio / 0.50)
 
 
+def spread_penalty_multiplier(market: Market) -> float:
+    """Liquidity multiplier from the YES bid/ask spread.
+
+    Tight spreads preserve the raw actionability score. Wider or one-sided books
+    reduce the ranking score because they are harder to enter or exit cleanly.
+    """
+    if market.yes_bid <= 0 or market.yes_ask <= 0:
+        return 0.50
+    spread_cents = max(0.0, market.yes_ask - market.yes_bid)
+    if spread_cents <= 2.0:
+        return 1.00
+    if spread_cents <= 5.0:
+        return 0.95
+    if spread_cents <= 10.0:
+        return 0.85
+    if spread_cents <= 20.0:
+        return 0.70
+    return 0.55
+
+
 def relative_historical_volume_score(
     daily_candles: list[Candle],
     volume_24h: int,
@@ -31,12 +51,16 @@ def relative_historical_volume_score(
 
 
 def volume_spike_short_term_score(hourly_candles: list[Candle]) -> float | None:
-    """Is the last hour unusually active vs this market's average hourly volume?
+    """Is the latest active hour unusually active vs prior active hours?
 
-    Requires at least 4 hourly candles (last 1h vs prior 3h+ baseline).
-    Score = 0.0 at baseline, 1.0 at 2.5× baseline.
+    Kalshi returns sparse candles for thin markets, so missing hours generally
+    mean no activity rather than a failed cache read.
+
+    Requires at least 2 hourly candles. Score = 0.0 at baseline, about 0.5 at
+    2.5× baseline, and 1.0 at 5× baseline. Sparse 2-3 candle histories are
+    capped slightly because the baseline is thinner.
     """
-    if len(hourly_candles) < 4:
+    if len(hourly_candles) < 2:
         return None
     sorted_candles = sorted(hourly_candles, key=lambda c: c.end_period_ts)
     last = sorted_candles[-1]
@@ -44,11 +68,27 @@ def volume_spike_short_term_score(hourly_candles: list[Candle]) -> float | None:
     baseline_volumes = [candle.volume for candle in prior if candle.volume >= 0]
     if not baseline_volumes:
         return None
+
+    if last.volume < 10:
+        return 0.0
+
     baseline = sum(baseline_volumes) / len(baseline_volumes)
     if baseline <= 0:
-        return 0.0
-    ratio = last.volume / baseline
-    return min(1.0, max(0.0, (ratio - 1.0) / 1.5))
+        score = 1.0
+    else:
+        ratio = last.volume / baseline
+        if ratio <= 1.0:
+            score = 0.0
+        elif ratio <= 2.5:
+            score = (ratio - 1.0) / 3.0
+        else:
+            score = min(1.0, 0.5 + ((ratio - 2.5) / 5.0))
+
+    if last.volume < 25:
+        score = min(score, 0.4)
+    if len(hourly_candles) < 4:
+        score = min(score, 0.85)
+    return score
 
 
 def oi_change_score(hourly_candles: list[Candle]) -> float | None:

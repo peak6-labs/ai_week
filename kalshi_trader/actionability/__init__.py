@@ -5,6 +5,7 @@ from kalshi_trader.actionability.signals import (
     oi_change_score,
     orderbook_skew_score,
     relative_historical_volume_score,
+    spread_penalty_multiplier,
     volume_oi_ratio_score,
     volume_spike_short_term_score,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "oi_change_score",
     "orderbook_skew_score",
     "relative_historical_volume_score",
+    "spread_penalty_multiplier",
     "volume_oi_ratio_score",
     "volume_spike_short_term_score",
 ]

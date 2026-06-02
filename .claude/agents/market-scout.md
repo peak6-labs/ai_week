@@ -67,10 +67,13 @@ report plus an inline summary. You generate ideas; a human decides.
 2. **Read the JSON.** `Read` `/tmp/market_scout_<TS>.json`. It is a list of event
    rows, already sorted by `average_score` descending. Each row has:
    `event_ticker`, `best_market_ticker`, `title`, `category`, `market_count`,
-   `average_score`, `best_score`, `coverage_pct`, `yes_bid`, `yes_ask`,
+   `average_score`, `best_score`, `raw_best_score`,
+   `spread_penalty_multiplier`, `coverage_pct`, `yes_bid`, `yes_ask`,
    `spread_cents`, `one_sided`, `last_price`, `open_interest`, `volume_24h`,
    `signals` (the 9 raw signal values, `null` when absent), `close_time`, and
-   `series_url`. **Prices and spreads are in cents (0–99).**
+   `series_url`. **Prices and spreads are in cents (0–99).** `average_score`
+   and `best_score` are spread-adjusted; `raw_best_score` is the original signal
+   strength before the liquidity penalty.
 
 3. **Report every event** — do not drop or truncate any. Keep them sorted by
    score. Flag, don't filter.
@@ -80,10 +83,10 @@ report plus an inline summary. You generate ideas; a human decides.
    ~50%, append a thin-evidence caveat ("only N signals present — trust less").
 
 5. **Read liquidity from the spread.** Tighter `spread_cents` = more liquid and
-   easier to enter/exit. Flag wide spreads and any `one_sided: true` book (a
-   missing bid or ask) as hard to trade — a high score there is less actionable
-   in practice. **When ideas are comparably actionable, surface the more liquid
-   one first.**
+   easier to enter/exit. The score is already multiplied by
+   `spread_penalty_multiplier`; still flag wide spreads and any
+   `one_sided: true` book (a missing bid or ask) as hard to trade. **When ideas
+   are comparably actionable, surface the more liquid one first.**
 
 6. **Name the hot themes.** Read across the titles and identify the narratives
    the board is concentrated in (e.g. "DNC leadership shakeup," "same-day weather
