@@ -137,22 +137,35 @@ class MarketScanner:
         orderbook_top_n: int = 20,
         category: str | None = None,
         markets_file: Path | str | None = None,
+        should_enrich_categories: bool = False,
+        markets: list[Market] | None = None,
     ) -> list[ScoredMarket]:
         """Score open markets and return them ranked by actionability.
 
         Flow:
-          1. Fetch all open markets (live) — or load from markets_file if provided
-          2. Filter to active categories + markets with open_interest >= 100 and volume_24h >= 10
-          3. Refresh stale candles for filtered tickers (SQLite cache; API only when stale)
-          4. Compute candle-based signals for all markets
-          5. Fetch live trades for top N → OFI signal
-          6. Fetch live orderbooks for top N → depth skew signal
-          7. Re-rank and return
+          1. Use a pre-supplied ``markets`` list, else load from ``markets_file``,
+             else fetch all open markets (live)
+          2. (live only, opt-in) Enrich categories from /events so the category
+             filter works — prod /markets returns empty category fields
+          3. Filter to active categories + markets with open_interest >= 100 and volume_24h >= 10
+          4. Refresh stale candles for filtered tickers (SQLite cache; API only when stale)
+          5. Compute candle-based signals for all markets
+          6. Fetch live trades for top N → OFI signal
+          7. Fetch live orderbooks for top N → depth skew signal
+          8. Re-rank and return
+
+        ``markets`` lets a caller supply an already-loaded, already-filtered list
+        (the dashboard does this from a cached snapshot — the prod live universe is
+        ~half a million markets, far too large to paginate + enrich every cycle).
+        ``should_enrich_categories`` defaults False to preserve the CLI's existing
+        behavior. Snapshot loads (markets_file) are already category-enriched at fetch.
         """
         now = int(time.time())
         now_dt = datetime.now(timezone.utc)
 
-        if markets_file is not None:
+        if markets is not None:
+            _log.info("Scoring %d pre-supplied (pre-filtered) markets", len(markets))
+        elif markets_file is not None:
             _log.info("Loading markets from snapshot: %s", markets_file)
             snapshot_markets = load_snapshot(markets_file, now_dt)
             _log.info("Loaded %d non-expired markets from snapshot", len(snapshot_markets))
@@ -161,6 +174,8 @@ class MarketScanner:
             _log.info("Fetching all open markets...")
             markets = await self.get_open_markets()
             _log.info("Found %d open markets", len(markets))
+            if should_enrich_categories:
+                await self.enrich_categories(markets)
             markets = filter_markets(markets, category, now_dt)
             _log.info("After filters: %d markets", len(markets))
 

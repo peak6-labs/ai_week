@@ -20,19 +20,23 @@ class KalshiClient:
     Credentials and environment (demo/prod) are read from .env automatically.
     """
 
-    def __init__(self):
+    def __init__(self, executor: concurrent.futures.ThreadPoolExecutor | None = None):
         self._sync = _SyncKalshiClient.from_env()
+        # Defaults to the shared pool; callers can pass a dedicated pool to
+        # isolate latency-sensitive traffic (e.g. the dashboard's live polls)
+        # from bursty bulk traffic (e.g. the candle/scoring scan).
+        self._executor = executor or _EXECUTOR
 
     async def get(self, endpoint: str, params: dict | None = None) -> dict:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(_EXECUTOR, self._sync.get, endpoint, params)
+        return await loop.run_in_executor(self._executor, self._sync.get, endpoint, params)
 
     async def post(self, endpoint: str, body: dict) -> dict:
         path = "/trade-api/v2" + endpoint
         headers = self._sync._headers("POST", path)
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
-            _EXECUTOR,
+            self._executor,
             functools.partial(
                 self._sync._session.post,
                 self._sync.base_url + endpoint,
@@ -49,7 +53,7 @@ class KalshiClient:
         headers = self._sync._headers("DELETE", path)
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
-            _EXECUTOR,
+            self._executor,
             functools.partial(
                 self._sync._session.delete,
                 self._sync.base_url + endpoint,
@@ -98,6 +102,10 @@ class KalshiClient:
     async def get_fills(self, ticker: str | None = None) -> dict:
         params = {"ticker": ticker} if ticker else {}
         return await self.get("/portfolio/fills", params=params or None)
+
+    async def get_orders(self, status: str = "resting") -> dict:
+        """Read the account's orders (default: resting/open orders). Read-only."""
+        return await self.get("/portfolio/orders", params={"status": status})
 
     async def create_order(self, ticker: str, action: str, side: str,
                            count: int, order_type: str = "market",
