@@ -1,4 +1,4 @@
-"""Tests for OrchestratorAgent — all tests mock BaseAgent.run."""
+"""Tests for DataOrchestratorAgent — all tests mock BaseAgent.run."""
 from __future__ import annotations
 
 import json
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from kalshi_trader.agents.orchestrator_agent import (
-    OrchestratorAgent,
+from kalshi_trader.agents.data_orchestrator_agent import (
+    DataOrchestratorAgent,
     _build_trade_idea,
     _estimate_to_input,
     _parse_trade_ideas,
@@ -233,13 +233,13 @@ def test_parse_trade_ideas_side_no():
 
 
 # ---------------------------------------------------------------------------
-# OrchestratorAgent integration tests (mock BaseAgent.run)
+# DataOrchestratorAgent integration tests (mock BaseAgent.run)
 # ---------------------------------------------------------------------------
 
-def _make_orchestrator() -> OrchestratorAgent:
-    """Create OrchestratorAgent without touching the real Anthropic client."""
-    with patch("kalshi_trader.agents.orchestrator_agent.BaseAgent"):
-        agent = OrchestratorAgent()
+def _make_orchestrator() -> DataOrchestratorAgent:
+    """Create DataOrchestratorAgent without touching the real Anthropic client."""
+    with patch("kalshi_trader.agents.data_orchestrator_agent.BaseAgent"):
+        agent = DataOrchestratorAgent()
     return agent
 
 
@@ -353,7 +353,7 @@ async def test_run_returns_empty_on_agent_no_json():
 
 
 # ---------------------------------------------------------------------------
-# OrchestratorAgent._get_market_signals
+# DataOrchestratorAgent._get_market_signals
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -401,7 +401,7 @@ async def test_get_market_signals_no_market_context():
 
 
 # ---------------------------------------------------------------------------
-# OrchestratorAgent._build_trade_idea_handler
+# DataOrchestratorAgent._build_trade_idea_handler
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
