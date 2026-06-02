@@ -37,14 +37,12 @@ def parse_signal_estimates(raw: str) -> list[SignalEstimate]:
     for item in data:
         try:
             issued_raw = item["data_issued_at"]
-            if isinstance(issued_raw, datetime):
-                data_issued_at = issued_raw
+            if isinstance(issued_raw, str):
+                data_issued_at = datetime.fromisoformat(issued_raw)
                 if data_issued_at.tzinfo is None:
                     data_issued_at = data_issued_at.replace(tzinfo=timezone.utc)
             else:
-                data_issued_at = datetime.fromisoformat(str(issued_raw))
-                if data_issued_at.tzinfo is None:
-                    data_issued_at = data_issued_at.replace(tzinfo=timezone.utc)
+                raise ValueError(f"Unexpected type for data_issued_at: {type(issued_raw)}")
 
             sig = SignalEstimate(
                 source=str(item["source"]),

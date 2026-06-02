@@ -33,15 +33,15 @@ def build_weather_signal(
 
     # Determine probability and uncertainty
     if metric in ("temp_high", "temp_low"):
-        high = forecast.get("temp_high") or 85.0
-        low = forecast.get("temp_low") or 65.0
+        high = forecast["temp_high"] if forecast.get("temp_high") is not None else 85.0
+        low = forecast["temp_low"] if forecast.get("temp_low") is not None else 65.0
         mean = (high + low) / 2.0
         std = max((high - low) / 4.0, 1.0)
         dist = scipy.stats.norm(mean, std)
         raw_prob = float(dist.sf(threshold) if operator == "above" else dist.cdf(threshold))
         uncertainty = 0.08
     elif metric == "precipitation":
-        raw_prob = (forecast.get("precip_pct") or 0) / 100.0
+        raw_prob = forecast.get("precip_pct", 0) / 100.0
         uncertainty = 0.05
     else:
         raise ValueError(f"Unsupported metric: {metric}")

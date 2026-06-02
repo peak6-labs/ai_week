@@ -52,6 +52,8 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 # Polymarket — unauthenticated public API with no published rate limit.
 # Keep concurrent requests low to avoid IP bans. Overrideable via env var.
 POLYMARKET_MAX_CONCURRENT = int(os.environ.get("POLYMARKET_MAX_CONCURRENT", "8"))
+# Enable composite 3-signal whale scorer (win rate + direction accuracy + evidence weight).
+WHALE_SCORER_V2: bool = os.environ.get("WHALE_SCORER_V2", "true").lower() not in ("0", "false", "no")
 
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"

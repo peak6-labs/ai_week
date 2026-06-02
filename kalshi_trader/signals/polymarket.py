@@ -29,10 +29,15 @@ def build_price_signal(
     if fetched_at is None:
         fetched_at = datetime.now(tz=timezone.utc)
 
-    direction = "above" if gap_cents > 0 else "below"
+    if gap_cents > 0:
+        direction_str = "higher"
+    elif gap_cents < 0:
+        direction_str = "lower"
+    else:
+        direction_str = "equal"
     narrative = (
         f"Polymarket prices {ticker} at {poly_prob:.0%} "
-        f"({abs(gap_cents):.1f}¢ {direction} Kalshi). "
+        f"({abs(gap_cents):.1f}¢ {direction_str} than Kalshi). "
         f"Market match confidence: {match_score:.0%}."
     )
 
@@ -72,12 +77,24 @@ def build_whale_signal(
     if not whale_entries:
         return None
 
+    # Filter out malformed entries missing required keys
+    valid_entries = []
+    for e in whale_entries:
+        try:
+            _ = e["wallet_address"], e["side"], e["entry_price"], e["size_usd"]
+            valid_entries.append(e)
+        except KeyError:
+            continue
+
+    if not valid_entries:
+        return None
+
     # Parse timestamps and compute size-weighted implied YES probability
     total_size = 0.0
     weighted_prob = 0.0
     timestamps: list[datetime] = []
 
-    for entry in whale_entries:
+    for entry in valid_entries:
         size = float(entry["size_usd"])
         side = entry["side"].upper()
         entry_price = float(entry["entry_price"])
@@ -87,7 +104,7 @@ def build_whale_signal(
         weighted_prob += implied_yes * size
 
         # Parse timestamp
-        ts = entry["timestamp"]
+        ts = entry.get("timestamp")
         if isinstance(ts, str):
             parsed = datetime.fromisoformat(ts)
             if parsed.tzinfo is None:
@@ -98,10 +115,13 @@ def build_whale_signal(
                 ts = ts.replace(tzinfo=timezone.utc)
             timestamps.append(ts)
 
-    probability = weighted_prob / total_size if total_size > 0 else 0.5
+    if total_size == 0:
+        return None
+
+    probability = weighted_prob / total_size
 
     # Distinct wallets determine uncertainty
-    whale_count = len({e["wallet_address"] for e in whale_entries})
+    whale_count = len({e["wallet_address"] for e in valid_entries})
     uncertainty = 0.15 if whale_count == 1 else 0.10
 
     # data_issued_at = most recent timestamp among entries

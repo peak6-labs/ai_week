@@ -45,11 +45,19 @@ def build_x_signal(
         if data_issued_at.tzinfo is None:
             data_issued_at = data_issued_at.replace(tzinfo=timezone.utc)
 
+    try:
+        source = raw_signal["source"]
+        probability = float(raw_signal["probability"])
+        uncertainty = float(raw_signal["uncertainty"])
+        weight = float(raw_signal["weight"])
+    except (KeyError, ValueError, TypeError) as e:
+        raise ValueError(f"raw_signal missing or invalid field for ticker {ticker}: {e}") from e
+
     return SignalEstimate(
-        source=raw_signal["source"],
-        probability=float(raw_signal["probability"]),
-        uncertainty=float(raw_signal["uncertainty"]),
-        weight=float(raw_signal["weight"]),
+        source=source,
+        probability=probability,
+        uncertainty=uncertainty,
+        weight=weight,
         data_issued_at=data_issued_at,
         metadata={
             "ticker": ticker,
