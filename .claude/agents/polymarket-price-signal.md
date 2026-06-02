@@ -4,6 +4,9 @@ description: >-
   Checks if Polymarket prices a Kalshi market differently. Returns a signal if
   gap > 10 cents. Use for any market that likely has a Polymarket equivalent.
 tools: Bash
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
 
@@ -32,6 +35,7 @@ You need the caller to supply:
 1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
 
    ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polymarket-price-signal: checking Poly/Kalshi gap for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.polymarket_price \
      --ticker TICKER \
@@ -46,10 +50,14 @@ You need the caller to supply:
    least 60 000 ms.
 
 2. **Check the output.**
-   - If the array is empty (`[]`), report: "No Polymarket pricing gap found for
-     TICKER — markets may not match or gap is within 10 cents."
-   - If non-empty, print the raw JSON and summarize: which direction the gap
-     favors, size of the gap in cents, and estimated edge.
+   - If the array is empty (`[]`):
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polymarket-price-signal: TICKER → no gap (markets don't match or gap <10¢)" warning
+     ```
+   - If non-empty: log gap size, direction, and edge.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polymarket-price-signal: TICKER → <N>¢ gap favoring <direction>"
+     ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the
    caller can incorporate it into a wider signal set.

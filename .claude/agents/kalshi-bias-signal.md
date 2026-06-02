@@ -5,6 +5,9 @@ description: >-
   (markets under 15 cents are overpriced), political underconfidence (political
   markets compressed toward 50%). Use for all markets.
 tools: Bash
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
 
@@ -37,6 +40,7 @@ You need the caller to supply:
 1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
 
    ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: checking calibration bias for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.kalshi_bias \
      --ticker TICKER \
@@ -49,16 +53,19 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the call fails because the module does not exist, report: "kalshi_bias
-     pipeline CLI not yet implemented — create
-     `kalshi_trader/pipelines/kalshi_bias.py` before using this agent." Return
-     `[]`.
-   - If the array is empty (`[]`), report: "No bias signal found for TICKER —
-     market may not exhibit a detectable calibration bias at current price and
-     category."
-   - If non-empty, print the raw JSON and summarize: which bias type fired
-     (longshot / political / other), direction of the correction, and size of
-     the estimated mispricing in cents.
+   - If the call fails because the module does not exist:
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: pipeline CLI not yet implemented" warning
+     ```
+     Return `[]`.
+   - If the array is empty (`[]`):
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: TICKER → no bias detected at current price" warning
+     ```
+   - If non-empty: log bias type, direction, and estimated mispricing.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: TICKER → <bias-type> bias, <direction>, ~<N>¢ mispricing"
+     ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error
    notice) so the caller can incorporate it into a wider signal set.

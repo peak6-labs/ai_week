@@ -5,6 +5,9 @@ description: >-
   from Kalshi trade history. High VPIN means informed traders are active. Use
   for any liquid market.
 tools: Bash
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
 
@@ -36,6 +39,7 @@ You need the caller to supply:
 1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
 
    ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: computing OFI/VPIN for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.order_flow \
      --ticker TICKER \
@@ -46,15 +50,19 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the call fails because the module does not exist, report: "order_flow
-     pipeline CLI not yet implemented — create
-     `kalshi_trader/pipelines/order_flow.py` before using this agent." Return
-     `[]`.
-   - If the array is empty (`[]`), report: "No order-flow signal found for
-     TICKER — trade history may be too sparse or OFI/VPIN were inconclusive."
-   - If non-empty, print the raw JSON and summarize: OFI direction (buy- or
-     sell-initiated imbalance), VPIN level, and what that implies about informed
-     activity.
+   - If the call fails because the module does not exist, log and report:
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: pipeline CLI not yet implemented" warning
+     ```
+     Return `[]`.
+   - If the array is empty (`[]`):
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: TICKER → no signal (sparse trade history)" warning
+     ```
+   - If non-empty: log and summarize OFI direction, VPIN level, and informed activity implication.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: TICKER → OFI=<dir> VPIN=<v> prob=<p>"
+     ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error
    notice) so the caller can incorporate it into a wider signal set.
