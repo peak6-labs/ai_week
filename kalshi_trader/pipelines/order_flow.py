@@ -7,8 +7,10 @@ import argparse
 import asyncio
 import json
 import sys
+import kalshi_trader.config  # noqa: F401 — loads .env so ANTHROPIC_API_KEY is set
 from kalshi_trader.agents.order_flow_agent import OrderFlowAgent
 from kalshi_trader.agents.parsing import estimate_to_dict
+from kalshi_trader.client import KalshiClient
 
 
 def main() -> None:
@@ -18,7 +20,8 @@ def main() -> None:
     args = parser.parse_args()
 
     async def run() -> None:
-        agent = OrderFlowAgent()
+        client = KalshiClient()
+        agent = OrderFlowAgent(client)
         try:
             estimates = await agent.run(args.ticker, args.title)
             print(json.dumps([estimate_to_dict(e) for e in estimates], default=str))
@@ -26,8 +29,8 @@ def main() -> None:
             print(f"Error: {exc}", file=sys.stderr)
             print(json.dumps([]))
         finally:
-            if hasattr(agent, "close"):
-                await agent.close()
+            if hasattr(client, "close"):
+                await client.close()
 
     asyncio.run(run())
 
