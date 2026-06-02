@@ -5,6 +5,9 @@ description: >-
   Grok. Returns a signal based on social consensus. Most useful for politics,
   sports, crypto, and current events.
 tools: Bash
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
 
@@ -32,6 +35,7 @@ You need the caller to supply:
 1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
 
    ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "x-signal: searching X/social for TICKER (CATEGORY)"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.x \
      --ticker TICKER \
@@ -43,12 +47,14 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the array is empty (`[]`), report: "No X/social signal found for
-     TICKER — query may have returned no relevant posts or sentiment was
-     inconclusive."
-   - If non-empty, print the raw JSON and summarize: overall sentiment
-     direction, strength, and any notable signal drivers (breaking news,
-     viral posts, etc.).
+   - If the array is empty (`[]`):
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "x-signal: TICKER → no signal (inconclusive sentiment)" warning
+     ```
+   - If non-empty: log sentiment direction, strength, and key drivers.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "x-signal: TICKER → <direction> sentiment, prob=<p>"
+     ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the
    caller can incorporate it into a wider signal set.

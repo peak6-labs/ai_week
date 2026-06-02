@@ -5,6 +5,9 @@ description: >-
   Market maker withdrawal signals an expected price move. Use for liquid
   markets.
 tools: Bash
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
 
@@ -37,6 +40,7 @@ You need the caller to supply:
 1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
 
    ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: analyzing orderbook spread for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.market_maker \
      --ticker TICKER \
@@ -47,15 +51,19 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the call fails because the module does not exist, report: "market_maker
-     pipeline CLI not yet implemented — create
-     `kalshi_trader/pipelines/market_maker.py` before using this agent." Return
-     `[]`.
-   - If the array is empty (`[]`), report: "No market-maker signal found for
-     TICKER — book may be normal or depth history is insufficient."
-   - If non-empty, print the raw JSON and summarize: whether spread has widened,
-     how much depth has been pulled from each side, and the implied direction of
-     the expected price move.
+   - If the call fails because the module does not exist:
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: pipeline CLI not yet implemented" warning
+     ```
+     Return `[]`.
+   - If the array is empty (`[]`):
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → no signal (book normal)" warning
+     ```
+   - If non-empty: log spread, depth withdrawal, and implied direction.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → spread=<s>¢ withdrawal=<bool> direction=<dir>"
+     ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error
    notice) so the caller can incorporate it into a wider signal set.

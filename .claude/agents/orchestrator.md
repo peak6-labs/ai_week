@@ -6,6 +6,11 @@ description: >-
   adversarial challenge. Does not execute trades. Invoke this to start the
   trading loop.
 tools: Bash, Read, Write
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(stat *)"
+  - "Bash(KALSHI_ENV=* *)"
+  - "Bash(sleep *)"
 model: opus
 ---
 

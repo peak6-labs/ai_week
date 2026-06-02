@@ -5,6 +5,9 @@ description: >-
   probability signal. Use for markets about temperature, precipitation, wind,
   or storms.
 tools: Bash
+allowedTools:
+  - "Bash(cd /Users/scorley/code*)"
+  - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
 
@@ -31,6 +34,7 @@ You need the caller to supply:
 1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
 
    ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: fetching NOAA forecast for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.weather \
      --ticker TICKER \
@@ -41,11 +45,14 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the array is empty (`[]`), report: "No weather signal found for
-     TICKER — NOAA GFS data may be unavailable or the market does not match a
-     supported weather variable."
-   - If non-empty, print the raw JSON and then a one-line summary: signal
-     direction, probability estimate, and confidence if present.
+   - If the array is empty (`[]`): log and report.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → no signal (NOAA data unavailable or market unrecognized)" warning
+     ```
+   - If non-empty: log the result and print the raw JSON.
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → prob=<p> ±<u> (<direction>)"
+     ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the
    caller can incorporate it into a wider signal set.

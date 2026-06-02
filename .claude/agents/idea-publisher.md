@@ -40,8 +40,11 @@ the trading dashboard UI so a human can review them.
 2. **Check idea count.** If the array is empty, report "No ideas to publish —
    orchestrator returned an empty slate" and stop.
 
-3. **POST to the UI.** Run this command (replace `IDEAS_FILE` with the actual
-   path):
+3. **POST to the UI.** Log first, then post (replace `IDEAS_FILE` with the actual path):
+
+   ```bash
+   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "IdeaPublisher: posting <N> ideas to dashboard for review"
+   ```
 
    ```bash
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python -c "
