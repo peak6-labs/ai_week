@@ -33,8 +33,8 @@ class RiskManager:
         if close_time is not None:
             now = datetime.now(timezone.utc)
             # Normalise naive close_time to UTC-aware for comparison
-            ct = close_time if close_time.tzinfo else close_time.replace(tzinfo=timezone.utc)
-            hours_to_close = (ct - now).total_seconds() / 3600
+            utc_close_time = close_time if close_time.tzinfo else close_time.replace(tzinfo=timezone.utc)
+            hours_to_close = (utc_close_time - now).total_seconds() / 3600
             if hours_to_close < config.MIN_HOURS_BEFORE_SETTLEMENT:
                 return RiskDecision(False, 0, f"settlement too soon ({hours_to_close:.1f}h)")
 
@@ -46,7 +46,8 @@ class RiskManager:
 
         # Half-Kelly sizing
         size = self._half_kelly_size(
-            idea.confidence, market_prob, portfolio.balance_dollars, idea.category
+            probability=idea.confidence, market_prob=market_prob,
+            balance=portfolio.balance_dollars, category=idea.category,
         )
 
         # Clamp within per-category and total headroom
@@ -62,11 +63,11 @@ class RiskManager:
         return RiskDecision(True, round(size, 2), fees_estimate_cents=fees * 100)
 
     def estimate_fee_dollars(self, price_cents: float, size_dollars: float) -> float:
-        c = price_cents / 100.0
-        if c <= 0:
+        price_in_dollars = price_cents / 100.0
+        if price_in_dollars <= 0:
             return 0.0
-        contracts = size_dollars / c
-        fee_per_contract = 0.07 * c * (1.0 - c)
+        contracts = size_dollars / price_in_dollars
+        fee_per_contract = 0.07 * price_in_dollars * (1.0 - price_in_dollars)
         return fee_per_contract * contracts
 
     def record_loss(self, category: str) -> None:
@@ -79,14 +80,14 @@ class RiskManager:
             self._consecutive_losses[category] = 0
 
     def _half_kelly_size(
-        self, p: float, market_prob: float, balance: float, category: str
+        self, probability: float, market_prob: float, balance: float, category: str
     ) -> float:
-        q = 1.0 - p
-        b = (1.0 - market_prob) / market_prob  # net odds on YES
-        if b <= 0:
+        complement_probability = 1.0 - probability
+        yes_net_odds = (1.0 - market_prob) / market_prob  # net odds on YES
+        if yes_net_odds <= 0:
             return 0.0
-        f_star = (p * b - q) / b
-        f_half = max(f_star / 2.0, 0.0)
+        full_kelly_fraction = (probability * yes_net_odds - complement_probability) / yes_net_odds
+        half_kelly_fraction = max(full_kelly_fraction / 2.0, 0.0)
         if self._consecutive_losses.get(category, 0) >= 3:
-            f_half *= 0.5
-        return f_half * balance
+            half_kelly_fraction *= 0.5
+        return half_kelly_fraction * balance

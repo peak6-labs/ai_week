@@ -1,8 +1,16 @@
 from __future__ import annotations
 import asyncio
+import concurrent.futures
+import functools
 from typing import Any
 import requests
 from kalshi_auth import KalshiClient as _SyncKalshiClient
+
+# Dedicated pool so candle batch requests aren't capped at the process default
+# (~22 threads on this machine). Tune against Kalshi rate limits if needed.
+_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=64, thread_name_prefix="kalshi-http"
+)
 
 
 class KalshiClient:
@@ -16,17 +24,22 @@ class KalshiClient:
         self._sync = _SyncKalshiClient.from_env()
 
     async def get(self, endpoint: str, params: dict | None = None) -> dict:
-        return await asyncio.to_thread(self._sync.get, endpoint, params)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(_EXECUTOR, self._sync.get, endpoint, params)
 
     async def post(self, endpoint: str, body: dict) -> dict:
         path = "/trade-api/v2" + endpoint
         headers = self._sync._headers("POST", path)
-        resp = await asyncio.to_thread(
-            requests.post,
-            self._sync.base_url + endpoint,
-            headers=headers,
-            json=body,
-            timeout=15,
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            _EXECUTOR,
+            functools.partial(
+                self._sync._session.post,
+                self._sync.base_url + endpoint,
+                headers=headers,
+                json=body,
+                timeout=15,
+            ),
         )
         resp.raise_for_status()
         return resp.json()
@@ -34,18 +47,36 @@ class KalshiClient:
     async def delete(self, endpoint: str, params: dict | None = None) -> dict:
         path = "/trade-api/v2" + endpoint
         headers = self._sync._headers("DELETE", path)
-        resp = await asyncio.to_thread(
-            requests.delete,
-            self._sync.base_url + endpoint,
-            headers=headers,
-            params=params,
-            timeout=15,
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            _EXECUTOR,
+            functools.partial(
+                self._sync._session.delete,
+                self._sync.base_url + endpoint,
+                headers=headers,
+                params=params,
+                timeout=15,
+            ),
         )
         resp.raise_for_status()
         return resp.json()
 
+    async def get_series(self) -> list[dict]:
+        """Return all series objects (ticker + category)."""
+        resp = await self.get("/series")
+        return resp.get("series") or []
+
+    async def get_events(self, status: str = "open", cursor: str = "",
+                         limit: int = 200, **kwargs) -> dict:
+        params: dict[str, Any] = {"status": status, "limit": limit,
+                                   "with_nested_markets": "true"}
+        if cursor:
+            params["cursor"] = cursor
+        params.update(kwargs)
+        return await self.get("/events", params=params)
+
     async def get_markets(self, status: str = "open", cursor: str = "",
-                          limit: int = 200, **kwargs) -> dict:
+                          limit: int = 1000, **kwargs) -> dict:
         params: dict[str, Any] = {"status": status, "limit": limit}
         if cursor:
             params["cursor"] = cursor
@@ -81,3 +112,39 @@ class KalshiClient:
 
     async def cancel_order(self, order_id: str) -> dict:
         return await self.delete(f"/portfolio/orders/{order_id}")
+
+    async def get_market_candlesticks_batch(
+        self,
+        tickers: list[str],
+        start_ts: int,
+        end_ts: int,
+        period_interval: int,
+    ) -> dict:
+        """Fetch OHLCV candles for up to 100 tickers in one request.
+
+        period_interval: minutes — 1, 60, or 1440.
+        Returns up to 10,000 total candles across all tickers.
+        """
+        params: dict[str, Any] = {
+            "market_tickers": ",".join(tickers),
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+            "period_interval": period_interval,
+        }
+        return await self.get("/markets/candlesticks", params=params)
+
+    async def get_trades(
+        self,
+        ticker: str,
+        min_ts: int | None = None,
+        limit: int = 1000,
+    ) -> dict:
+        """Fetch recent public trades for a market.
+
+        min_ts: Unix timestamp lower bound (inclusive).
+        taker_outcome_side on each trade is "yes" or "no" — exact buy direction.
+        """
+        params: dict[str, Any] = {"ticker": ticker, "limit": limit}
+        if min_ts is not None:
+            params["min_ts"] = min_ts
+        return await self.get("/markets/trades", params=params)

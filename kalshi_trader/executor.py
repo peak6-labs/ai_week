@@ -25,7 +25,7 @@ class TradeExecutor:
         if idea.side == Side.NO:
             yes_price = 100 - yes_price
 
-        resp = await self._client.create_order(
+        order_response = await self._client.create_order(
             ticker=idea.ticker,
             action=idea.action.value,
             side=idea.side.value,
@@ -33,17 +33,17 @@ class TradeExecutor:
             order_type="market",
             yes_price=yes_price,
         )
-        order = resp.get("order", {})
-        fill_price = float(order.get("yes_price", yes_price))
+        order_data = order_response.get("order", {})
+        fill_price = float(order_data.get("yes_price", yes_price))
 
         result = OrderResult(
-            order_id=order.get("order_id", ""),
+            order_id=order_data.get("order_id", ""),
             ticker=idea.ticker,
             side=idea.side,
             action=idea.action,
             size_dollars=count * price_dollars,
             fill_price=fill_price,
-            status=order.get("status", "unknown"),
+            status=order_data.get("status", "unknown"),
             created_at=datetime.utcnow(),
         )
 

@@ -4,15 +4,15 @@ from pathlib import Path
 
 def _load_dotenv(path: str = ".env") -> None:
     """Minimal .env loader — does not overwrite vars already set in the environment."""
-    p = Path(path)
-    if not p.exists():
+    dotenv_path = Path(path)
+    if not dotenv_path.exists():
         return
-    for line in p.read_text().splitlines():
+    for line in dotenv_path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+        variable_name, _, variable_value = line.partition("=")
+        os.environ.setdefault(variable_name.strip(), variable_value.strip())
 
 
 _load_dotenv()
