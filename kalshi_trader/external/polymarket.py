@@ -13,9 +13,33 @@ import re
 import ssl
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import aiohttp
 import truststore
+
+_TARGETS_DEFAULT = Path(__file__).parent.parent / "data" / "targets.json"
+
+
+def load_whale_targets(path: str | Path = _TARGETS_DEFAULT) -> list[str]:
+    """Load whale wallet addresses from a JSON targets file.
+
+    Returns an empty list if the file doesn't exist or contains no wallets.
+    """
+    p = Path(path)
+    if not p.exists():
+        return []
+    data = json.loads(p.read_text())
+    return data.get("wallets", [])
+
+
+def save_whale_targets(wallets: list[str], path: str | Path = _TARGETS_DEFAULT) -> None:
+    """Persist whale wallet addresses to the JSON targets file."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    existing = json.loads(p.read_text()) if p.exists() else {}
+    existing["wallets"] = wallets
+    p.write_text(json.dumps(existing, indent=2))
 
 from kalshi_trader.models import SignalEstimate
 

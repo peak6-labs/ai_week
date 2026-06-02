@@ -1,0 +1,4 @@
+{
+  "_comment": "Whale wallet addresses for Polymarket copy-trading. Populate via: python -m kalshi_trader.refresh_targets",
+  "wallets": []
+}
