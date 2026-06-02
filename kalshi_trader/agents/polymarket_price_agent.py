@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import json
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -11,7 +12,7 @@ from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dic
 from kalshi_trader.signals.polymarket import build_price_signal
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
-_CLI = "/tmp/polymarket"
+_CLI = os.environ.get("POLYMARKET_CLI_PATH", str(Path.home() / ".local" / "bin" / "polymarket"))
 _MIN_DEPTH_USD = 500.0
 
 
