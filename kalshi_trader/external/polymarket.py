@@ -8,6 +8,7 @@ Both feed into the Kalshi agent as SignalEstimate / WhaleSignal objects.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import ssl
@@ -20,32 +21,47 @@ import truststore
 
 _TARGETS_DEFAULT = Path(__file__).parent.parent / "data" / "targets.json"
 
+# SSL context created once per process — truststore.SSLContext is expensive to construct
+_SSL_CTX: ssl.SSLContext | None = None
 
-def load_whale_targets(path: str | Path = _TARGETS_DEFAULT) -> list[str]:
-    """Load whale wallet addresses from a JSON targets file.
 
-    Returns an empty list if the file doesn't exist or contains no wallets.
+def load_whale_targets(
+    scorer: str = "winrate", path: str | Path = _TARGETS_DEFAULT
+) -> list[str]:
+    """Load a named whale wallet list from the targets file.
+
+    Args:
+        scorer: "winrate" (win-rate only) or "composite" (multi-signal).
+                Falls back to legacy "wallets" key for old files.
+        path:   Path to the targets JSON file.
     """
     p = Path(path)
     if not p.exists():
         return []
     data = json.loads(p.read_text())
-    return data.get("wallets", [])
+    return data.get(scorer, data.get("wallets", []))
 
 
-def save_whale_targets(wallets: list[str], path: str | Path = _TARGETS_DEFAULT) -> None:
-    """Persist whale wallet addresses to the JSON targets file."""
+def save_whale_targets(
+    wallets: list[str],
+    scorer: str = "winrate",
+    path: str | Path = _TARGETS_DEFAULT,
+) -> None:
+    """Persist a named whale wallet list without overwriting other scorer lists."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     existing = json.loads(p.read_text()) if p.exists() else {}
-    existing["wallets"] = wallets
+    existing[scorer] = wallets
     p.write_text(json.dumps(existing, indent=2))
 
+from kalshi_trader import config
 from kalshi_trader.models import SignalEstimate
 
 def _ssl_context() -> ssl.SSLContext:
-    ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    return ctx
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        _SSL_CTX = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    return _SSL_CTX
 
 from dataclasses import dataclass, field as _field
 
@@ -119,6 +135,33 @@ def _numbers_compatible(a: list[float], b: list[float]) -> bool:
 
 
 class PolymarketClient:
+    def __init__(self, max_concurrent: int | None = None) -> None:
+        self._session: aiohttp.ClientSession | None = None
+        limit = max_concurrent if max_concurrent is not None else config.POLYMARKET_MAX_CONCURRENT
+        self._semaphore = asyncio.Semaphore(limit)
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(ssl=_ssl_context())
+            self._session = aiohttp.ClientSession(connector=connector)
+        return self._session
+
+    async def _get(self, url: str, params: dict | None = None) -> object:
+        async with self._semaphore:
+            async with self._get_session().get(url, params=params) as resp:
+                return await resp.json()
+
+    async def close(self) -> None:
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+    async def __aenter__(self) -> "PolymarketClient":
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await self.close()
+
     def to_signal_estimate(self, market: dict) -> SignalEstimate:
         prices = json.loads(market["outcomePrices"])
         yes_price = float(prices[0])
@@ -223,24 +266,44 @@ class PolymarketClient:
         wins = sum(1 for p in positions if float(p.get("cashPnl", 0)) > 0)
         return wins / len(positions)
 
+    def score_wallet_v2(self, positions: list[dict]) -> float:
+        """Composite 3-signal scorer (WHALE_SCORER_V2=true).
+
+        Combines:
+        - win_rate (0.50 weight): fraction of positions with positive cashPnl
+        - direction_accuracy (0.30): fraction where curPrice > avgPrice
+          (market moved in the wallet's favour regardless of realised PnL)
+        - evidence_weight (0.20): confidence factor; full weight at 10+ positions
+
+        Returns 0.0 if no positions.
+        """
+        if not positions:
+            return 0.0
+        n = len(positions)
+        wins = sum(1 for p in positions if float(p.get("cashPnl", 0)) > 0)
+        win_rate = wins / n
+        directional = sum(
+            1 for p in positions
+            if float(p.get("curPrice", 0)) > float(p.get("avgPrice", 0))
+        )
+        direction_accuracy = directional / n
+        evidence_weight = min(n / 10.0, 1.0)
+        return 0.50 * win_rate + 0.30 * direction_accuracy + 0.20 * evidence_weight
+
     async def get_large_trades(
         self, condition_id: str, min_size_usd: float = 500.0, limit: int = 100
     ) -> list[dict]:
         """Fetch recent trades for a market, filtered to large positions only."""
-        params = {"market": condition_id, "limit": str(limit)}
-        connector = aiohttp.TCPConnector(ssl=_ssl_context())
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(f"{_DATA_BASE}/trades", params=params) as resp:
-                raw: list[dict] = await resp.json()
+        raw: list[dict] = await self._get(  # type: ignore[assignment]
+            f"{_DATA_BASE}/trades", {"market": condition_id, "limit": str(limit)}
+        )
         return [t for t in raw if float(t.get("size", 0)) >= min_size_usd]
 
     async def get_wallet_positions(self, address: str, limit: int = 100) -> list[dict]:
         """Fetch current open positions for a wallet address."""
-        params = {"user": address, "limit": str(limit)}
-        connector = aiohttp.TCPConnector(ssl=_ssl_context())
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(f"{_DATA_BASE}/positions", params=params) as resp:
-                return await resp.json()
+        return await self._get(  # type: ignore[return-value]
+            f"{_DATA_BASE}/positions", {"user": address, "limit": str(limit)}
+        )
 
     # ------------------------------------------------------------------
     # Gamma API
@@ -248,11 +311,9 @@ class PolymarketClient:
 
     async def get_markets(self, limit: int = 500) -> list[dict]:
         """Fetch active markets from Polymarket Gamma API."""
-        params = {"active": "true", "closed": "false", "limit": str(limit)}
-        connector = aiohttp.TCPConnector(ssl=_ssl_context())
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(f"{_GAMMA_BASE}/markets", params=params) as resp:
-                raw: list[dict] = await resp.json()
+        raw: list[dict] = await self._get(  # type: ignore[assignment]
+            f"{_GAMMA_BASE}/markets", {"active": "true", "closed": "false", "limit": str(limit)}
+        )
         return [m for m in raw if m.get("active") and not m.get("closed")]
 
     async def bootstrap_whale_targets(
@@ -260,38 +321,55 @@ class PolymarketClient:
         min_score: float = 0.6,
         top_n: int = 50,
         market_limit: int = 100,
-        trade_min_size: float = 500.0,
+        trade_min_size: float = 100.0,
     ) -> list[str]:
         """Build initial target wallet list by scanning markets for profitable large traders.
 
         Steps:
         1. Fetch market_limit active markets.
-        2. For each market, fetch large trades (above trade_min_size).
+        2. Fetch large trades for ALL markets concurrently.
         3. Collect all unique wallet addresses from those trades.
-        4. For each unique wallet, fetch positions and score profitability.
-        5. Keep wallets with score >= min_score.
-        6. Sort by score descending, return top N wallet addresses.
+        4. Fetch positions for ALL wallets concurrently and score profitability.
+        5. Keep wallets with score >= min_score, return top N by score.
         """
         markets = await self.get_markets(limit=market_limit)
+        print(f"  Scanning {len(markets)} markets for trades >= ${trade_min_size}…", flush=True)
 
-        # Collect unique wallets across all markets
+        # Parallel: fetch trades for all markets at once
+        trade_results = await asyncio.gather(
+            *[self.get_large_trades(m.get("conditionId", ""), min_size_usd=trade_min_size)
+              for m in markets],
+            return_exceptions=True,
+        )
+
         unique_wallets: set[str] = set()
-        for market in markets:
-            condition_id = market.get("conditionId", "")
-            trades = await self.get_large_trades(condition_id, min_size_usd=trade_min_size)
-            for trade in trades:
+        for result in trade_results:
+            if isinstance(result, BaseException):
+                continue
+            for trade in result:
                 wallet = trade.get("proxyWallet")
                 if wallet:
                     unique_wallets.add(wallet)
 
-        # Score each wallet
+        print(f"  Found {len(unique_wallets)} unique wallets, scoring…", flush=True)
+        if not unique_wallets:
+            return []
+
+        # Parallel: score all wallets at once
+        wallet_list = list(unique_wallets)
+        pos_results = await asyncio.gather(
+            *[self.get_wallet_positions(w) for w in wallet_list],
+            return_exceptions=True,
+        )
+
+        scorer = self.score_wallet_v2 if config.WHALE_SCORER_V2 else self.score_wallet_profitability
         scored: list[tuple[float, str]] = []
-        for wallet in unique_wallets:
-            positions = await self.get_wallet_positions(wallet)
-            score = self.score_wallet_profitability(positions)
+        for wallet, result in zip(wallet_list, pos_results):
+            if isinstance(result, BaseException):
+                continue
+            score = scorer(result)
             if score >= min_score:
                 scored.append((score, wallet))
 
-        # Sort by score descending, return top N addresses
         scored.sort(key=lambda x: x[0], reverse=True)
         return [wallet for _, wallet in scored[:top_n]]

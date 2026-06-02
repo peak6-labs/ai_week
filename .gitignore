@@ -228,3 +228,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .worktrees/
+
+# Superpowers brainstorming mockups
+.superpowers/

@@ -1,26 +1,37 @@
 """CLI to refresh targets.json from live Polymarket data.
 
 Usage:
-    python -m kalshi_trader.refresh_targets [--min-score 0.6] [--top-n 50]
+    # V1 scorer (win-rate only, default)
+    python -m kalshi_trader.refresh_targets
+
+    # V2 scorer (composite: win-rate + direction + evidence)
+    WHALE_SCORER_V2=true python -m kalshi_trader.refresh_targets
+
+Both commands save under separate keys so neither overwrites the other.
+Load with: load_whale_targets(scorer="winrate") or scorer="composite".
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 
+from kalshi_trader import config
 from kalshi_trader.external.polymarket import (
     PolymarketClient,
-    load_whale_targets,
     save_whale_targets,
 )
 
 
 async def _run(min_score: float, top_n: int) -> None:
-    client = PolymarketClient()
-    print(f"Scanning Polymarket for top-{top_n} wallets (min_score={min_score})…")
-    wallets = await client.bootstrap_whale_targets(min_score=min_score, top_n=top_n)
-    save_whale_targets(wallets)
-    print(f"Saved {len(wallets)} whale wallet(s) to targets.json")
+    scorer_key = "composite" if config.WHALE_SCORER_V2 else "winrate"
+    print(
+        f"Scanning Polymarket for top-{top_n} wallets "
+        f"(scorer={scorer_key}, min_score={min_score})…"
+    )
+    async with PolymarketClient() as client:
+        wallets = await client.bootstrap_whale_targets(min_score=min_score, top_n=top_n)
+    save_whale_targets(wallets, scorer=scorer_key)
+    print(f"Saved {len(wallets)} wallet(s) to targets.json under key '{scorer_key}'")
     for w in wallets:
         print(f"  {w}")
 
