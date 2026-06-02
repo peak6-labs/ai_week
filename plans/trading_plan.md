@@ -30,10 +30,33 @@ The core thesis from expert advice (Vishal, Benny G) and the Prediction Arena pa
 ### Primary: Kalshi
 - CFTC-regulated, USD-settled, zero surprise on compliance
 - Official Python SDK: `kalshi_python_async` (pip install)
-- Taker fee formula: `0.035 × C × P × (1−P)` — fees are highest at 50-cent contracts, minimal at extremes
+- Fee structure: varies by order type and market — see **Kalshi Fee Structure** below
 - WebSocket feed for real-time order book
 - Rate limits: Basic tier — 200 read tokens/s, 100 write tokens/s
 - Key categories: Sports (80% of volume), Politics, Economics, Weather, Crypto, Culture/Mentions
+
+### Kalshi Fee Structure
+
+Fees scale with `C × P × (1−P)` (C = contracts, P = price in dollars): highest at 50-cent
+contracts, approaching zero at the extremes. The coefficient depends on order type and market.
+
+| Order type | Coefficient | Formula | Notes |
+|------------|-------------|---------|-------|
+| **Taker** (default / general markets) | `0.07` | `ceil(0.07 × C × P × (1−P))` | Standard trading fee. **Rounded up to the next cent per order.** |
+| **Maker** (resting limit orders that add liquidity) | `0` on most markets | — | Generally free; historically $0 on the bulk of markets. |
+| **Per-market exceptions** (e.g. S&P 500 / Nasdaq index markets) | `0.035` | `ceil(0.035 × C × P × (1−P))` | Reduced taker coefficient; these markets *do* also charge maker fees. |
+
+**Worked example (general taker):** $100 position at 50¢ → `0.07 × (100/0.50) × 0.50 × 0.50` = **$3.50**.
+
+> ⚠️ **Verify before relying on these numbers.** Kalshi's fee schedule is per-market and changes
+> over time. The authoritative sources are Kalshi's published fee schedule and the `fee` fields on
+> the API's `/markets` responses. The `0.035` figure is a *specific-market* taker rate (S&P/Nasdaq),
+> **not** the general taker rate — an earlier draft of this plan mislabeled it as the default.
+
+> ⚠️ **Code does not match this yet.** [`risk.py`](../kalshi_trader/risk.py) `estimate_fee_dollars`
+> applies a single flat `0.07 × C × P × (1−P)` with **no order-type distinction** and **no per-cent
+> round-up**. So it overstates fees for maker orders, understates them for the round-up, and ignores
+> the per-market `0.035` tier. Reconcile before trusting fee-adjusted EV.
 
 ### Signal Layer: Polymarket
 - All positions are publicly visible on Polygon blockchain

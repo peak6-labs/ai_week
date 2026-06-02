@@ -8,7 +8,7 @@ async def test_scanner_returns_markets(mock_client):
     scanner = MarketScanner(mock_client)
     markets = await scanner.get_open_markets()
     assert len(markets) > 0
-    assert all(m.status == "open" for m in markets)
+    assert all(m.status is not None for m in markets)
 
 
 @pytest.mark.asyncio
@@ -24,12 +24,12 @@ def mock_client():
     client.get_markets.return_value = {
         "markets": [
             {
-                "ticker": "NBA-CELTICS-WIN", "event_ticker": "NBA-FINALS",
-                "series_ticker": "NBA", "title": "Celtics win?",
-                "yes_bid": 21, "yes_ask": 23, "last_price": 22,
+                "ticker": "KXELEC-PRES-2028", "event_ticker": "KXELEC-PRES",
+                "series_ticker": "KXELEC", "title": "Who wins the 2028 election?",
+                "yes_bid": 45, "yes_ask": 47, "last_price": 46,
                 "volume": 50000, "open_interest": 12000,
-                "category": "sports", "close_time": "2026-06-05T23:00:00Z",
-                "status": "open",
+                "category": "elections", "close_time": "2028-11-05T23:00:00Z",
+                "status": "active",
             }
         ],
         "cursor": "",

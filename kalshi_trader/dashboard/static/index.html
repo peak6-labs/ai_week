@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KALSHI // PORTFOLIO MONITOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:           #080b09;
+    --bg-panel:     #0c110e;
+    --bg-elevated:  #111813;
+    --border:       #1b2620;
+    --grid-line:    #141d18;
+    --text:         #c6d6cb;
+    --text-dim:     #6c7e73;
+    --text-faint:   #3d4a42;
+    --green:        #3ddc84;
+    --green-bright: #5cffa6;
+    --red:          #ff5d6c;
+    --amber:        #ffb454;
+    --cyan:         #54d6ff;
+    --shadow:       0 1px 0 rgba(255,255,255,.02), 0 18px 40px -24px rgba(0,0,0,.9);
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background:
+      radial-gradient(120% 80% at 50% -10%, #0d140f 0%, var(--bg) 60%) fixed,
+      var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .01em;
+    min-height: 100%;
+  }
+  /* CRT scanline + vignette atmosphere — restrained, behind everything */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(
+      to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.16) 2px 3px);
+    mix-blend-mode: multiply; opacity: .35;
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
+    box-shadow: inset 0 0 220px 40px rgba(0,0,0,.6);
+  }
+
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: var(--green-bright); }
+
+  .wrap { max-width: 1500px; margin: 0 auto; padding: 14px 20px 40px; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 18px;
+    padding: 10px 14px; margin-bottom: 14px;
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg-panel));
+    border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow);
+  }
+  .wordmark { font-weight: 700; letter-spacing: .18em; font-size: 14px; white-space: nowrap; }
+  .wordmark .slash { color: var(--green); }
+  .wordmark .sub { color: var(--text-dim); font-weight: 400; }
+  .badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .14em;
+    padding: 4px 9px; border-radius: 4px;
+    color: var(--amber); border: 1px solid var(--amber);
+    box-shadow: 0 0 0 1px rgba(255,180,84,.12), 0 0 18px -6px rgba(255,180,84,.5) inset;
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .badge .dot { color: var(--red); }
+  .spacer { flex: 1; }
+  .stat-inline { color: var(--text-dim); font-size: 11.5px; letter-spacing: .08em; white-space: nowrap; }
+  .stat-inline b { color: var(--text); font-weight: 600; }
+  .live { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; letter-spacing: .1em; }
+  .live .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 8px 1px var(--green); animation: pulse 1.6s ease-in-out infinite;
+  }
+  .live.stale .pulse { background: var(--amber); box-shadow: 0 0 8px 1px var(--amber); }
+  .live.down .pulse  { background: var(--red);   box-shadow: 0 0 8px 1px var(--red); animation: none; }
+  @keyframes pulse { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.35; transform:scale(.7);} }
+
+  /* ---------- metrics strip ---------- */
+  .metrics {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 14px;
+  }
+  .metric {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 11px 13px 12px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    animation: rise .5s both;
+  }
+  .metric .label { color: var(--text-dim); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; }
+  .metric .value { font-size: 21px; font-weight: 600; margin-top: 4px; letter-spacing: -.01em; }
+  .metric .note { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; letter-spacing: .04em; }
+  .bar { height: 3px; border-radius: 2px; background: var(--grid-line); margin-top: 8px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--green); width: 0; transition: width .5s ease; }
+
+  /* ---------- layout ---------- */
+  .grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 14px; align-items: start; }
+  .col-right { display: grid; gap: 14px; }
+  @media (max-width: 1080px) { .grid { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(3, 1fr); } }
+
+  .panel {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); animation: rise .5s both; overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: baseline; gap: 10px; padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-head h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+  .panel-head .meta { color: var(--text-faint); font-size: 11px; letter-spacing: .06em; margin-left: auto; }
+  .panel-body { max-height: 64vh; overflow: auto; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    position: sticky; top: 0; z-index: 2; background: var(--bg-elevated);
+    color: var(--text-dim); font-weight: 500; font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+    text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  thead th.l, tbody td.l { text-align: left; }
+  tbody td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--grid-line); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: rgba(61,220,132,.05); }
+  .ticker { color: var(--text); font-weight: 500; }
+  .ticker:hover { color: var(--green-bright); }
+  /* Ideas table: fixed layout so the question column gets a real, readable share. */
+  #ideas-table { table-layout: fixed; }
+  .title {
+    color: var(--text); white-space: normal; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .ev { overflow: hidden; text-overflow: ellipsis; }   /* event ticker truncates if long */
+
+  .pill { font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 2px 6px; border-radius: 3px; }
+  .pill.yes { color: var(--green); background: rgba(61,220,132,.1); }
+  .pill.no  { color: var(--cyan);  background: rgba(84,214,255,.1); }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .zero { color: var(--text-dim); }
+  .dim { color: var(--text-faint); }
+  .thin { color: var(--amber); font-size: 10px; letter-spacing: .04em; white-space: nowrap; }
+
+  /* hoverable column headers + custom tooltip (instant, styled, never clipped) */
+  thead th[data-tip] { cursor: help; text-decoration: underline dotted var(--text-faint); text-underline-offset: 4px; text-decoration-thickness: 1px; }
+  thead th[data-tip]:hover { color: var(--text); }
+  #tip {
+    position: fixed; z-index: 10000; max-width: 270px;
+    background: var(--bg-elevated); color: var(--text);
+    border: 1px solid var(--border); border-left: 2px solid var(--green);
+    padding: 9px 11px; border-radius: 5px; font-size: 11.5px; line-height: 1.5;
+    letter-spacing: .01em; text-align: left; text-transform: none; font-weight: 400;
+    box-shadow: 0 12px 32px -10px rgba(0,0,0,.85); pointer-events: none;
+    opacity: 0; transform: translateY(-2px); transition: opacity .12s, transform .12s;
+  }
+  #tip.show { opacity: 1; transform: none; }
+
+  .empty, .msg { padding: 26px 16px; text-align: center; color: var(--text-faint); font-size: 12px; letter-spacing: .06em; }
+  .msg.err { color: var(--red); }
+
+  /* value-flash on change */
+  .flash-up   { animation: flashUp .9s ease-out; }
+  .flash-down { animation: flashDown .9s ease-out; }
+  @keyframes flashUp   { 0%{ background: rgba(61,220,132,.35);} 100%{ background: transparent;} }
+  @keyframes flashDown { 0%{ background: rgba(255,93,108,.35);} 100%{ background: transparent;} }
+  @keyframes rise { 0%{ opacity:0; transform: translateY(6px);} 100%{ opacity:1; transform:none;} }
+  .metric:nth-child(2){animation-delay:.04s}.metric:nth-child(3){animation-delay:.08s}
+  .metric:nth-child(4){animation-delay:.12s}.metric:nth-child(5){animation-delay:.16s}
+  .metric:nth-child(6){animation-delay:.2s}.metric:nth-child(7){animation-delay:.24s}
+
+  .footnote { margin-top: 16px; color: var(--text-faint); font-size: 10.5px; letter-spacing: .08em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="wordmark">KALSHI <span class="slash">//</span> <span class="sub">PORTFOLIO MONITOR</span></div>
+    <span class="badge" id="env-badge" title="Real-money account. This dashboard is read-only and cannot place or cancel orders."><span class="dot">●</span> PROD · READ-ONLY</span>
+    <div class="spacer"></div>
+    <span class="stat-inline">SCAN <b id="scan-cycle">—</b> · <b id="scan-age">—</b></span>
+    <span class="live" id="live"><span class="pulse"></span><span id="live-label">CONNECTING</span></span>
+    <span class="stat-inline"><b id="clock">--:--:--</b> UTC</span>
+  </header>
+
+  <section class="metrics">
+    <div class="metric"><div class="label">Balance</div><div class="value" data-k="balance">—</div><div class="note">available cash</div></div>
+    <div class="metric"><div class="label">Portfolio Value</div><div class="value" data-k="pv">—</div><div class="note">positions held</div></div>
+    <div class="metric"><div class="label">Exposure</div><div class="value" data-k="exp">—</div><div class="note" id="exp-note">— / —</div><div class="bar"><i id="exp-bar"></i></div></div>
+    <div class="metric"><div class="label">Unrealized P&amp;L</div><div class="value" data-k="upnl">—</div><div class="note">open positions</div></div>
+    <div class="metric"><div class="label">Realized P&amp;L</div><div class="value" data-k="rpnl">—</div><div class="note">lifetime, locked-in</div></div>
+    <div class="metric"><div class="label">Positions</div><div class="value" data-k="npos">—</div><div class="note">markets held</div></div>
+    <div class="metric"><div class="label">Open Orders</div><div class="value" data-k="nord">—</div><div class="note">resting</div></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel" style="animation-delay:.1s">
+      <div class="panel-head">
+        <h2>Highest-Scoring Ideas</h2>
+        <span class="meta" id="ideas-meta">—</span>
+      </div>
+      <div class="panel-body">
+        <table id="ideas-table">
+          <colgroup>
+            <col><!-- Market: takes all remaining width -->
+            <col style="width:148px"><!-- Event -->
+            <col style="width:58px"><!-- Avg -->
+            <col style="width:34px"><!-- N -->
+            <col style="width:52px"><!-- Cov -->
+            <col style="width:50px"><!-- OI% -->
+            <col style="width:50px"><!-- Hist -->
+            <col style="width:56px"><!-- Spike -->
+            <col style="width:50px"><!-- Mom -->
+            <col style="width:50px"><!-- OFI -->
+          </colgroup>
+          <thead><tr>
+            <th class="l" data-tip="The highest-scoring market within the event (its question).">Market</th>
+            <th class="l" data-tip="Kalshi event — a group of related markets. Click to open it on kalshi.com.">Event</th>
+            <th data-tip="Average actionability score (0–1) across the event's markets. Higher = more unusual activity right now.">Avg</th>
+            <th data-tip="Number of markets in this event.">N</th>
+            <th data-tip="Signal coverage — the share of the 9 signals that had enough data to count. A high score at low coverage rests on only a few signals, so trust it less.">Cov</th>
+            <th data-tip="Daily turnover: 24-hour volume relative to open interest. Higher = more of the open position is changing hands today.">OI%</th>
+            <th data-tip="Today's volume versus its 30-day daily average. Flags an unusual volume surge.">Hist</th>
+            <th data-tip="Last hour's volume versus the prior 3 hours. Catches a short-term burst of trading.">Spike</th>
+            <th data-tip="Size of the price move over the last ~4 hours. A bigger move = stronger momentum.">Mom</th>
+            <th data-tip="Order-flow imbalance — net taker buy vs sell pressure in recent trades.">OFI</th>
+          </tr></thead>
+          <tbody id="ideas-body"><tr><td colspan="10"><div class="msg" id="ideas-msg">warming up — first scan in progress…</div></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="col-right">
+      <section class="panel" style="animation-delay:.14s">
+        <div class="panel-head"><h2>Positions</h2><span class="meta" id="pos-meta">—</span></div>
+        <div class="panel-body" style="max-height:32vh">
+          <table>
+            <thead><tr>
+              <th class="l" data-tip="Market you hold. Click to open it on kalshi.com.">Ticker</th>
+              <th class="l" data-tip="Which outcome you're long — YES or NO.">Side</th>
+              <th data-tip="Number of contracts held.">Qty</th>
+              <th data-tip="Your average entry price per contract, in cents.">Avg¢</th>
+              <th data-tip="Current market price for your side, in cents.">Last¢</th>
+              <th data-tip="Unrealized profit/loss at the current price — on paper, not yet locked in.">Unreal P&amp;L</th>
+            </tr></thead>
+            <tbody id="pos-body"><tr><td colspan="6"><div class="msg">loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" style="animation-delay:.18s">
+        <div class="panel-head"><h2>Open Orders</h2><span class="meta" id="ord-meta">—</span></div>
+        <div class="panel-body" style="max-height:32vh">
+          <table>
+            <thead><tr>
+              <th class="l" data-tip="Market the order is on. Click to open it on kalshi.com.">Ticker</th>
+              <th class="l" data-tip="Which outcome the resting order is for — YES or NO.">Side</th>
+              <th data-tip="Limit price of the order, in cents.">Price¢</th>
+              <th data-tip="Contracts still resting — not yet filled.">Rem</th>
+              <th data-tip="Filled vs initial order size, in contracts.">Filled</th>
+              <th data-tip="Time since the order was placed.">Age</th>
+            </tr></thead>
+            <tbody id="ord-body"><tr><td colspan="6"><div class="msg">loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="footnote">read-only monitor · live data polled every 10s · ideas re-scored every 5 min · cannot place or cancel orders</div>
+</div>
+
+<script>
+"use strict";
+
+// ---------- formatting helpers ----------
+const fmtMoney = (n) => (n === null || n === undefined) ? "—"
+  : (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtSignedMoney = (n) => (n === null || n === undefined) ? "—"
+  : (n > 0 ? "+$" : n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtCents = (n) => (n === null || n === undefined) ? "—" : n.toFixed(0) + "¢";
+const fmtNum = (n) => (n === null || n === undefined) ? "—" : (Number.isInteger(n) ? n : (+n).toLocaleString(undefined, {maximumFractionDigits: 2}));
+const fmtSig = (n) => (n === null || n === undefined) ? '<span class="dim">··</span>' : `<span style="color:${scoreColor(n)}">${n.toFixed(2)}</span>`;
+const pnlClass = (n) => (n === null || n === undefined || n === 0) ? "zero" : (n > 0 ? "pos" : "neg");
+
+function scoreColor(v) {
+  const x = Math.max(0, Math.min(1, v));
+  return `hsl(${150 - x*6}, ${42 + x*46}%, ${36 + x*34}%)`;
+}
+function ageStr(iso) {
+  if (!iso) return "—";
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return Math.floor(secs) + "s";
+  if (secs < 3600) return Math.floor(secs/60) + "m";
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60);
+  return h + "h " + (m ? m + "m" : "");
+}
+function esc(s) { return (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ---------- column-header tooltips (custom: instant + repositions to stay on-screen) ----------
+const tip = document.createElement("div");
+tip.id = "tip";
+document.body.appendChild(tip);
+function showTip(el) {
+  const text = el.getAttribute("data-tip");
+  if (!text) return;
+  tip.textContent = text;
+  const rect = el.getBoundingClientRect();
+  const width = tip.offsetWidth, height = tip.offsetHeight, pad = 8;
+  let left = rect.left + rect.width / 2 - width / 2;
+  left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
+  let top = rect.bottom + 8;
+  if (top + height > window.innerHeight - pad) top = rect.top - height - 8;  // flip above if no room
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+  tip.classList.add("show");
+}
+function hideTip() { tip.classList.remove("show"); }
+document.addEventListener("mouseover", (e) => { const el = e.target.closest("[data-tip]"); if (el) showTip(el); });
+document.addEventListener("mouseout",  (e) => { const el = e.target.closest("[data-tip]"); if (el) hideTip(); });
+
+// ---------- value-flash on change ----------
+const prev = {};
+function setMetric(key, text, numericForFlash) {
+  const el = document.querySelector(`[data-k="${key}"]`);
+  if (!el) return;
+  el.textContent = text;
+  if (numericForFlash !== undefined && numericForFlash !== null && key in prev && prev[key] !== numericForFlash) {
+    const cls = numericForFlash > prev[key] ? "flash-up" : "flash-down";
+    el.classList.remove("flash-up", "flash-down"); void el.offsetWidth; el.classList.add(cls);
+  }
+  if (numericForFlash !== undefined) prev[key] = numericForFlash;
+}
+
+async function getJSON(url) {
+  const r = await fetch(url, {cache: "no-store"});
+  if (!r.ok) throw new Error(url + " → " + r.status);
+  return r.json();
+}
+
+// ---------- renderers ----------
+function renderPortfolio(d) {
+  if (d.status === "error") {
+    setMetric("balance", "ERR"); document.getElementById("pos-body").innerHTML =
+      `<tr><td colspan="6"><div class="msg err">portfolio fetch failed</div></td></tr>`;
+    return;
+  }
+  setMetric("balance", fmtMoney(d.balance_dollars), d.balance_dollars);
+  setMetric("pv", fmtMoney(d.portfolio_value_dollars), d.portfolio_value_dollars);
+  setMetric("exp", fmtMoney(d.total_exposure_dollars), d.total_exposure_dollars);
+  setMetric("upnl", fmtSignedMoney(d.unrealized_pnl_dollars), d.unrealized_pnl_dollars);
+  setMetric("rpnl", fmtSignedMoney(d.realized_pnl_dollars), d.realized_pnl_dollars);
+  setMetric("npos", fmtNum(d.open_positions_count), d.open_positions_count);
+  document.querySelector('[data-k="upnl"]').className = "value " + pnlClass(d.unrealized_pnl_dollars);
+  document.querySelector('[data-k="rpnl"]').className = "value " + pnlClass(d.realized_pnl_dollars);
+
+  const limit = d.exposure_limit_dollars || 0, used = d.total_exposure_dollars || 0;
+  const pct = limit ? Math.min(100, used / limit * 100) : 0;
+  document.getElementById("exp-note").textContent = fmtMoney(used) + " / " + fmtMoney(limit);
+  const bar = document.getElementById("exp-bar");
+  bar.style.width = pct + "%";
+  bar.style.background = pct > 90 ? "var(--red)" : pct > 70 ? "var(--amber)" : "var(--green)";
+
+  const body = document.getElementById("pos-body");
+  const rows = d.positions || [];
+  document.getElementById("pos-meta").textContent = rows.length + " held";
+  body.innerHTML = rows.length ? rows.map(p => `
+    <tr>
+      <td class="l"><a class="ticker" href="${p.kalshi_url}" target="_blank" rel="noopener" title="${esc(p.title)}">${esc(p.ticker)}</a></td>
+      <td class="l"><span class="pill ${p.side}">${p.side.toUpperCase()}</span></td>
+      <td>${fmtNum(p.quantity)}</td>
+      <td>${fmtCents(p.avg_price_cents)}</td>
+      <td>${fmtCents(p.current_price_cents)}</td>
+      <td class="${pnlClass(p.unrealized_pnl_dollars)}">${fmtSignedMoney(p.unrealized_pnl_dollars)}</td>
+    </tr>`).join("") : `<tr><td colspan="6"><div class="empty">no open positions</div></td></tr>`;
+}
+
+function renderOrders(d) {
+  const body = document.getElementById("ord-body");
+  if (d.status === "error") {
+    setMetric("nord", "ERR");
+    body.innerHTML = `<tr><td colspan="6"><div class="msg err">orders fetch failed</div></td></tr>`;
+    return;
+  }
+  const rows = d.orders || [];
+  setMetric("nord", fmtNum(rows.length), rows.length);
+  document.getElementById("ord-meta").textContent = rows.length + " resting";
+  body.innerHTML = rows.length ? rows.map(o => `
+    <tr>
+      <td class="l"><a class="ticker" href="${o.kalshi_url}" target="_blank" rel="noopener" title="${esc(o.title)}">${esc(o.ticker)}</a></td>
+      <td class="l"><span class="pill ${o.outcome_side}">${(o.outcome_side||'').toUpperCase()}</span></td>
+      <td>${fmtCents(o.price_cents)}</td>
+      <td>${fmtNum(o.remaining_count)}</td>
+      <td class="dim">${fmtNum(o.fill_count)}/${fmtNum(o.initial_count)}</td>
+      <td class="dim">${ageStr(o.created_time)}</td>
+    </tr>`).join("") : `<tr><td colspan="6"><div class="empty">no resting orders</div></td></tr>`;
+}
+
+function fmtCov(pct) {
+  if (pct === null || pct === undefined) return '<span class="dim">··</span>';
+  return `<span style="color:${scoreColor(pct/100)}">${Math.round(pct)}<span class="dim">%</span></span>`;
+}
+
+function renderIdeas(d) {
+  const body = document.getElementById("ideas-body");
+  document.getElementById("ideas-meta").textContent =
+    d.status === "warming_up" ? "warming up" : ("updated " + ageStr(d.generated_at) + " ago");
+  if (d.status === "warming_up") {
+    body.innerHTML = `<tr><td colspan="10"><div class="msg">warming up — first scan in progress…</div></td></tr>`;
+    return;
+  }
+  const rows = d.ideas || [];
+  body.innerHTML = rows.length ? rows.map(it => {
+    const s = it.signals;
+    const thin = it.one_sided
+      ? ' <span class="thin" title="one-sided book — hard to enter/exit">⚠ thin</span>'
+      : '';
+    return `<tr>
+      <td class="l title" title="${esc(it.title)}">${esc(it.title)}${thin}</td>
+      <td class="l ev"><a class="ticker" href="${it.series_url}" target="_blank" rel="noopener" title="${esc(it.event_ticker)}">${esc(it.event_ticker)}</a></td>
+      <td style="color:${scoreColor(it.average_score)};font-weight:600">${it.average_score.toFixed(3)}</td>
+      <td class="dim">${it.market_count}</td>
+      <td>${fmtCov(it.coverage_pct)}</td>
+      <td>${fmtSig(s.volume_oi_ratio)}</td>
+      <td>${fmtSig(s.relative_historical_volume)}</td>
+      <td>${fmtSig(s.volume_spike_short_term)}</td>
+      <td>${fmtSig(s.price_momentum)}</td>
+      <td>${fmtSig(s.ofi)}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="10"><div class="empty">no ideas passed filters</div></td></tr>`;
+}
+
+function renderHealth(d) {
+  document.getElementById("scan-cycle").textContent = "#" + (d.scan?.cycle_number ?? 0);
+  document.getElementById("scan-age").textContent =
+    d.scan?.last_generated_at ? (ageStr(d.scan.last_generated_at) + " old") : "warming up";
+  const live = document.getElementById("live"), label = document.getElementById("live-label");
+  live.classList.remove("stale", "down");
+  if (d.status === "degraded") { live.classList.add("stale"); label.textContent = "DEGRADED"; }
+  else if (d.status === "warming_up") { live.classList.add("stale"); label.textContent = "WARMING UP"; }
+  else { label.textContent = "LIVE"; }
+  const badge = document.getElementById("env-badge");
+  if (d.kalshi_env && d.kalshi_env !== "prod") {
+    badge.style.color = "var(--green)"; badge.style.borderColor = "var(--green)";
+    badge.innerHTML = `<span style="color:var(--green)">●</span> ${esc(d.kalshi_env.toUpperCase())} · READ-ONLY`;
+  }
+}
+
+function markDown() {
+  const live = document.getElementById("live"), label = document.getElementById("live-label");
+  live.classList.remove("stale"); live.classList.add("down"); label.textContent = "OFFLINE";
+}
+
+// ---------- pollers ----------
+async function poll(url, render) { try { render(await getJSON(url)); } catch (e) { console.warn(e); if (url.endsWith("/health")) markDown(); } }
+function loop(url, render, ms) { poll(url, render); setInterval(() => poll(url, render), ms); }
+
+function tickClock() {
+  document.getElementById("clock").textContent = new Date().toISOString().slice(11, 19);
+}
+setInterval(tickClock, 1000); tickClock();
+
+loop("/api/health", renderHealth, 10000);
+loop("/api/portfolio", renderPortfolio, 10000);
+loop("/api/orders", renderOrders, 10000);
+loop("/api/ideas?top=20", renderIdeas, 30000);
+</script>
+</body>
+</html>
