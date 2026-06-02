@@ -33,7 +33,7 @@ except ImportError:
 
 BASE_URLS = {
     "demo": "https://demo-api.kalshi.co/trade-api/v2",
-    "prod": "https://api.elections.kalshi.com/trade-api/v2",
+    "prod": "https://external-api.kalshi.com/trade-api/v2",
 }
 
 
