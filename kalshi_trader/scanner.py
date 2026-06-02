@@ -3,9 +3,11 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from kalshi_trader.models import Market, ScoredMarket
 from kalshi_trader.actionability import MarketScorer, SnapshotStore, orderbook_skew_score
+from kalshi_trader.market_snapshot import load_snapshot
 
 _log = logging.getLogger(__name__)
 
@@ -20,6 +22,21 @@ SCORED_CATEGORIES: frozenset[str] = frozenset({
     "economics",
     "science and technology",
 })
+
+
+def filter_markets(
+    markets: list[Market],
+    category: str | None,
+    now_dt: datetime,
+) -> list[Market]:
+    """Apply the standard pipeline filters (close_time, category, OI/vol)."""
+    markets = [m for m in markets if m.close_time > now_dt]
+    if category:
+        markets = [m for m in markets if m.category == category]
+    else:
+        markets = [m for m in markets if m.category in SCORED_CATEGORIES]
+    markets = [m for m in markets if m.open_interest >= 100 and m.volume_24h >= 10]
+    return markets
 
 
 class MarketScanner:
@@ -62,12 +79,13 @@ class MarketScanner:
         trade_top_n: int = 50,
         orderbook_top_n: int = 20,
         category: str | None = None,
+        markets_file: Path | str | None = None,
     ) -> list[ScoredMarket]:
         """Score open markets and return them ranked by actionability.
 
         Flow:
-          1. Fetch all open markets (live)
-          2. Filter to active categories + markets with open_interest > 0 and volume_24h > 0
+          1. Fetch all open markets (live) — or load from markets_file if provided
+          2. Filter to active categories + markets with open_interest >= 100 and volume_24h >= 10
           3. Refresh stale candles for filtered tickers (SQLite cache; API only when stale)
           4. Compute candle-based signals for all markets
           5. Fetch live trades for top N → OFI signal
@@ -75,29 +93,21 @@ class MarketScanner:
           7. Re-rank and return
         """
         now = int(time.time())
-
-        _log.info("Fetching all open markets...")
-        markets = await self.get_open_markets()
-        _log.info("Found %d open markets", len(markets))
-
         now_dt = datetime.now(timezone.utc)
-        before = len(markets)
 
-        markets = [m for m in markets if m.close_time > now_dt]
-        _log.info("After close_time filter: %d/%d", len(markets), before)
-
-        before = len(markets)
-        if category:
-            markets = [m for m in markets if m.category == category]
+        if markets_file is not None:
+            _log.info("Loading markets from snapshot: %s", markets_file)
+            markets = load_snapshot(markets_file, now_dt)
+            _log.info("Loaded %d non-expired markets from snapshot", len(markets))
+            if category:
+                markets = [m for m in markets if m.category == category]
+                _log.info("After category filter: %d markets", len(markets))
         else:
-            markets = [m for m in markets if m.category in SCORED_CATEGORIES]
-        _log.info("After category filter: %d/%d (sample categories: %s)",
-                  len(markets), before,
-                  list({m.category for m in markets})[:5])
-
-        before = len(markets)
-        markets = [m for m in markets if m.open_interest >= 100 and m.volume_24h >= 10]
-        _log.info("After OI/vol filter: %d/%d", len(markets), before)
+            _log.info("Fetching all open markets...")
+            markets = await self.get_open_markets()
+            _log.info("Found %d open markets", len(markets))
+            markets = filter_markets(markets, category, now_dt)
+            _log.info("After filters: %d markets", len(markets))
 
         _log.info("Scoring %d active markets after filters", len(markets))
         all_tickers = [m.ticker for m in markets]

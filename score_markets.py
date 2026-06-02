@@ -20,13 +20,15 @@ def _fmt(val: float | None) -> str:
     return f"{val:.2f}" if val is not None else "  -- "
 
 
-async def run(top: int, category: str | None) -> None:
+async def run(top: int, category: str | None, markets_file: str | None) -> None:
     client  = KalshiClient()
     scanner = MarketScanner(client)
     scorer  = MarketScorer()
     store   = SnapshotStore()
 
-    ranked = await scanner.get_scored_markets(scorer, store, category=category)
+    ranked = await scanner.get_scored_markets(
+        scorer, store, category=category, markets_file=markets_file
+    )
 
     header = (
         f"{'TICKER':<42} {'SCORE':>5}  "
@@ -55,6 +57,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Score Kalshi markets by actionability.")
     parser.add_argument("--top", type=int, default=10, help="Number of markets to display")
     parser.add_argument("--category", type=str, default=None, help="Filter by category")
+    parser.add_argument("--markets-file", type=str, default=None, dest="markets_file",
+                        help="Use pre-fetched market snapshot instead of querying the API")
     parser.add_argument("--verbose", action="store_true", help="Show DEBUG-level cache detail")
     args = parser.parse_args()
 
@@ -64,4 +68,4 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
-    asyncio.run(run(args.top, args.category))
+    asyncio.run(run(args.top, args.category, args.markets_file))
