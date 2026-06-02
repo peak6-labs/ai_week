@@ -9,19 +9,24 @@ from __future__ import annotations
 from collections import defaultdict
 
 from kalshi_trader.models import OrderAction, TradeIdea
+from kalshi_trader.ui.config_manager import cfg
 
 
-def apply_consensus(ideas: list[TradeIdea], min_agents: int = 2) -> list[TradeIdea]:
+def apply_consensus(ideas: list[TradeIdea], min_agents: int | None = None) -> list[TradeIdea]:
     """Return ideas where ≥ min_agents distinct agents agree on (ticker, side).
 
     Args:
         ideas: All trade ideas from all specialist agents.
         min_agents: How many distinct agent_ids must agree before passing.
+                    Defaults to cfg.get("min_agents") (runtime-configurable).
 
     Returns:
         One merged TradeIdea per (ticker, side) group that reached consensus.
         The merged idea uses the highest confidence and union of signal_sources.
     """
+    if min_agents is None:
+        min_agents = cfg.get("min_agents")
+
     groups: dict[tuple[str, str], list[TradeIdea]] = defaultdict(list)
     for idea in ideas:
         key = (idea.ticker, idea.side.value)

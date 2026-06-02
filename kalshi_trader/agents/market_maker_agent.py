@@ -6,6 +6,7 @@ from typing import Any
 from kalshi_trader.models import SignalEstimate
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
+from kalshi_trader.ui.config_manager import cfg
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -74,11 +75,11 @@ def analyze_spread_dynamics(snapshots: list[dict]) -> dict:
     # Classify
     if spread is None:
         signal = "normal"
-    elif spread > 15 or latest["best_bid"] is None or latest["best_ask"] is None:
+    elif spread > cfg.get("mm_spread_withdrawal_cents") or latest["best_bid"] is None or latest["best_ask"] is None:
         signal = "withdrawal"
-    elif trend > 0.30 and abs(imbalance) > 0.60:
+    elif trend > cfg.get("mm_spread_trend_threshold") and abs(imbalance) > cfg.get("mm_directional_imbalance_threshold"):
         signal = "directional"
-    elif trend > 0.30:
+    elif trend > cfg.get("mm_spread_trend_threshold"):
         signal = "widening"
     else:
         signal = "normal"
@@ -208,12 +209,12 @@ class MarketMakerAgent:
         maker_withdrawal_score = analysis.get("maker_withdrawal_score", 0.0)
 
         # Derive probability from depth imbalance
-        prob = 0.5 + depth_imbalance * 0.25
+        prob = 0.5 + depth_imbalance * cfg.get("mm_imbalance_prob_scale")
         prob = max(0.10, min(0.90, prob))
 
         if spread_anomaly and abs(depth_imbalance) > 0.4:
             uncertainty = 0.10
-            weight = 0.65
+            weight = cfg.get("weight_market_maker")
         elif spread_anomaly:
             uncertainty = 0.15
             weight = 0.55

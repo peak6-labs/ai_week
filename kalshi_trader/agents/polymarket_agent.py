@@ -15,11 +15,9 @@ from datetime import datetime, timezone
 from kalshi_trader.external.market_scorer import score_market
 from kalshi_trader.external.polymarket import PolymarketClient
 from kalshi_trader.models import Market, OrderAction, Side, TradeIdea
+from kalshi_trader.ui.config_manager import cfg
 
 _AGENT_ID = "polymarket"
-_WHALE_CONFIDENCE_BOOST = 0.15
-_MAX_CONFIDENCE = 0.95
-_GAP_SCALE = 0.20   # gap of 20¢ → confidence 1.0 before cap
 
 
 class PolymarketAgent:
@@ -34,6 +32,10 @@ class PolymarketAgent:
     async def run(self, markets: list[Market]) -> list[TradeIdea]:
         if not markets:
             return []
+
+        whale_boost = cfg.get("poly_whale_confidence_boost")
+        max_conf = cfg.get("poly_max_confidence")
+        gap_scale = cfg.get("poly_gap_scale")
 
         poly_markets = await self._client.get_markets()
         ideas: list[TradeIdea] = []
@@ -53,7 +55,7 @@ class PolymarketAgent:
             side = Side.YES if gap > 0 else Side.NO
 
             # Base confidence from gap size: 7¢ → ~0.35, 20¢ → 1.0 (capped)
-            base_conf = min(abs(gap) / _GAP_SCALE, _MAX_CONFIDENCE)
+            base_conf = min(abs(gap) / gap_scale, max_conf)
 
             # Check for agreeing target-whale entries
             trades = await self._client.get_large_trades(match["conditionId"])
@@ -66,7 +68,7 @@ class PolymarketAgent:
             confidence = base_conf
             sources = ["polymarket_price"]
             if target_entries:
-                confidence = min(confidence + _WHALE_CONFIDENCE_BOOST, _MAX_CONFIDENCE)
+                confidence = min(confidence + whale_boost, max_conf)
                 sources.append(f"whale_copy:{len(target_entries)}_targets")
 
             ideas.append(TradeIdea(

@@ -6,6 +6,7 @@ from typing import Any
 from kalshi_trader.models import SignalEstimate
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
+from kalshi_trader.ui.config_manager import cfg
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -24,9 +25,9 @@ def _is_political(category: str, title: str) -> bool:
 def _horizon_factor(hours_to_resolution: float) -> float:
     """Scale down bias correction as market approaches resolution."""
     if hours_to_resolution < 12:
-        return 0.30
+        return cfg.get("bias_near_expiry_horizon")
     elif hours_to_resolution < 48:
-        return 0.60
+        return cfg.get("bias_mid_horizon")
     else:
         return 1.0
 
@@ -55,19 +56,20 @@ def compute_bias_adjustment(
     if is_political:
         # Political underconfidence: push away from 0.5
         if price_prob > 0.5:
-            raw_adj = 0.065 * h  # push toward YES
+            raw_adj = cfg.get("bias_political_adjustment") * h  # push toward YES
         elif price_prob < 0.5:
-            raw_adj = -0.065 * h  # push toward NO
+            raw_adj = -cfg.get("bias_political_adjustment") * h  # push toward NO
         else:
             raw_adj = 0.0
     else:
+        longshot_factor = cfg.get("bias_longshot_factor")
         # Favorite-longshot bias
         if price_prob < 0.15:
-            # Longshot overpriced: true_prob ≈ market × 0.65
-            raw_adj = price_prob * (0.65 - 1.0) * h  # negative: push down
+            # Longshot overpriced: true_prob ≈ market × longshot_factor
+            raw_adj = price_prob * (longshot_factor - 1.0) * h  # negative: push down
         elif price_prob > 0.85:
-            # Favorite underpriced: true_prob ≈ 1 - (1-p)*0.65
-            raw_adj = (1.0 - price_prob) * (1.0 - 0.65) * h  # positive: push up
+            # Favorite underpriced: true_prob ≈ 1 - (1-p)*longshot_factor
+            raw_adj = (1.0 - price_prob) * (1.0 - longshot_factor) * h  # positive: push up
         else:
             raw_adj = 0.0
 

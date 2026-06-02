@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import scipy.stats
 
 from kalshi_trader.models import SignalEstimate
+from kalshi_trader.ui.config_manager import cfg
 
 
 def build_weather_signal(
@@ -39,10 +40,10 @@ def build_weather_signal(
         std = max((high - low) / 4.0, 1.0)
         dist = scipy.stats.norm(mean, std)
         raw_prob = float(dist.sf(threshold) if operator == "above" else dist.cdf(threshold))
-        uncertainty = 0.08
+        uncertainty = cfg.get("uncertainty_noaa_temp")
     elif metric == "precipitation":
         raw_prob = forecast.get("precip_pct", 0) / 100.0
-        uncertainty = 0.05
+        uncertainty = cfg.get("uncertainty_noaa_precip")
     else:
         raise ValueError(f"Unsupported metric: {metric}")
 
@@ -90,7 +91,7 @@ def build_weather_signal(
         source="noaa_gfs",
         probability=probability,
         uncertainty=uncertainty,
-        weight=0.85,
+        weight=cfg.get("weight_noaa"),
         data_issued_at=data_issued_at,
         metadata=metadata,
     )

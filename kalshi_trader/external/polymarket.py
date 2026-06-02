@@ -56,6 +56,7 @@ def save_whale_targets(
 
 from kalshi_trader import config
 from kalshi_trader.models import SignalEstimate
+from kalshi_trader.ui.config_manager import cfg
 
 def _ssl_context() -> ssl.SSLContext:
     global _SSL_CTX
@@ -178,7 +179,7 @@ class PolymarketClient:
             source="polymarket",
             probability=yes_price,
             uncertainty=round(uncertainty, 4),
-            weight=_POLYMARKET_WEIGHT,
+            weight=cfg.get("weight_polymarket_price"),
             data_issued_at=issued,
             metadata={"volume_24h": int(float(market.get("volume24hr", 0)))},
         )

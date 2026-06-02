@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from kalshi_trader.models import SignalEstimate
+from kalshi_trader.ui.config_manager import cfg
 
 
 def build_price_signal(
@@ -44,8 +45,8 @@ def build_price_signal(
     return SignalEstimate(
         source="polymarket_price",
         probability=poly_prob,
-        uncertainty=0.03,
-        weight=0.75,
+        uncertainty=cfg.get("uncertainty_poly_price"),
+        weight=cfg.get("weight_polymarket_price"),
         data_issued_at=fetched_at,
         metadata={
             "ticker": ticker,
@@ -122,7 +123,7 @@ def build_whale_signal(
 
     # Distinct wallets determine uncertainty
     whale_count = len({e["wallet_address"] for e in valid_entries})
-    uncertainty = 0.15 if whale_count == 1 else 0.10
+    uncertainty = cfg.get("uncertainty_whale_single") if whale_count == 1 else cfg.get("uncertainty_whale_multi")
 
     # data_issued_at = most recent timestamp among entries
     data_issued_at = max(timestamps) if timestamps else (
@@ -138,7 +139,7 @@ def build_whale_signal(
         source="polymarket_whale",
         probability=probability,
         uncertainty=uncertainty,
-        weight=0.60,
+        weight=cfg.get("weight_polymarket_whale"),
         data_issued_at=data_issued_at,
         metadata={
             "ticker": ticker,

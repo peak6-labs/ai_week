@@ -7,6 +7,7 @@ from typing import Any
 from kalshi_trader.models import SignalEstimate
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
+from kalshi_trader.ui.config_manager import cfg
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -211,7 +212,7 @@ class OrderFlowAgent:
         }
 
     async def _compute_ofi(self, trades: list[dict]) -> dict:
-        ofi_score = compute_ofi(trades, window_minutes=30)
+        ofi_score = compute_ofi(trades, window_minutes=cfg.get("ofi_window_minutes"))
         if ofi_score > 0.1:
             direction = "YES"
         elif ofi_score < -0.1:
@@ -245,7 +246,7 @@ class OrderFlowAgent:
         direction = ofi_result.get("direction", "neutral")
 
         # Probability: 0.5 base, shifted by OFI direction
-        base_prob = 0.5 + ofi_score * 0.25
+        base_prob = 0.5 + ofi_score * cfg.get("ofi_prob_scale")
         prob = max(0.05, min(0.95, base_prob))
 
         # Uncertainty: higher VPIN → more confident (lower uncertainty)

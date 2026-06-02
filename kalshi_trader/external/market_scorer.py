@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from kalshi_trader.models import Market
+from kalshi_trader.ui.config_manager import cfg
 
 
 def score_market(market: Market, polymarket_prob: float) -> dict | None:
@@ -41,13 +42,13 @@ def score_market(market: Market, polymarket_prob: float) -> dict | None:
     hours_left = (close_time - now).total_seconds() / 3600.0
 
     # --- Hard filters ---
-    if gap < 0.07:
+    if gap < cfg.get("poly_min_gap_cents") / 100.0:
         return None
-    if depth < 500:
+    if depth < cfg.get("filter_min_open_interest"):
         return None
-    if hours_left < 4:
+    if hours_left < cfg.get("filter_min_hours_to_close"):
         return None
-    if hours_left > 168:
+    if hours_left > cfg.get("filter_max_hours_to_close"):
         return None
 
     # Expected value: gap * (1 - midpoint_prob) gives rough EV for a YES bet
@@ -75,7 +76,7 @@ def should_take_profit(
         current_price: Current market price (probability, 0.0–1.0).
         expected_gap: The edge gap identified at entry time.
     """
-    target = entry_price + expected_gap * 0.85
+    target = entry_price + expected_gap * cfg.get("exit_take_profit_threshold")
     return current_price >= target
 
 
@@ -90,4 +91,4 @@ def is_stale_thesis(hours_since_entry: float, price_change_abs: float) -> bool:
         hours_since_entry: How many hours since the position was opened.
         price_change_abs: Absolute price change since entry (probability units).
     """
-    return hours_since_entry > 24 and price_change_abs < 0.02
+    return hours_since_entry > cfg.get("exit_stale_thesis_hours") and price_change_abs < cfg.get("exit_stale_thesis_min_move")
