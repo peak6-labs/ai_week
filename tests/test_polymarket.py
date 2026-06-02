@@ -141,6 +141,31 @@ def test_match_market_stopwords_alone_do_not_match():
     assert result is None
 
 
+# --- match_market_with_score ---
+
+def test_match_market_with_score_returns_score():
+    client = PolymarketClient()
+    poly_markets = [
+        _make_gamma_market(id="0xabc", question="Will the Boston Celtics win the NBA championship?"),
+    ]
+    result = client.match_market_with_score(
+        "Will the Boston Celtics win the 2026 NBA Finals?", poly_markets
+    )
+    assert result is not None
+    match, score = result
+    assert match["id"] == "0xabc"
+    assert 0.0 < score <= 1.0
+
+
+def test_match_market_with_score_no_match_returns_none():
+    client = PolymarketClient()
+    poly_markets = [
+        _make_gamma_market(id="0xdef", question="Will it rain in Seattle tomorrow?"),
+    ]
+    result = client.match_market_with_score("Will the Lakers win the championship?", poly_markets)
+    assert result is None
+
+
 # --- detect_volume_spike ---
 
 def test_detect_volume_spike_true_when_current_exceeds_2x_average():

@@ -31,7 +31,7 @@ def load_whale_targets(
     """Load a named whale wallet list from the targets file.
 
     Args:
-        scorer: "winrate" (win-rate only) or "composite" (multi-signal).
+        scorer: "winrate" (win-rate only) or "harvard" (5-signal composite).
                 Falls back to legacy "wallets" key for old files.
         path:   Path to the targets JSON file.
     """
@@ -211,6 +211,31 @@ class PolymarketClient:
         if len(kalshi_words & best_words) < 2:
             return None
         return best_market
+
+    def match_market_with_score(
+        self, kalshi_title: str, poly_markets: list[dict]
+    ) -> tuple[dict, float] | None:
+        """Like match_market but also returns the Jaccard similarity score."""
+        kalshi_words, kalshi_nums = _tokenize(kalshi_title)
+        best_score = 0.0
+        best_market = None
+        for market in poly_markets:
+            poly_words, poly_nums = _tokenize(market["question"])
+            if not _numbers_compatible(kalshi_nums, poly_nums):
+                continue
+            union = len(kalshi_words | poly_words)
+            if not union:
+                continue
+            score = len(kalshi_words & poly_words) / union
+            if score > best_score:
+                best_score = score
+                best_market = market
+        if best_score < 0.20 or not best_market:
+            return None
+        best_words, _ = _tokenize(best_market["question"])
+        if len(kalshi_words & best_words) < 2:
+            return None
+        return best_market, best_score
 
     def detect_volume_spike(self, current: float, recent_volumes: list[float]) -> bool:
         """Return True if current volume exceeds 2× the recent average."""
