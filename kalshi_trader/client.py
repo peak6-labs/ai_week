@@ -81,3 +81,6 @@ class KalshiClient:
 
     async def cancel_order(self, order_id: str) -> dict:
         return await self.delete(f"/portfolio/orders/{order_id}")
+
+    async def get_trades(self, ticker: str, limit: int = 100) -> dict:
+        return await self.get(f"/markets/{ticker}/trades", {"limit": limit})
