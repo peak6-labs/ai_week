@@ -193,7 +193,7 @@ class OrderFlowAgent:
         return parse_signal_estimates(raw)
 
     async def _get_market_trades(self, ticker: str, limit: int = 200) -> list[dict]:
-        result = await self._client.get_trades(ticker, limit)
+        result = await self._client.get_trades(ticker, limit=limit)
         if isinstance(result, list):
             return result
         return result.get("trades", [])

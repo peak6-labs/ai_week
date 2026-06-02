@@ -87,29 +87,16 @@ class PortfolioState:
 
 
 @dataclass
-<<<<<<< HEAD
-class SignalEstimate:
-    source: str             # e.g. "noaa_gfs", "nws_discussion", "polymarket"
-    probability: float      # 0.0–1.0
-    uncertainty: float      # ± band in probability units, e.g. 0.08 = ±8pp
-    weight: float           # source trustworthiness, 0.0–1.0
-    data_issued_at: datetime  # from API response, NOT fetch time
-    metadata: dict = field(default_factory=dict)
-
-    @property
-    def staleness_minutes(self) -> float:
-        return (datetime.now(tz=timezone.utc) - self.data_issued_at).total_seconds() / 60
-=======
 class Candle:
     end_period_ts: int
     volume: float
     open_interest: float
-    price_open: Optional[float]     # first trade in period (cents); None = no trades
+    price_open: Optional[float]
     price_high: Optional[float]
     price_low: Optional[float]
-    price_close: Optional[float]    # last trade in period (cents)
-    price_mean: Optional[float]     # VWAP (cents)
-    price_previous: Optional[float] # prior period's close (cents)
+    price_close: Optional[float]
+    price_mean: Optional[float]
+    price_previous: Optional[float]
 
 
 @dataclass
@@ -125,7 +112,20 @@ class ScoredMarket:
     weekly_hl_score: Optional[float] = None
     ofi_score: Optional[float] = None
     orderbook_skew_score: Optional[float] = None
->>>>>>> origin/lle-market-scoring
+
+
+@dataclass
+class SignalEstimate:
+    source: str
+    probability: float
+    uncertainty: float
+    weight: float
+    data_issued_at: datetime
+    metadata: dict = field(default_factory=dict)
+
+    @property
+    def staleness_minutes(self) -> float:
+        return (datetime.now(tz=timezone.utc) - self.data_issued_at).total_seconds() / 60
 
 
 @dataclass

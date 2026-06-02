@@ -113,10 +113,6 @@ class KalshiClient:
     async def cancel_order(self, order_id: str) -> dict:
         return await self.delete(f"/portfolio/orders/{order_id}")
 
-<<<<<<< HEAD
-    async def get_trades(self, ticker: str, limit: int = 100) -> dict:
-        return await self.get(f"/markets/{ticker}/trades", {"limit": limit})
-=======
     async def get_market_candlesticks_batch(
         self,
         tickers: list[str],
@@ -127,7 +123,6 @@ class KalshiClient:
         """Fetch OHLCV candles for up to 100 tickers in one request.
 
         period_interval: minutes — 1, 60, or 1440.
-        Returns up to 10,000 total candles across all tickers.
         """
         params: dict[str, Any] = {
             "market_tickers": ",".join(tickers),
@@ -143,13 +138,8 @@ class KalshiClient:
         min_ts: int | None = None,
         limit: int = 1000,
     ) -> dict:
-        """Fetch recent public trades for a market.
-
-        min_ts: Unix timestamp lower bound (inclusive).
-        taker_outcome_side on each trade is "yes" or "no" — exact buy direction.
-        """
+        """Fetch recent public trades for a market."""
         params: dict[str, Any] = {"ticker": ticker, "limit": limit}
         if min_ts is not None:
             params["min_ts"] = min_ts
         return await self.get("/markets/trades", params=params)
->>>>>>> origin/lle-market-scoring
