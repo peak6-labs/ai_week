@@ -6,6 +6,7 @@ All orchestration logic lives in orchestrator.md.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -180,6 +181,15 @@ _SCHEMAS: list[dict] = [
             "required": ["ideas_json"],
         },
     },
+    {
+        "name": "sleep_until_next_cycle",
+        "description": "Pause for 20 minutes before starting the next trading cycle. Call this after report_slate every cycle.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
 ]
 
 
@@ -215,6 +225,7 @@ class MainOrchestratorAgent:
                 "run_data_orchestrator":      self._run_data_orchestrator,
                 "run_risk_check":            self._run_risk_check,
                 "report_slate":              self._report_slate,
+                "sleep_until_next_cycle":    self._sleep_until_next_cycle,
             },
             system_prompt=system_prompt,
             model=config.COORDINATOR_MODEL,
@@ -349,6 +360,11 @@ class MainOrchestratorAgent:
                      idea.get("approved_size_dollars", 0),
                      idea.get("reasoning", "")[:120])
         return {"count": len(ideas), "tickers": [i["ticker"] for i in ideas]}
+
+
+    async def _sleep_until_next_cycle(self) -> dict:
+        await asyncio.sleep(20 * 60)
+        return {"status": "ready", "message": "20 minutes elapsed — starting next cycle"}
 
     async def close(self) -> None:
         for agent in [self._price_agent, self._whale_agent, self._ofi_agent,
