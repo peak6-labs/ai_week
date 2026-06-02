@@ -23,11 +23,11 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 # Must match kalshi_auth.py BASE_URLS exactly
 _BASE_URLS = {
     "demo": "https://demo-api.kalshi.co/trade-api/v2",
-    "prod": "https://api.elections.kalshi.com/trade-api/v2",
+    "prod": "https://external-api.kalshi.com/trade-api/v2",
 }
 _WS_URLS = {
     "demo": "wss://demo-api.kalshi.co/trade-api/ws/v2",
-    "prod": "wss://api.elections.kalshi.com/trade-api/ws/v2",
+    "prod": "wss://external-api.kalshi.com/trade-api/ws/v2",
 }
 KALSHI_BASE_URL = _BASE_URLS.get(KALSHI_ENV, _BASE_URLS["demo"])
 KALSHI_WS_URL = _WS_URLS.get(KALSHI_ENV, _WS_URLS["demo"])
