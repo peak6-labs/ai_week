@@ -7,6 +7,7 @@ import time
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
+from kalshi_trader._retry import with_retry
 from kalshi_trader.models import Candle
 
 if TYPE_CHECKING:
@@ -238,20 +239,14 @@ class SnapshotStore:
         async def _fetch_one(batch: list[str], batch_num: int) -> dict[str, list[Candle]]:
             _log.debug("Fetching %s batch %d/%d (%d tickers)", label, batch_num, len(batches), len(batch))
             async with sem:
-                for attempt in range(4):
-                    try:
-                        resp = await client.get_market_candlesticks_batch(batch, start_ts, now, period)
-                        break
-                    except Exception as exc:
-                        status = getattr(getattr(exc, "response", None), "status_code", None)
-                        if status == 429:
-                            wait = 2 ** attempt
-                            _log.debug("%s batch %d/%d: 429, retrying in %ds", label, batch_num, len(batches), wait)
-                            await asyncio.sleep(wait)
-                        else:
-                            _log.warning("%s batch %d/%d failed: %s", label, batch_num, len(batches), exc)
-                            return {}
-                else:
+                try:
+                    resp = await with_retry(
+                        client.get_market_candlesticks_batch, batch, start_ts, now, period
+                    )
+                except Exception as exc:
+                    _log.warning("%s batch %d/%d failed: %s", label, batch_num, len(batches), exc)
+                    return {}
+                if not resp:
                     _log.warning("%s batch %d/%d: giving up after retries", label, batch_num, len(batches))
                     return {}
             by_ticker: dict[str, list[Candle]] = defaultdict(list)

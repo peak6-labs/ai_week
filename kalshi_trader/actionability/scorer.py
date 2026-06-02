@@ -91,21 +91,24 @@ class MarketScorer:
                 s.ofi_score = ofi_score(trade_data[ticker])
             if ticker in orderbook_data:
                 s.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
-            all_scores: dict[str, float | None] = {
-                "volume_oi_ratio":            s.volume_oi_ratio_score,
-                "relative_historical_volume": s.relative_historical_volume_score,
-                "volume_spike_short_term":    s.volume_spike_short_term_score,
-                "oi_change":                  s.oi_change_score,
-                "price_momentum":             s.momentum_score,
-                "intraday_hl":                s.intraday_hl_score,
-                "weekly_hl":                  s.weekly_hl_score,
-                "ofi":                        s.ofi_score,
-                "orderbook_skew":             s.orderbook_skew_score,
-            }
-            s.composite_score = self._composite(all_scores)
+            s.composite_score = self._composite(self._scores_dict(s))
 
         scored.sort(key=lambda s: s.composite_score, reverse=True)
         return scored
+
+    @staticmethod
+    def _scores_dict(s: ScoredMarket) -> dict[str, float | None]:
+        return {
+            "volume_oi_ratio":            s.volume_oi_ratio_score,
+            "relative_historical_volume": s.relative_historical_volume_score,
+            "volume_spike_short_term":    s.volume_spike_short_term_score,
+            "oi_change":                  s.oi_change_score,
+            "price_momentum":             s.momentum_score,
+            "intraday_hl":                s.intraday_hl_score,
+            "weekly_hl":                  s.weekly_hl_score,
+            "ofi":                        s.ofi_score,
+            "orderbook_skew":             s.orderbook_skew_score,
+        }
 
     def _composite(self, scores: dict[str, float | None]) -> float:
         """Weighted average over non-None signals. Re-normalizes when signals are absent."""
