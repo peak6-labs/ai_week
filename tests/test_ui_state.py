@@ -56,7 +56,7 @@ class TestLog:
         state.log("second")
         state.log("third")
         assert len(state.event_log) == 3
-        assert [l.message for l in state.event_log] == ["first", "second", "third"]
+        assert [line.message for line in state.event_log] == ["first", "second", "third"]
 
 
 class TestToDict:
