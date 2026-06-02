@@ -189,7 +189,8 @@ def test_detect_volume_spike_false_with_empty_history():
 
 @pytest.mark.asyncio
 async def test_get_markets_returns_parsed_list():
-    raw = [_make_gamma_market(id="m1"), _make_gamma_market(id="m2")]
+    """Keyset endpoint returns {markets: [...], next_cursor: null} — single page."""
+    raw = {"markets": [_make_gamma_market(id="m1"), _make_gamma_market(id="m2")], "next_cursor": None}
     mock_response = AsyncMock()
     mock_response.json = AsyncMock(return_value=raw)
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
@@ -210,10 +211,13 @@ async def test_get_markets_returns_parsed_list():
 
 @pytest.mark.asyncio
 async def test_get_markets_filters_inactive():
-    raw = [
-        _make_gamma_market(id="active1", active=True, closed=False),
-        _make_gamma_market(id="closed1", active=False, closed=True),
-    ]
+    raw = {
+        "markets": [
+            _make_gamma_market(id="active1", active=True, closed=False),
+            _make_gamma_market(id="closed1", active=False, closed=True),
+        ],
+        "next_cursor": None,
+    }
     mock_response = AsyncMock()
     mock_response.json = AsyncMock(return_value=raw)
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
