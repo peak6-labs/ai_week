@@ -275,6 +275,25 @@ def test_state_injected_externally_is_used():
 # run() — graceful stop via mock WS
 # ---------------------------------------------------------------------------
 
+def _make_mock_ws(messages: list) -> MagicMock:
+    """Build a mock WS where ws.receive() returns messages in sequence."""
+    mock_ws = AsyncMock()
+    mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
+    mock_ws.__aexit__ = AsyncMock(return_value=False)
+    mock_ws.send_str = AsyncMock()
+    mock_ws.receive = AsyncMock(side_effect=messages)
+    return mock_ws
+
+
+def _make_mock_session(mock_ws) -> AsyncMock:
+    mock_session = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    mock_session.ws_connect = MagicMock(return_value=mock_ws)
+    mock_session.close = AsyncMock()
+    return mock_session
+
+
 @pytest.mark.asyncio
 async def test_run_processes_one_message_then_closes():
     """run() should process a message and exit cleanly when CLOSE is received."""
@@ -287,24 +306,8 @@ async def test_run_processes_one_message_then_closes():
         "yes": [{"price": "50", "quantity": "10"}],
         "no": [{"price": "55", "quantity": "5"}],
     })
-    close_msg = _close_msg()
-
-    # Build an async iterable that yields one text message then a close
-    async def _ws_iter():
-        yield snapshot_msg
-        yield close_msg
-
-    mock_ws = AsyncMock()
-    mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
-    mock_ws.__aexit__ = AsyncMock(return_value=False)
-    mock_ws.__aiter__ = lambda self: _ws_iter().__aiter__()
-    mock_ws.send_str = AsyncMock()
-
-    mock_session = AsyncMock()
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
-    mock_session.ws_connect = MagicMock(return_value=mock_ws)
-    mock_session.close = AsyncMock()
+    mock_ws = _make_mock_ws([snapshot_msg, _close_msg()])
+    mock_session = _make_mock_session(mock_ws)
 
     with (
         patch("kalshi_trader.external.kalshi_ws._ws_headers", return_value={}),
@@ -312,18 +315,12 @@ async def test_run_processes_one_message_then_closes():
         patch("aiohttp.ClientSession", return_value=mock_session),
         patch("aiohttp.TCPConnector"),
     ):
-        # After the WS closes, run() will try to reconnect after _RECONNECT_DELAY.
-        # Stop the client before the reconnect fires.
         async def _stop_after_delay():
             await asyncio.sleep(0.05)
             await client.stop()
 
-        await asyncio.gather(
-            client.run(),
-            _stop_after_delay(),
-        )
+        await asyncio.gather(client.run(), _stop_after_delay())
 
-    # The snapshot should have been applied to state
     assert state._bids[TICKER] == {50: 10}
     assert state._asks[TICKER] == {55: 5}
 
@@ -331,24 +328,11 @@ async def test_run_processes_one_message_then_closes():
 @pytest.mark.asyncio
 async def test_run_sends_subscribe_message():
     """run() should send a subscribe message after connecting."""
-    state = OrderBookState()
     tickers = [TICKER, "OTHER-TICKER"]
-    client = KalshiWebSocketClient(tickers=tickers, state=state)
+    client = KalshiWebSocketClient(tickers=tickers)
 
-    async def _ws_iter():
-        yield _close_msg()
-
-    mock_ws = AsyncMock()
-    mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
-    mock_ws.__aexit__ = AsyncMock(return_value=False)
-    mock_ws.__aiter__ = lambda self: _ws_iter().__aiter__()
-    mock_ws.send_str = AsyncMock()
-
-    mock_session = AsyncMock()
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
-    mock_session.ws_connect = MagicMock(return_value=mock_ws)
-    mock_session.close = AsyncMock()
+    mock_ws = _make_mock_ws([_close_msg()])
+    mock_session = _make_mock_session(mock_ws)
 
     with (
         patch("kalshi_trader.external.kalshi_ws._ws_headers", return_value={}),
@@ -360,17 +344,52 @@ async def test_run_sends_subscribe_message():
             await asyncio.sleep(0.05)
             await client.stop()
 
-        await asyncio.gather(
-            client.run(),
-            _stop_after_delay(),
-        )
+        await asyncio.gather(client.run(), _stop_after_delay())
 
-    # Verify send_str was called with a valid subscribe message
     mock_ws.send_str.assert_called_once()
     sent_payload = json.loads(mock_ws.send_str.call_args[0][0])
     assert sent_payload["cmd"] == "subscribe"
     assert set(sent_payload["params"]["market_tickers"]) == set(tickers)
     assert "orderbook_delta" in sent_payload["params"]["channels"]
+
+
+@pytest.mark.asyncio
+async def test_run_reconnects_on_watchdog_timeout():
+    """Watchdog timeout on ws.receive() should trigger a reconnect."""
+    client = KalshiWebSocketClient(tickers=[TICKER])
+
+    call_count = 0
+
+    async def _receive_timeout():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise asyncio.TimeoutError  # simulate silent proxy drop
+        return _close_msg()
+
+    mock_ws = AsyncMock()
+    mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
+    mock_ws.__aexit__ = AsyncMock(return_value=False)
+    mock_ws.send_str = AsyncMock()
+    mock_ws.receive = _receive_timeout
+    mock_session = _make_mock_session(mock_ws)
+
+    with (
+        patch("kalshi_trader.external.kalshi_ws._ws_headers", return_value={}),
+        patch("kalshi_trader.external.kalshi_ws._ssl_context", return_value=None),
+        patch("kalshi_trader.external.kalshi_ws._WATCHDOG_TIMEOUT", 0.01),
+        patch("kalshi_trader.external.kalshi_ws._RECONNECT_DELAY", 0.01),
+        patch("aiohttp.ClientSession", return_value=mock_session),
+        patch("aiohttp.TCPConnector"),
+    ):
+        async def _stop_after_delay():
+            await asyncio.sleep(0.15)
+            await client.stop()
+
+        await asyncio.gather(client.run(), _stop_after_delay())
+
+    # Should have connected at least twice (initial + reconnect after timeout)
+    assert mock_ws.send_str.call_count >= 2
 
 
 @pytest.mark.asyncio

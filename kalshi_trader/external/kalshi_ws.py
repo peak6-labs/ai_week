@@ -36,7 +36,8 @@ from kalshi_trader.orderbook import OrderBookState
 
 log = logging.getLogger(__name__)
 
-_RECONNECT_DELAY = 5  # seconds between reconnect attempts
+_RECONNECT_DELAY = 5   # seconds between reconnect attempts
+_WATCHDOG_TIMEOUT = 60  # force reconnect if no message received in this many seconds
 
 
 def _to_cents(raw) -> int:
@@ -91,8 +92,16 @@ class KalshiWebSocketClient:
                     ) as ws:
                         log.info("WS connected to %s", config.KALSHI_WS_URL)
                         await self._subscribe(ws)
-                        async for msg in ws:
-                            if not self._running:
+                        # Use wait_for on each receive so the watchdog fires even when
+                        # the connection is silently dead (e.g. Zscaler proxy drops it
+                        # while responding to pings on our behalf).
+                        while self._running:
+                            try:
+                                msg = await asyncio.wait_for(
+                                    ws.receive(), timeout=_WATCHDOG_TIMEOUT
+                                )
+                            except asyncio.TimeoutError:
+                                log.warning("WS watchdog timeout — forcing reconnect")
                                 break
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 self._handle(json.loads(msg.data))
