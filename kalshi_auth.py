@@ -57,6 +57,7 @@ class KalshiClient:
         self.base_url = base_url.rstrip("/")
         key_bytes = Path(private_key_path).read_bytes()
         self.private_key = serialization.load_pem_private_key(key_bytes, password=None)
+        self._session = requests.Session()
 
     @classmethod
     def from_env(cls, env: str | None = None) -> "KalshiClient":
@@ -99,11 +100,11 @@ class KalshiClient:
     def get(self, endpoint: str, params: dict | None = None) -> dict:
         # The signed path must include the API prefix that follows the host.
         path = "/trade-api/v2" + endpoint
-        resp = requests.get(
+        resp = self._session.get(
             self.base_url + endpoint,
             headers=self._headers("GET", path),
             params=params,
-            timeout=15,
+            timeout=45,
         )
         resp.raise_for_status()
         return resp.json()

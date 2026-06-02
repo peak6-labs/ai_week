@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 
 class Side(str, Enum):
@@ -83,6 +84,34 @@ class PortfolioState:
     daily_realized_pnl: float = 0.0
     total_exposure_dollars: float = 0.0
     exposure_by_category: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class Candle:
+    end_period_ts: int
+    volume: float
+    open_interest: float
+    price_open: Optional[float]     # first trade in period (cents); None = no trades
+    price_high: Optional[float]
+    price_low: Optional[float]
+    price_close: Optional[float]    # last trade in period (cents)
+    price_mean: Optional[float]     # VWAP (cents)
+    price_previous: Optional[float] # prior period's close (cents)
+
+
+@dataclass
+class ScoredMarket:
+    market: Market
+    composite_score: float
+    volume_oi_ratio_score: float
+    relative_historical_volume_score: Optional[float] = None
+    volume_spike_short_term_score: Optional[float] = None
+    oi_change_score: Optional[float] = None
+    momentum_score: Optional[float] = None
+    intraday_hl_score: Optional[float] = None
+    weekly_hl_score: Optional[float] = None
+    ofi_score: Optional[float] = None
+    orderbook_skew_score: Optional[float] = None
 
 
 @dataclass
