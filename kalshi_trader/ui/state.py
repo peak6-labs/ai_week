@@ -36,6 +36,8 @@ class TradingState:
     total_exposure_dollars: float = 0.0
     positions: list[dict] = field(default_factory=list)
     recent_ideas: list[dict] = field(default_factory=list)  # last 50 trade ideas, serializable dicts
+    pending_ideas: list[dict] = field(default_factory=list)   # awaiting review
+    reviewed_ideas: list[dict] = field(default_factory=list)  # last 50 reviewed, newest first
     agent_statuses: dict[str, AgentStatus] = field(default_factory=dict)
     event_log: deque[LogLine] = field(default_factory=lambda: deque(maxlen=200))
     last_error: str = ""
@@ -55,6 +57,8 @@ class TradingState:
             "total_exposure_dollars": self.total_exposure_dollars,
             "positions": self.positions,
             "recent_ideas": self.recent_ideas,
+            "pending_ideas": list(self.pending_ideas),
+            "reviewed_ideas": list(self.reviewed_ideas),
             "agent_statuses": {
                 name: {
                     "enabled": agent.enabled,

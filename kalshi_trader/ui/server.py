@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from kalshi_trader.ui.state import TradingState
 from kalshi_trader.ui.config_manager import cfg as _default_cfg, ConfigManager
+from kalshi_trader.db import insert_reviewed_idea
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,52 @@ def create_app(
         errors = mgr.validate_and_update(updates)
         if errors:
             return JSONResponse({"errors": errors}, status_code=422)
+        return JSONResponse({"ok": True})
+
+    @app.post("/api/ideas")
+    async def post_ideas(request: Request) -> JSONResponse:
+        """Accept a list of idea dicts and append them to pending_ideas."""
+        state: TradingState = request.app.state.trading_state
+        ideas: list[dict] = await request.json()
+        for idea in ideas:
+            idea["id"] = str(uuid.uuid4())
+        state.pending_ideas.extend(ideas)
+        return JSONResponse({"ok": True, "count": len(ideas)})
+
+    @app.post("/api/ideas/{idea_id}/approve")
+    async def approve_idea(idea_id: str, request: Request) -> JSONResponse:
+        """Approve a pending idea by id."""
+        state: TradingState = request.app.state.trading_state
+        idx = next((i for i, idea in enumerate(state.pending_ideas) if idea.get("id") == idea_id), None)
+        if idx is None:
+            return JSONResponse({"error": "idea not found"}, status_code=404)
+        idea = state.pending_ideas.pop(idx)
+        idea["decision"] = "approved"
+        idea["reviewed_at"] = datetime.now(tz=timezone.utc).isoformat()
+        state.reviewed_ideas.insert(0, idea)
+        state.reviewed_ideas = state.reviewed_ideas[:50]
+        try:
+            await insert_reviewed_idea(idea, "approved")
+        except Exception as exc:
+            logger.error("DB save failed for approved idea %s: %s", idea_id, exc)
+        return JSONResponse({"ok": True})
+
+    @app.post("/api/ideas/{idea_id}/reject")
+    async def reject_idea(idea_id: str, request: Request) -> JSONResponse:
+        """Reject a pending idea by id."""
+        state: TradingState = request.app.state.trading_state
+        idx = next((i for i, idea in enumerate(state.pending_ideas) if idea.get("id") == idea_id), None)
+        if idx is None:
+            return JSONResponse({"error": "idea not found"}, status_code=404)
+        idea = state.pending_ideas.pop(idx)
+        idea["decision"] = "rejected"
+        idea["reviewed_at"] = datetime.now(tz=timezone.utc).isoformat()
+        state.reviewed_ideas.insert(0, idea)
+        state.reviewed_ideas = state.reviewed_ideas[:50]
+        try:
+            await insert_reviewed_idea(idea, "rejected")
+        except Exception as exc:
+            logger.error("DB save failed for rejected idea %s: %s", idea_id, exc)
         return JSONResponse({"ok": True})
 
     @app.post("/api/system/start")

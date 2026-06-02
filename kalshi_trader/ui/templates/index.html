@@ -505,6 +505,114 @@
     .toggle-switch input:checked + .toggle-track::after { left: 19px; }
 
     /* ------------------------------------------------------------------ */
+    /* Trade Ideas tab (Tab 4)                                             */
+    /* ------------------------------------------------------------------ */
+    #tab-ideas .ideas-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.10em;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    #tab-ideas .ideas-pending-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .idea-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .idea-card-header {
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .idea-ticker {
+      font-size: 14px;
+      font-weight: 700;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--text-primary);
+      margin-right: 2px;
+    }
+    .idea-agent {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-left: auto;
+    }
+    .idea-card-body { padding: 10px 14px; }
+    .idea-reasoning {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .idea-signals {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .signal-tag {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+    .idea-market-price {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-bottom: 10px;
+    }
+    .idea-card-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-approve {
+      flex: 1;
+      padding: 6px 14px;
+      background: var(--success);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-approve:hover { opacity: 0.85; }
+    .btn-reject {
+      flex: 1;
+      padding: 6px 14px;
+      background: var(--error);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-reject:hover { opacity: 0.85; }
+    .ideas-empty {
+      color: var(--text-tertiary);
+      font-style: italic;
+      font-size: 13px;
+      padding: 20px 0;
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Utility                                                              */
     /* ------------------------------------------------------------------ */
     .text-mono { font-family: "SF Mono", "Fira Code", monospace; }
@@ -524,6 +632,7 @@
   <button class="tab-btn active" data-tab="monitor">Live Monitor</button>
   <button class="tab-btn" data-tab="config">Config &amp; Weights</button>
   <button class="tab-btn" data-tab="agents">Agents</button>
+  <button class="tab-btn" data-tab="ideas">Trade Ideas</button>
 </nav>
 
 <!-- ====================================================================== -->
@@ -976,6 +1085,45 @@
   <div id="tab-agents" class="tab-pane">
     <div class="agents-grid" id="agents-grid">
       <!-- Cards rendered by JS -->
+    </div>
+  </div>
+
+  <!-- -------------------------------------------------------------------- -->
+  <!-- Tab 4: Trade Ideas                                                     -->
+  <!-- -------------------------------------------------------------------- -->
+  <div id="tab-ideas" class="tab-pane">
+    <!-- Pending Review -->
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panel-header">Pending Review</div>
+      <div class="panel-body">
+        <div class="ideas-pending-grid" id="pending-ideas-grid">
+          <!-- Cards rendered by JS -->
+        </div>
+        <div class="ideas-empty hidden" id="pending-ideas-empty">No pending ideas</div>
+      </div>
+    </div>
+
+    <!-- Reviewed Ideas -->
+    <div class="panel">
+      <div class="panel-header">Reviewed Ideas</div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Ticker</th>
+              <th>Side</th>
+              <th>Conf.</th>
+              <th>Size</th>
+              <th>Decision</th>
+              <th>Agent</th>
+            </tr>
+          </thead>
+          <tbody id="reviewed-ideas-tbody">
+            <tr class="empty-row"><td colspan="7">No reviewed ideas yet</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -1449,6 +1597,9 @@ async function poll() {
       renderEventLog(state.event_log);
     } else if (activeTab === 'agents') {
       renderAgentsGrid(state.agent_statuses || {}, currentConfig);
+    } else if (activeTab === 'ideas') {
+      renderPendingIdeas(state.pending_ideas || []);
+      renderReviewedIdeas(state.reviewed_ideas || []);
     }
     // Config tab doesn't auto-update from state (user is editing)
   } catch (err) {
