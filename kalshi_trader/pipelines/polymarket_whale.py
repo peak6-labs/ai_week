@@ -25,6 +25,8 @@ def main() -> None:
         except Exception as exc:
             print(f"Error: {exc}", file=sys.stderr)
             print(json.dumps([]))
+        finally:
+            await agent.close()
 
     asyncio.run(run())
 

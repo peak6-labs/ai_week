@@ -116,3 +116,6 @@ class PolymarketWhaleAgent:
         if estimate is None:
             return None
         return estimate_to_dict(estimate)
+
+    async def close(self) -> None:
+        pass

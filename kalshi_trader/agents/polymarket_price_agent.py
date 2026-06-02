@@ -141,3 +141,6 @@ class PolymarketPriceAgent:
     ) -> dict:
         estimate = build_price_signal(ticker, poly_prob, gap_cents, match_score)
         return estimate_to_dict(estimate)
+
+    async def close(self) -> None:
+        pass
