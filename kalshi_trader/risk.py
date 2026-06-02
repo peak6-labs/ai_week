@@ -1,8 +1,21 @@
 from __future__ import annotations
+import math
 from collections import defaultdict
 from datetime import datetime, timezone
 from kalshi_trader import config
 from kalshi_trader.models import TradeIdea, PortfolioState, RiskDecision
+
+
+# Kalshi trading-fee coefficients. The fee scales with contracts * price * (1 - price)
+# and is rounded up to the next whole cent per order. See plans/trading_plan.md
+# section 2 ("Kalshi Fee Structure") for the authoritative description.
+#   - General markets: takers pay GENERAL_TAKER_FEE_COEFFICIENT; makers are free.
+#   - Index markets (S&P 500 / Nasdaq): both makers and takers pay the reduced
+#     INDEX_MARKET_FEE_COEFFICIENT.
+# These rates are per-market and change over time; the `fee` fields on the API's
+# /markets responses are the source of truth before relying on a specific number.
+GENERAL_TAKER_FEE_COEFFICIENT = 0.07
+INDEX_MARKET_FEE_COEFFICIENT = 0.035
 
 
 class RiskManager:
@@ -59,16 +72,37 @@ class RiskManager:
         if size < config.MIN_SINGLE_POSITION_DOLLARS:
             return RiskDecision(False, 0, f"sized position too small (${size:.2f}) after limits")
 
+        # Trade ideas enter by crossing the spread, so assume the taker rate on a
+        # general market (index markets are filtered out of the tradeable universe).
         fees = self.estimate_fee_dollars(idea.market_price, size)
         return RiskDecision(True, round(size, 2), fees_estimate_cents=fees * 100)
 
-    def estimate_fee_dollars(self, price_cents: float, size_dollars: float) -> float:
+    def estimate_fee_dollars(
+        self,
+        price_cents: float,
+        size_dollars: float,
+        is_maker: bool = False,
+        is_index_market: bool = False,
+    ) -> float:
         price_in_dollars = price_cents / 100.0
-        if price_in_dollars <= 0:
+        if price_in_dollars <= 0.0 or price_in_dollars >= 1.0 or size_dollars <= 0.0:
+            return 0.0
+        coefficient = self._fee_coefficient(is_maker=is_maker, is_index_market=is_index_market)
+        if coefficient <= 0.0:
             return 0.0
         contracts = size_dollars / price_in_dollars
-        fee_per_contract = 0.07 * price_in_dollars * (1.0 - price_in_dollars)
-        return fee_per_contract * contracts
+        raw_fee_cents = coefficient * contracts * price_in_dollars * (1.0 - price_in_dollars) * 100.0
+        # Kalshi rounds each order's fee up to the next whole cent. Round away
+        # floating-point noise first so a fee landing exactly on a cent boundary
+        # (e.g. $2.10 -> 210.00000000000003) isn't pushed to the next cent.
+        return math.ceil(round(raw_fee_cents, 6)) / 100.0
+
+    def _fee_coefficient(self, is_maker: bool, is_index_market: bool) -> float:
+        if is_index_market:
+            # Index markets (S&P 500 / Nasdaq) charge the reduced rate on both sides.
+            return INDEX_MARKET_FEE_COEFFICIENT
+        # General markets: takers pay the standard rate; makers are free.
+        return 0.0 if is_maker else GENERAL_TAKER_FEE_COEFFICIENT
 
     def record_loss(self, category: str) -> None:
         self._consecutive_losses[category] += 1
