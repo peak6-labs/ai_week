@@ -39,6 +39,17 @@ log = logging.getLogger(__name__)
 _RECONNECT_DELAY = 5  # seconds between reconnect attempts
 
 
+def _to_cents(raw) -> int:
+    """Convert a price value to integer cents.
+
+    Kalshi's live WS feed sends prices as dollar strings like "0.3000" (= 30¢).
+    Tests and legacy callers send integer or string cent values like 30 or "30".
+    Heuristic: float(raw) <= 1.0 → dollar format → multiply by 100.
+    """
+    v = float(raw)
+    return round(v * 100) if v <= 1.0 else int(v)
+
+
 def _ws_headers() -> dict:
     """Build RSA-signed auth headers for the WS upgrade request."""
     from kalshi_auth import KalshiClient as _Auth
@@ -104,30 +115,38 @@ class KalshiWebSocketClient:
         }
         await ws.send_str(json.dumps(msg))
 
-    def _handle(self, msg: dict) -> None:
-        msg_type = msg.get("type", "")
-        ticker = msg.get("market_ticker", "")
+    def _handle(self, envelope: dict) -> None:
+        # Kalshi WS wraps payload in envelope["msg"] (dict); top-level has "type".
+        # Guard: "msg" on error messages is a plain string, not a dict — fall back to envelope.
+        msg_type = envelope.get("type", "")
+        raw_inner = envelope.get("msg")
+        inner = raw_inner if isinstance(raw_inner, dict) else envelope
+
+        ticker = inner.get("market_ticker", "")
 
         if msg_type == "orderbook_snapshot":
-            yes_book = msg.get("yes", [])
-            no_book = msg.get("no", [])
-            self.state.apply_snapshot(ticker, yes_book, no_book)
+            # Live feed uses "yes_dollars_fp" / "no_dollars_fp"; tests/fallback use "yes"/"no"
+            yes_raw = inner.get("yes_dollars_fp", inner.get("yes", []))
+            no_raw = inner.get("no_dollars_fp", inner.get("no", []))
+            self.state.apply_snapshot(ticker, yes_raw, no_raw)
 
         elif msg_type == "orderbook_delta":
-            side = msg.get("side", "yes")
-            price = int(msg.get("price", 0))
-            delta = int(msg.get("delta", 0))
+            side = inner.get("side", "yes")
+            raw_price = inner.get("price", 0)
+            price = _to_cents(raw_price)
+            raw_delta = inner.get("delta", 0)
+            delta = float(raw_delta) if isinstance(raw_delta, str) else float(raw_delta)
             self.state.apply_delta(ticker, side, price, delta)
 
         elif msg_type == "trade":
-            size = int(msg.get("count", 0))
+            raw = inner.get("count", inner.get("size", 0))
+            size = float(raw) if isinstance(raw, str) else float(raw)
             self.state.record_trade(ticker, size)
 
-        # "subscribed" and "error" are lifecycle messages — logged but not handled structurally
         elif msg_type == "subscribed":
             log.info("WS subscription confirmed for tickers: %s", self.tickers)
         elif msg_type == "error":
-            log.error("WS error message from server: %s", msg)
+            log.error("WS error message from server: %s", envelope)
         # Unknown types are silently ignored
 
     async def stop(self) -> None:

@@ -21,7 +21,7 @@ class OrderBookState:
     # rolling (timestamp, trade_size) for volume velocity
     _trades: dict[str, deque] = field(default_factory=lambda: defaultdict(lambda: deque(maxlen=500)))
 
-    def apply_delta(self, ticker: str, side: str, price: int, delta: int) -> None:
+    def apply_delta(self, ticker: str, side: str, price: int, delta: float) -> None:
         """Apply an orderbook_delta message. delta=0 means remove level."""
         book = self._bids[ticker] if side == "yes" else self._asks[ticker]
         if delta == 0:
@@ -29,10 +29,28 @@ class OrderBookState:
         else:
             book[price] = delta
 
-    def apply_snapshot(self, ticker: str, yes_book: list[dict], no_book: list[dict]) -> None:
-        """Replace full order book from a snapshot message."""
-        self._bids[ticker] = {int(lvl["price"]): int(lvl["quantity"]) for lvl in yes_book}
-        self._asks[ticker] = {int(lvl["price"]): int(lvl["quantity"]) for lvl in no_book}
+    def apply_snapshot(self, ticker: str, yes_book: list, no_book: list) -> None:
+        """Replace full order book from a snapshot message.
+
+        Accepts both dict format {"price": ..., "quantity": ...} and the live
+        Kalshi WS format where each level is a [price_dollars_str, qty_dollars_str]
+        tuple, e.g. ["0.3000", "100.00"]. Prices are stored as integer cents.
+        """
+        self._bids[ticker] = {self._to_cents(lvl): self._to_qty(lvl) for lvl in yes_book}
+        self._asks[ticker] = {self._to_cents(lvl): self._to_qty(lvl) for lvl in no_book}
+
+    @staticmethod
+    def _to_cents(lvl) -> int:
+        if isinstance(lvl, dict):
+            return int(lvl["price"])
+        v = float(lvl[0])
+        return round(v * 100) if v <= 1.0 else int(v)
+
+    @staticmethod
+    def _to_qty(lvl) -> float:
+        if isinstance(lvl, dict):
+            return int(lvl["quantity"])
+        return float(lvl[1])  # dollar string quantity
 
     def record_trade(self, ticker: str, size: int) -> None:
         self._trades[ticker].append((datetime.now(tz=timezone.utc), size))
