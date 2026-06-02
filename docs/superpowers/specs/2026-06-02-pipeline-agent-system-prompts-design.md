@@ -154,7 +154,7 @@ All pipeline agents return a `list[SignalEstimate]` JSON block. Empty list is va
 3. Call `get_large_trades(condition_id)` then `detect_whale_entries(trades)`
 4. Filter entries to those whose `wallet_address` is in target wallets
 5. No target entries → return `[]`
-6. `probability` = `poly_prob` (the price the whales are trading at — they are effectively endorsing this price)
+6. `probability` = weighted average entry price of target whale trades (the price they actually paid — their revealed implied probability). This is independent of the Polymarket/Kalshi price gap.
 7. Return one `SignalEstimate` — `source="polymarket_whale"`, weight=0.60
 
 **Additional metadata fields:**
@@ -213,4 +213,4 @@ The Python agent class should be minimal: load the `.md` file as system prompt, 
 - All metadata fields are intentionally mutable — expect these to be tuned as signals are evaluated against outcomes
 - `data_quality` thresholds (60 min / 360 min for weather) are starting points; adjust after observing data freshness in practice
 - The `weight` values (0.85 weather, 0.75 polymarket_price, 0.60 polymarket_whale, variable for x) will be tuned once we have trade outcome data
-- `polymarket_whale` probability is the Polymarket price the whales are trading at — it is NOT an independent probability estimate, it is a confirmation signal. The combiner should treat it as corroborating evidence for `polymarket_price`, not an independent source.
+- `polymarket_whale` is an independent positive signal — the probability is derived from where smart wallets actually entered, not from the Polymarket/Kalshi price gap. It can fire on markets where the price gap is small or nonexistent.
