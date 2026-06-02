@@ -20,7 +20,7 @@ def relative_historical_volume_score(
     Returns None when fewer than 3 days of history are available.
     Score = 0.0 at baseline, 1.0 at 3× baseline.
     """
-    volumes = [c.volume for c in daily_candles if c.volume > 0]
+    volumes = [candle.volume for candle in daily_candles if candle.volume > 0]
     if len(volumes) < 3:
         return None
     baseline = sum(volumes) / len(volumes)
@@ -41,7 +41,7 @@ def volume_spike_short_term_score(hourly_candles: list[Candle]) -> float | None:
     sorted_candles = sorted(hourly_candles, key=lambda c: c.end_period_ts)
     last = sorted_candles[-1]
     prior = sorted_candles[:-1]
-    baseline_volumes = [c.volume for c in prior if c.volume >= 0]
+    baseline_volumes = [candle.volume for candle in prior if candle.volume >= 0]
     if not baseline_volumes:
         return None
     baseline = sum(baseline_volumes) / len(baseline_volumes)
@@ -60,12 +60,12 @@ def oi_change_score(hourly_candles: list[Candle]) -> float | None:
     if len(hourly_candles) < 2:
         return None
     sorted_candles = sorted(hourly_candles, key=lambda c: c.end_period_ts)
-    oi_now = sorted_candles[-1].open_interest
-    oi_old = sorted_candles[0].open_interest
-    if oi_old <= 0:
+    open_interest_now = sorted_candles[-1].open_interest
+    open_interest_old = sorted_candles[0].open_interest
+    if open_interest_old <= 0:
         return None
-    delta_ratio = (oi_now - oi_old) / oi_old
-    return min(1.0, max(0.0, delta_ratio / 0.10))
+    open_interest_delta_ratio = (open_interest_now - open_interest_old) / open_interest_old
+    return min(1.0, max(0.0, open_interest_delta_ratio / 0.10))
 
 
 def momentum_score(hourly_candles: list[Candle]) -> float | None:
@@ -78,12 +78,12 @@ def momentum_score(hourly_candles: list[Candle]) -> float | None:
     if len(hourly_candles) < 4:
         return None
     sorted_candles = sorted(hourly_candles, key=lambda c: c.end_period_ts)
-    recent = sorted_candles[-4:]
-    prices = [c.price_close for c in recent if c.price_close is not None]
-    if len(prices) < 2:
+    recent_candles = sorted_candles[-4:]
+    close_prices = [candle.price_close for candle in recent_candles if candle.price_close is not None]
+    if len(close_prices) < 2:
         return 0.0
-    delta = abs(prices[-1] - prices[0])
-    return min(1.0, delta / 10.0)
+    price_delta = abs(close_prices[-1] - close_prices[0])
+    return min(1.0, price_delta / 10.0)
 
 
 def hl_position_score(candles: list[Candle], current_price: float) -> float | None:
@@ -94,16 +94,16 @@ def hl_position_score(candles: list[Candle], current_price: float) -> float | No
     """
     if not candles:
         return None
-    prices = [c.price_close for c in candles if c.price_close is not None]
-    prices.append(current_price)
-    if len(prices) < 2:
+    close_prices = [candle.price_close for candle in candles if candle.price_close is not None]
+    close_prices.append(current_price)
+    if len(close_prices) < 2:
         return None
-    lo = min(prices)
-    hi = max(prices)
-    if hi == lo:
-        return 0.5
-    position = (current_price - lo) / (hi - lo)
-    return abs(position - 0.5) * 2.0
+    price_low = min(close_prices)
+    price_high = max(close_prices)
+    if price_high - price_low < 2.0:
+        return None
+    normalized_position = (current_price - price_low) / (price_high - price_low)
+    return abs(normalized_position - 0.5) * 2.0
 
 
 def ofi_score(trades: list[dict]) -> float | None:
@@ -115,22 +115,22 @@ def ofi_score(trades: list[dict]) -> float | None:
     """
     if not trades:
         return None
-    yes_vol = 0.0
-    no_vol = 0.0
-    for t in trades:
+    yes_volume = 0.0
+    no_volume = 0.0
+    for trade in trades:
         try:
-            count = float(t.get("count_fp", 0) or 0)
+            count = float(trade.get("count_fp", 0) or 0)
         except (ValueError, TypeError):
             continue
-        side = t.get("taker_outcome_side", "")
+        side = trade.get("taker_outcome_side", "")
         if side == "yes":
-            yes_vol += count
+            yes_volume += count
         elif side == "no":
-            no_vol += count
-    total = yes_vol + no_vol
-    if total <= 0:
+            no_volume += count
+    total_volume = yes_volume + no_volume
+    if total_volume <= 0:
         return None
-    return abs(yes_vol - no_vol) / total
+    return abs(yes_volume - no_volume) / total_volume
 
 
 def orderbook_skew_score(orderbook: dict) -> float:
@@ -147,22 +147,22 @@ def orderbook_skew_score(orderbook: dict) -> float:
     def depth_near_mid(levels: list, cents_window: float = 5.0) -> float:
         if not levels:
             return 0.0
-        prices = [float(l[0]) if isinstance(l, (list, tuple)) else 0.0 for l in levels]
-        mid_approx = (max(prices) + min(prices)) / 2.0 if prices else 50.0
-        total = 0.0
+        prices = [float(level_entry[0]) if isinstance(level_entry, (list, tuple)) else 0.0 for level_entry in levels]
+        midpoint_approximation = (max(prices) + min(prices)) / 2.0 if prices else 50.0
+        total_depth = 0.0
         for level in levels:
             try:
                 price, size = float(level[0]), float(level[1])
             except (IndexError, TypeError, ValueError):
                 continue
-            if abs(price - mid_approx) <= cents_window:
-                total += size
-        return total
+            if abs(price - midpoint_approximation) <= cents_window:
+                total_depth += size
+        return total_depth
 
     yes_depth = depth_near_mid(yes_levels)
     no_depth = depth_near_mid(no_levels)
-    total = yes_depth + no_depth
-    if total <= 0:
+    total_depth = yes_depth + no_depth
+    if total_depth <= 0:
         return 0.5
-    skew = yes_depth / total
-    return abs(skew - 0.5) * 2.0
+    yes_side_skew = yes_depth / total_depth
+    return abs(yes_side_skew - 0.5) * 2.0

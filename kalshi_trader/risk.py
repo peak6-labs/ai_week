@@ -1,8 +1,21 @@
 from __future__ import annotations
+import math
 from collections import defaultdict
 from datetime import datetime, timezone
 from kalshi_trader import config
 from kalshi_trader.models import TradeIdea, PortfolioState, RiskDecision
+
+
+# Kalshi trading-fee coefficients. The fee scales with contracts * price * (1 - price)
+# and is rounded up to the next whole cent per order. See plans/trading_plan.md
+# section 2 ("Kalshi Fee Structure") for the authoritative description.
+#   - General markets: takers pay GENERAL_TAKER_FEE_COEFFICIENT; makers are free.
+#   - Index markets (S&P 500 / Nasdaq): both makers and takers pay the reduced
+#     INDEX_MARKET_FEE_COEFFICIENT.
+# These rates are per-market and change over time; the `fee` fields on the API's
+# /markets responses are the source of truth before relying on a specific number.
+GENERAL_TAKER_FEE_COEFFICIENT = 0.07
+INDEX_MARKET_FEE_COEFFICIENT = 0.035
 
 
 class RiskManager:
@@ -33,8 +46,8 @@ class RiskManager:
         if close_time is not None:
             now = datetime.now(timezone.utc)
             # Normalise naive close_time to UTC-aware for comparison
-            ct = close_time if close_time.tzinfo else close_time.replace(tzinfo=timezone.utc)
-            hours_to_close = (ct - now).total_seconds() / 3600
+            utc_close_time = close_time if close_time.tzinfo else close_time.replace(tzinfo=timezone.utc)
+            hours_to_close = (utc_close_time - now).total_seconds() / 3600
             if hours_to_close < config.MIN_HOURS_BEFORE_SETTLEMENT:
                 return RiskDecision(False, 0, f"settlement too soon ({hours_to_close:.1f}h)")
 
@@ -46,7 +59,8 @@ class RiskManager:
 
         # Half-Kelly sizing
         size = self._half_kelly_size(
-            idea.confidence, market_prob, portfolio.balance_dollars, idea.category
+            probability=idea.confidence, market_prob=market_prob,
+            balance=portfolio.balance_dollars, category=idea.category,
         )
 
         # Clamp within per-category and total headroom
@@ -58,16 +72,37 @@ class RiskManager:
         if size < config.MIN_SINGLE_POSITION_DOLLARS:
             return RiskDecision(False, 0, f"sized position too small (${size:.2f}) after limits")
 
+        # Trade ideas enter by crossing the spread, so assume the taker rate on a
+        # general market (index markets are filtered out of the tradeable universe).
         fees = self.estimate_fee_dollars(idea.market_price, size)
         return RiskDecision(True, round(size, 2), fees_estimate_cents=fees * 100)
 
-    def estimate_fee_dollars(self, price_cents: float, size_dollars: float) -> float:
-        c = price_cents / 100.0
-        if c <= 0:
+    def estimate_fee_dollars(
+        self,
+        price_cents: float,
+        size_dollars: float,
+        is_maker: bool = False,
+        is_index_market: bool = False,
+    ) -> float:
+        price_in_dollars = price_cents / 100.0
+        if price_in_dollars <= 0.0 or price_in_dollars >= 1.0 or size_dollars <= 0.0:
             return 0.0
-        contracts = size_dollars / c
-        fee_per_contract = 0.07 * c * (1.0 - c)
-        return fee_per_contract * contracts
+        coefficient = self._fee_coefficient(is_maker=is_maker, is_index_market=is_index_market)
+        if coefficient <= 0.0:
+            return 0.0
+        contracts = size_dollars / price_in_dollars
+        raw_fee_cents = coefficient * contracts * price_in_dollars * (1.0 - price_in_dollars) * 100.0
+        # Kalshi rounds each order's fee up to the next whole cent. Round away
+        # floating-point noise first so a fee landing exactly on a cent boundary
+        # (e.g. $2.10 -> 210.00000000000003) isn't pushed to the next cent.
+        return math.ceil(round(raw_fee_cents, 6)) / 100.0
+
+    def _fee_coefficient(self, is_maker: bool, is_index_market: bool) -> float:
+        if is_index_market:
+            # Index markets (S&P 500 / Nasdaq) charge the reduced rate on both sides.
+            return INDEX_MARKET_FEE_COEFFICIENT
+        # General markets: takers pay the standard rate; makers are free.
+        return 0.0 if is_maker else GENERAL_TAKER_FEE_COEFFICIENT
 
     def record_loss(self, category: str) -> None:
         self._consecutive_losses[category] += 1
@@ -79,14 +114,14 @@ class RiskManager:
             self._consecutive_losses[category] = 0
 
     def _half_kelly_size(
-        self, p: float, market_prob: float, balance: float, category: str
+        self, probability: float, market_prob: float, balance: float, category: str
     ) -> float:
-        q = 1.0 - p
-        b = (1.0 - market_prob) / market_prob  # net odds on YES
-        if b <= 0:
+        complement_probability = 1.0 - probability
+        yes_net_odds = (1.0 - market_prob) / market_prob  # net odds on YES
+        if yes_net_odds <= 0:
             return 0.0
-        f_star = (p * b - q) / b
-        f_half = max(f_star / 2.0, 0.0)
+        full_kelly_fraction = (probability * yes_net_odds - complement_probability) / yes_net_odds
+        half_kelly_fraction = max(full_kelly_fraction / 2.0, 0.0)
         if self._consecutive_losses.get(category, 0) >= 3:
-            f_half *= 0.5
-        return f_half * balance
+            half_kelly_fraction *= 0.5
+        return half_kelly_fraction * balance

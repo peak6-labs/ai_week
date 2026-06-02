@@ -7,6 +7,7 @@ import time
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
+from kalshi_trader._retry import with_retry
 from kalshi_trader.models import Candle
 
 if TYPE_CHECKING:
@@ -56,27 +57,32 @@ def _parse_candle_row(row: tuple) -> Candle:
     )
 
 
-def _candle_from_api(raw: dict) -> Candle:
-    """Parse one raw API candlestick dict. Converts dollar prices to cents."""
-    def _to_cents(v: str | float | None) -> float | None:
-        if v is None:
-            return None
-        try:
-            return round(float(v) * 100, 4)
-        except (ValueError, TypeError):
-            return None
+def _candle_from_api(raw_candle: dict) -> Candle:
+    """Parse one raw API candlestick dict. Converts dollar prices to cents.
 
-    price = raw.get("price") or {}
+    The API returns prices split into yes_bid / yes_ask sub-objects with
+    *_dollars keys. We compute mid-price (average) for each OHLC field.
+    Volume and OI come as *_fp string fields.
+    """
+    def _mid_cents(bid_data: dict, ask_data: dict, field: str) -> float | None:
+        bid_value, ask_value = bid_data.get(field), ask_data.get(field)
+        valid_values = [float(x) for x in (bid_value, ask_value) if x is not None]
+        if not valid_values:
+            return None
+        return round(sum(valid_values) / len(valid_values) * 100, 4)
+
+    yes_bid = raw_candle.get("yes_bid") or {}
+    yes_ask = raw_candle.get("yes_ask") or {}
     return Candle(
-        end_period_ts=int(raw["end_period_ts"]),
-        volume=float(raw.get("volume") or 0),
-        open_interest=float(raw.get("open_interest") or 0),
-        price_open=_to_cents(price.get("open")),
-        price_high=_to_cents(price.get("high")),
-        price_low=_to_cents(price.get("low")),
-        price_close=_to_cents(price.get("close")),
-        price_mean=_to_cents(price.get("mean")),
-        price_previous=_to_cents(price.get("previous")),
+        end_period_ts=int(raw_candle["end_period_ts"]),
+        volume=float(raw_candle.get("volume_fp") or raw_candle.get("volume") or 0),
+        open_interest=float(raw_candle.get("open_interest_fp") or raw_candle.get("open_interest") or 0),
+        price_open=_mid_cents(yes_bid, yes_ask, "open_dollars"),
+        price_high=_mid_cents(yes_bid, yes_ask, "high_dollars"),
+        price_low=_mid_cents(yes_bid, yes_ask, "low_dollars"),
+        price_close=_mid_cents(yes_bid, yes_ask, "close_dollars"),
+        price_mean=None,
+        price_previous=None,
     )
 
 
@@ -126,24 +132,24 @@ class SnapshotStore:
     # ------------------------------------------------------------------
 
     def get_daily(self, ticker: str) -> list[Candle]:
-        rows = self._conn.execute(
+        result_rows = self._conn.execute(
             "SELECT end_period_ts, volume, open_interest, price_open, price_high, "
             "price_low, price_close, price_mean, price_previous "
             "FROM candles WHERE ticker=? AND period_interval=? "
             "ORDER BY end_period_ts ASC",
             (ticker, self.PERIOD_DAILY),
         ).fetchall()
-        return [_parse_candle_row(r) for r in rows]
+        return [_parse_candle_row(row) for row in result_rows]
 
     def get_hourly(self, ticker: str) -> list[Candle]:
-        rows = self._conn.execute(
+        result_rows = self._conn.execute(
             "SELECT end_period_ts, volume, open_interest, price_open, price_high, "
             "price_low, price_close, price_mean, price_previous "
             "FROM candles WHERE ticker=? AND period_interval=? "
             "ORDER BY end_period_ts ASC",
             (ticker, self.PERIOD_HOURLY),
         ).fetchall()
-        return [_parse_candle_row(r) for r in rows]
+        return [_parse_candle_row(row) for row in result_rows]
 
     # ------------------------------------------------------------------
     # Write
@@ -156,19 +162,19 @@ class SnapshotStore:
         self._upsert_candles(ticker, self.PERIOD_HOURLY, candles, commit=commit)
 
     def _upsert_candles(self, ticker: str, period: int, candles: list[Candle], commit: bool = True) -> None:
-        now = int(time.time())
-        rows = [
-            (ticker, period, c.end_period_ts, c.volume, c.open_interest,
-             c.price_open, c.price_high, c.price_low, c.price_close,
-             c.price_mean, c.price_previous)
-            for c in candles
+        current_timestamp = int(time.time())
+        candle_rows = [
+            (ticker, period, candle.end_period_ts, candle.volume, candle.open_interest,
+             candle.price_open, candle.price_high, candle.price_low, candle.price_close,
+             candle.price_mean, candle.price_previous)
+            for candle in candles
         ]
         self._conn.executemany(
-            "INSERT OR REPLACE INTO candles VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows
+            "INSERT OR REPLACE INTO candles VALUES (?,?,?,?,?,?,?,?,?,?,?)", candle_rows
         )
         self._conn.execute(
             "INSERT OR REPLACE INTO refresh_log VALUES (?,?,?)",
-            (ticker, period, now),
+            (ticker, period, current_timestamp),
         )
         if commit:
             self._conn.commit()
@@ -184,8 +190,8 @@ class SnapshotStore:
         now: int,
     ) -> None:
         """Batch-fetch candles for any tickers whose cache is stale."""
-        stale_daily = [t for t in tickers if self.is_daily_stale(t)]
-        stale_hourly = [t for t in tickers if self.is_hourly_stale(t)]
+        stale_daily = [ticker for ticker in tickers if self.is_daily_stale(ticker)]
+        stale_hourly = [ticker for ticker in tickers if self.is_hourly_stale(ticker)]
 
         if not stale_daily and not stale_hourly:
             _log.info("Candle cache is warm — no refresh needed")
@@ -228,46 +234,40 @@ class SnapshotStore:
         period: int,
         lookback_seconds: int,
     ) -> None:
-        label = "daily" if period == self.PERIOD_DAILY else "hourly"
-        start_ts = now - lookback_seconds
+        period_label = "daily" if period == self.PERIOD_DAILY else "hourly"
+        lookback_start_ts = now - lookback_seconds
         batches = [tickers[i:i + self.BATCH_SIZE] for i in range(0, len(tickers), self.BATCH_SIZE)]
-        _log.info("Fetching %s candles in %d parallel batches...", label, len(batches))
+        _log.info("Fetching %s candles in %d parallel batches...", period_label, len(batches))
 
-        sem = asyncio.Semaphore(8)
+        concurrency_semaphore = asyncio.Semaphore(8)
 
-        async def _fetch_one(batch: list[str], batch_num: int) -> dict[str, list[Candle]]:
-            _log.debug("Fetching %s batch %d/%d (%d tickers)", label, batch_num, len(batches), len(batch))
-            async with sem:
-                for attempt in range(4):
-                    try:
-                        resp = await client.get_market_candlesticks_batch(batch, start_ts, now, period)
-                        break
-                    except Exception as exc:
-                        status = getattr(getattr(exc, "response", None), "status_code", None)
-                        if status == 429:
-                            wait = 2 ** attempt
-                            _log.debug("%s batch %d/%d: 429, retrying in %ds", label, batch_num, len(batches), wait)
-                            await asyncio.sleep(wait)
-                        else:
-                            _log.warning("%s batch %d/%d failed: %s", label, batch_num, len(batches), exc)
-                            return {}
-                else:
-                    _log.warning("%s batch %d/%d: giving up after retries", label, batch_num, len(batches))
+        async def _fetch_one(ticker_batch: list[str], batch_num: int) -> dict[str, list[Candle]]:
+            _log.debug("Fetching %s batch %d/%d (%d tickers)", period_label, batch_num, len(batches), len(ticker_batch))
+            async with concurrency_semaphore:
+                try:
+                    api_response = await with_retry(
+                        client.get_market_candlesticks_batch, ticker_batch, lookback_start_ts, now, period
+                    )
+                except Exception as api_exception:
+                    _log.warning("%s batch %d/%d failed: %s", period_label, batch_num, len(batches), api_exception)
+                    return {}
+                if not api_response:
+                    _log.warning("%s batch %d/%d: giving up after retries", period_label, batch_num, len(batches))
                     return {}
             by_ticker: dict[str, list[Candle]] = defaultdict(list)
-            for entry in (resp.get("candles") or []):
+            for entry in (api_response.get("markets") or []):
                 ticker = entry.get("market_ticker") or entry.get("ticker", "")
-                for raw in (entry.get("candlesticks") or []):
+                for raw_candle in (entry.get("candlesticks") or []):
                     try:
-                        by_ticker[ticker].append(_candle_from_api(raw))
+                        by_ticker[ticker].append(_candle_from_api(raw_candle))
                     except (KeyError, TypeError):
                         continue
             _log.debug("%s batch %d/%d: %d candles across %d tickers",
-                       label, batch_num, len(batches),
-                       sum(len(v) for v in by_ticker.values()), len(by_ticker))
+                       period_label, batch_num, len(batches),
+                       sum(len(candle_list) for candle_list in by_ticker.values()), len(by_ticker))
             return by_ticker
 
-        results = await asyncio.gather(*[_fetch_one(b, i + 1) for i, b in enumerate(batches)])
+        results = await asyncio.gather(*[_fetch_one(ticker_batch, batch_index + 1) for batch_index, ticker_batch in enumerate(batches)])
 
         for by_ticker in results:
             for ticker, candles in by_ticker.items():

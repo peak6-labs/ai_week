@@ -152,6 +152,15 @@ activemq-data/
 
 # Kalshi candle cache (local SQLite, each machine maintains its own)
 kalshi_trader/candle_cache.db
+kalshi_trader/candle_cache.db-shm
+kalshi_trader/candle_cache.db-wal
+
+# Market data snapshots (regenerable via scripts/fetch_markets.py; can be 100s of MB)
+live_markets*.json
+live_markets*.csv
+
+# Generated agent reports (regenerable via the market-scout agent)
+reports/
 
 # Secrets / API keys — NEVER commit these
 *.pem

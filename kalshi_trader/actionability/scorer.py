@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from kalshi_trader.models import Market, ScoredMarket
+
+_log = logging.getLogger(__name__)
 from kalshi_trader.actionability.signals import (
     hl_position_score,
     momentum_score,
@@ -25,6 +28,8 @@ class MarketScorer:
     unusual is happening in a specific market right now.
     """
 
+    MIN_COVERAGE: float = 0.30  # fraction of total weight that must be present
+
     WEIGHTS: dict[str, float] = {
         "relative_historical_volume": 0.25,
         "volume_spike_short_term":    0.20,
@@ -43,23 +48,24 @@ class MarketScorer:
         store: "SnapshotStore",
     ) -> list[ScoredMarket]:
         """Score all markets using cached candles. Returns sorted descending."""
-        scored = [self._score_one(m, store) for m in markets]
+        scored = [self._score_one(market, store) for market in markets]
         scored.sort(key=lambda s: s.composite_score, reverse=True)
         return scored
 
     def _score_one(self, market: Market, store: "SnapshotStore") -> ScoredMarket:
-        daily = store.get_daily(market.ticker)
-        hourly = store.get_hourly(market.ticker)
-        mid = (market.yes_bid + market.yes_ask) / 2.0
+        daily_candles = store.get_daily(market.ticker)
+        hourly_candles = store.get_hourly(market.ticker)
+        _log.debug("%s  daily=%d  hourly=%d", market.ticker, len(daily_candles), len(hourly_candles))
+        midpoint_price = (market.yes_bid + market.yes_ask) / 2.0
 
         scores: dict[str, float | None] = {
             "volume_oi_ratio":            volume_oi_ratio_score(market),
-            "relative_historical_volume": relative_historical_volume_score(daily, market.volume_24h),
-            "volume_spike_short_term":    volume_spike_short_term_score(hourly),
-            "oi_change":                  oi_change_score(hourly),
-            "price_momentum":             momentum_score(hourly),
-            "intraday_hl":                hl_position_score(hourly, mid),
-            "weekly_hl":                  hl_position_score(daily[-7:] if len(daily) >= 7 else daily, mid),
+            "relative_historical_volume": relative_historical_volume_score(daily_candles, market.volume_24h),
+            "volume_spike_short_term":    volume_spike_short_term_score(hourly_candles),
+            "oi_change":                  oi_change_score(hourly_candles),
+            "price_momentum":             momentum_score(hourly_candles),
+            "intraday_hl":                hl_position_score(hourly_candles, midpoint_price),
+            "weekly_hl":                  hl_position_score(daily_candles[-7:] if len(daily_candles) >= 7 else daily_candles, midpoint_price),
             "ofi":                        None,
             "orderbook_skew":             None,
         }
@@ -85,37 +91,53 @@ class MarketScorer:
         orderbook_data: dict[str, dict],
     ) -> list[ScoredMarket]:
         """Add OFI and orderbook skew for markets that have live data, then re-sort."""
-        for s in scored:
-            ticker = s.market.ticker
+        trade_hits = 0
+        orderbook_hits = 0
+        for scored_market in scored:
+            ticker = scored_market.market.ticker
             if ticker in trade_data:
-                s.ofi_score = ofi_score(trade_data[ticker])
+                scored_market.ofi_score = ofi_score(trade_data[ticker])
+                trade_hits += 1
             if ticker in orderbook_data:
-                s.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
-            all_scores: dict[str, float | None] = {
-                "volume_oi_ratio":            s.volume_oi_ratio_score,
-                "relative_historical_volume": s.relative_historical_volume_score,
-                "volume_spike_short_term":    s.volume_spike_short_term_score,
-                "oi_change":                  s.oi_change_score,
-                "price_momentum":             s.momentum_score,
-                "intraday_hl":                s.intraday_hl_score,
-                "weekly_hl":                  s.weekly_hl_score,
-                "ofi":                        s.ofi_score,
-                "orderbook_skew":             s.orderbook_skew_score,
-            }
-            s.composite_score = self._composite(all_scores)
+                scored_market.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
+                orderbook_hits += 1
+            scored_market.composite_score = self._composite(self._scores_dict(scored_market))
+        _log.debug(
+            "live enrichment: %d/%d trade hits, %d/%d orderbook hits",
+            trade_hits, len(scored), orderbook_hits, len(scored),
+        )
 
         scored.sort(key=lambda s: s.composite_score, reverse=True)
         return scored
 
+    @staticmethod
+    def _scores_dict(scored_market: ScoredMarket) -> dict[str, float | None]:
+        return {
+            "volume_oi_ratio":            scored_market.volume_oi_ratio_score,
+            "relative_historical_volume": scored_market.relative_historical_volume_score,
+            "volume_spike_short_term":    scored_market.volume_spike_short_term_score,
+            "oi_change":                  scored_market.oi_change_score,
+            "price_momentum":             scored_market.momentum_score,
+            "intraday_hl":                scored_market.intraday_hl_score,
+            "weekly_hl":                  scored_market.weekly_hl_score,
+            "ofi":                        scored_market.ofi_score,
+            "orderbook_skew":             scored_market.orderbook_skew_score,
+        }
+
     def _composite(self, scores: dict[str, float | None]) -> float:
-        """Weighted average over non-None signals. Re-normalizes when signals are absent."""
+        """Weighted average over non-None signals. Re-normalizes when signals are absent.
+
+        Returns 0.0 if fewer than MIN_COVERAGE of total weights are present, so
+        markets with no candle history don't crowd out well-covered markets.
+        """
         total_weight = 0.0
         weighted_sum = 0.0
-        for key, weight in self.WEIGHTS.items():
-            val = scores.get(key)
-            if val is not None:
-                weighted_sum += val * weight
+        for signal_name, weight in self.WEIGHTS.items():
+            signal_value = scores.get(signal_name)
+            if signal_value is not None:
+                weighted_sum += signal_value * weight
                 total_weight += weight
-        if total_weight <= 0:
+        full_weight = sum(self.WEIGHTS.values())
+        if total_weight <= 0 or (total_weight / full_weight) < self.MIN_COVERAGE:
             return 0.0
         return weighted_sum / total_weight
