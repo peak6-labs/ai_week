@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalshi Trading Dashboard</title>
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* CSS Variables — light theme + dark theme                            */
+    /* ------------------------------------------------------------------ */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #6e6e73;
+        --accent: #0a84ff;
+        --success: #30d158;
+        --warning: #ffd60a;
+        --error: #ff453a;
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Reset & base                                                         */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; }
+
+    /* ------------------------------------------------------------------ */
+    /* Top nav / tab bar                                                    */
+    /* ------------------------------------------------------------------ */
+    #tab-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 4px;
+      height: 44px;
+    }
+    #tab-bar .app-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-right: 16px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 12px 14px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ------------------------------------------------------------------ */
+    /* Status bar (Monitor tab)                                            */
+    /* ------------------------------------------------------------------ */
+    #status-bar {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    #status-bar .stat-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #status-bar .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #status-bar .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    #status-bar .stat-value.positive { color: var(--success); }
+    #status-bar .stat-value.negative { color: var(--error); }
+    .running-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-tertiary);
+    }
+    .dot.running {
+      background: var(--success);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .sys-status-text {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+    .sys-status-text.running { color: var(--success); }
+
+    /* Start/Stop button */
+    #toggle-btn {
+      margin-left: auto;
+      padding: 6px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #toggle-btn:hover { opacity: 0.85; }
+    #toggle-btn.start { background: var(--success); color: #fff; }
+    #toggle-btn.stop  { background: var(--error);   color: #fff; }
+
+    /* ------------------------------------------------------------------ */
+    /* Main content area                                                    */
+    /* ------------------------------------------------------------------ */
+    #main-content {
+      padding: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Tab panes */
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Panels / cards                                                       */
+    /* ------------------------------------------------------------------ */
+    .panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+    }
+    .panel-body { padding: 16px; }
+
+    /* ------------------------------------------------------------------ */
+    /* Monitor tab layout                                                  */
+    /* ------------------------------------------------------------------ */
+    #tab-monitor .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 900px) {
+      #tab-monitor .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Tables                                                               */
+    /* ------------------------------------------------------------------ */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .data-table th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--bg-primary); }
+    .empty-row td {
+      text-align: center;
+      color: var(--text-tertiary);
+      font-style: italic;
+      padding: 24px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Badges                                                               */
+    /* ------------------------------------------------------------------ */
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .badge-yes  { background: var(--success); color: #fff; }
+    .badge-no   { background: var(--error);   color: #fff; }
+    .badge-conf { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .badge-approved { background: var(--success); color: #fff; }
+    .badge-rejected { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .badge-running { background: var(--warning); color: #fff; }
+    .badge-error   { background: var(--error);   color: #fff; }
+    .badge-idle    { background: var(--bg-tertiary); color: var(--text-secondary); }
+
+    /* ------------------------------------------------------------------ */
+    /* Event log                                                            */
+    /* ------------------------------------------------------------------ */
+    #event-log-panel .panel-body {
+      padding: 0;
+      max-height: 260px;
+      overflow-y: auto;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
+      font-size: 11.5px;
+    }
+    #event-log-lines {
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .log-line {
+      display: flex;
+      gap: 10px;
+    }
+    .log-ts {
+      color: var(--text-tertiary);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .log-msg { color: var(--text-primary); word-break: break-all; }
+
+    /* ------------------------------------------------------------------ */
+    /* P&L colours                                                          */
+    /* ------------------------------------------------------------------ */
+    .pnl-pos { color: var(--success); }
+    .pnl-neg { color: var(--error);   }
+    .pnl-zer { color: var(--text-tertiary); }
+
+    /* ------------------------------------------------------------------ */
+    /* Config tab                                                           */
+    /* ------------------------------------------------------------------ */
+    #tab-config {
+      padding-bottom: 80px; /* room for sticky save bar */
+    }
+    .config-section {
+      margin-bottom: 12px;
+    }
+    .config-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.10em;
+      color: var(--text-secondary);
+      padding: 10px 16px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .config-fields {
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px 20px;
+    }
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .field-key-tag {
+      font-size: 10px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--text-tertiary);
+      background: var(--bg-tertiary);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .field-input {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+    .field-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,113,227,0.18);
+    }
+    select.field-input { cursor: pointer; }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .slider-val {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 36px;
+      text-align: right;
+    }
+    .field-error {
+      font-size: 11px;
+      color: var(--error);
+      display: none;
+    }
+    .field-error.visible { display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Sticky save bar                                                      */
+    /* ------------------------------------------------------------------ */
+    #save-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 12px 20px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+    #save-bar.visible { display: flex; }
+    #save-bar .btn-primary {
+      padding: 7px 18px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #save-bar .btn-primary:hover { opacity: 0.85; }
+    #save-bar .btn-secondary {
+      padding: 7px 18px;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #save-bar .btn-secondary:hover { opacity: 0.85; }
+    #saved-msg {
+      font-size: 13px;
+      color: var(--success);
+      font-weight: 500;
+      display: none;
+    }
+    #saved-msg.visible { display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Agent cards (Tab 3)                                                 */
+    /* ------------------------------------------------------------------ */
+    #tab-agents .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+    }
+    .agent-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: opacity 0.2s;
+    }
+    .agent-card.disabled { opacity: 0.5; }
+    .agent-card-header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .agent-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+    .agent-sources { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .agent-card-body { padding: 12px 14px; font-size: 12px; }
+    .agent-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .agent-last-run {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+    .agent-output-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .kv-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 3px 0;
+      border-top: 1px solid var(--border);
+    }
+    .kv-row:first-child { border-top: none; }
+    .kv-key { color: var(--text-secondary); }
+    .kv-val { font-weight: 600; color: var(--text-primary); text-align: right; word-break: break-all; }
+    .no-summary { color: var(--text-tertiary); font-style: italic; font-size: 11px; }
+
+    /* Toggle switch */
+    .toggle-switch {
+      position: relative;
+      width: 38px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: 11px;
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      top: 3px;
+      left: 3px;
+      transition: left 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-track { background: var(--success); }
+    .toggle-switch input:checked + .toggle-track::after { left: 19px; }
+
+    /* ------------------------------------------------------------------ */
+    /* Utility                                                              */
+    /* ------------------------------------------------------------------ */
+    .text-mono { font-family: "SF Mono", "Fira Code", monospace; }
+    .text-sm { font-size: 12px; }
+    .text-xs { font-size: 11px; }
+    .mt-2 { margin-top: 8px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ====================================================================== -->
+<!-- Tab Bar                                                                  -->
+<!-- ====================================================================== -->
+<nav id="tab-bar">
+  <span class="app-title">Kalshi</span>
+  <button class="tab-btn active" data-tab="monitor">Live Monitor</button>
+  <button class="tab-btn" data-tab="config">Config &amp; Weights</button>
+  <button class="tab-btn" data-tab="agents">Agents</button>
+</nav>
+
+<!-- ====================================================================== -->
+<!-- Status Bar (shown only on Monitor tab)                                  -->
+<!-- ====================================================================== -->
+<div id="status-bar">
+  <div class="stat-group running-indicator">
+    <div class="dot" id="status-dot"></div>
+    <span class="sys-status-text" id="status-text">STOPPED</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Balance</span>
+    <span class="stat-value" id="stat-balance">$0.00</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Today P&amp;L</span>
+    <span class="stat-value" id="stat-pnl">$0.00</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Exposure</span>
+    <span class="stat-value" id="stat-exposure">$0.00</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Cycle</span>
+    <span class="stat-value" id="stat-cycle">#0</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Last Cycle</span>
+    <span class="stat-value" id="stat-last-cycle">—</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Positions</span>
+    <span class="stat-value" id="stat-positions">0</span>
+  </div>
+  <button id="toggle-btn" class="start">Start System</button>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Main Content                                                             -->
+<!-- ====================================================================== -->
+<div id="main-content">
+
+  <!-- -------------------------------------------------------------------- -->
+  <!-- Tab 1: Live Monitor                                                    -->
+  <!-- -------------------------------------------------------------------- -->
+  <div id="tab-monitor" class="tab-pane active">
+    <div class="two-col">
+      <!-- Open Positions -->
+      <div class="panel">
+        <div class="panel-header">Open Positions</div>
+        <div class="panel-body" style="padding:0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Side</th>
+                <th>Qty</th>
+                <th>Avg Price</th>
+                <th>Current</th>
+                <th>Unreal. P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody id="positions-tbody">
+              <tr class="empty-row"><td colspan="6">No open positions</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent Trade Ideas -->
+      <div class="panel">
+        <div class="panel-header">Recent Trade Ideas</div>
+        <div class="panel-body" style="padding:0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Side</th>
+                <th>Conf.</th>
+                <th>Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="ideas-tbody">
+              <tr class="empty-row"><td colspan="4">No recent ideas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="panel" id="event-log-panel">
+      <div class="panel-header">Event Log</div>
+      <div class="panel-body" id="event-log-scroll">
+        <div id="event-log-lines"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -------------------------------------------------------------------- -->
+  <!-- Tab 2: Config & Weights                                               -->
+  <!-- -------------------------------------------------------------------- -->
+  <div id="tab-config" class="tab-pane">
+
+    <!-- Section 1: Consensus -->
+    <div class="panel config-section">
+      <div class="config-section-title">Consensus</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="min_agents">
+          <label class="field-label">Min Agents <span class="field-key-tag">min_agents</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-min_agents" min="1" max="10" step="1" />
+          <span class="field-error" id="err-min_agents"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Signal Weights & Uncertainty -->
+    <div class="panel config-section">
+      <div class="config-section-title">Signal Weights &amp; Uncertainty</div>
+      <div class="config-fields">
+        <!-- Weights -->
+        <div class="field-row" data-key="weight_noaa">
+          <label class="field-label">NOAA / Weather <span class="field-key-tag">weight_noaa</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_noaa" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_noaa">0.85</span>
+          </div>
+          <span class="field-error" id="err-weight_noaa"></span>
+        </div>
+        <div class="field-row" data-key="weight_polymarket_price">
+          <label class="field-label">Polymarket price gap <span class="field-key-tag">weight_polymarket_price</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_polymarket_price" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_polymarket_price">0.75</span>
+          </div>
+          <span class="field-error" id="err-weight_polymarket_price"></span>
+        </div>
+        <div class="field-row" data-key="weight_polymarket_whale">
+          <label class="field-label">Polymarket whale <span class="field-key-tag">weight_polymarket_whale</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_polymarket_whale" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_polymarket_whale">0.60</span>
+          </div>
+          <span class="field-error" id="err-weight_polymarket_whale"></span>
+        </div>
+        <div class="field-row" data-key="weight_x_grok">
+          <label class="field-label">X / Grok <span class="field-key-tag">weight_x_grok</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_x_grok" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_x_grok">0.60</span>
+          </div>
+          <span class="field-error" id="err-weight_x_grok"></span>
+        </div>
+        <div class="field-row" data-key="weight_x_claude">
+          <label class="field-label">X / Claude <span class="field-key-tag">weight_x_claude</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_x_claude" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_x_claude">0.75</span>
+          </div>
+          <span class="field-error" id="err-weight_x_claude"></span>
+        </div>
+        <div class="field-row" data-key="weight_market_maker">
+          <label class="field-label">Market maker (orderbook) <span class="field-key-tag">weight_market_maker</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_market_maker" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_market_maker">0.65</span>
+          </div>
+          <span class="field-error" id="err-weight_market_maker"></span>
+        </div>
+        <!-- Uncertainty inputs -->
+        <div class="field-row" data-key="uncertainty_noaa_temp">
+          <label class="field-label">NOAA temperature <span class="field-key-tag">uncertainty_noaa_temp</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_noaa_temp" min="0" max="0.5" step="0.001" />
+          <span class="field-error" id="err-uncertainty_noaa_temp"></span>
+        </div>
+        <div class="field-row" data-key="uncertainty_noaa_precip">
+          <label class="field-label">NOAA precipitation <span class="field-key-tag">uncertainty_noaa_precip</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_noaa_precip" min="0" max="0.5" step="0.001" />
+          <span class="field-error" id="err-uncertainty_noaa_precip"></span>
+        </div>
+        <div class="field-row" data-key="uncertainty_poly_price">
+          <label class="field-label">Polymarket price <span class="field-key-tag">uncertainty_poly_price</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_poly_price" min="0" max="0.5" step="0.001" />
+          <span class="field-error" id="err-uncertainty_poly_price"></span>
+        </div>
+        <div class="field-row" data-key="uncertainty_whale_single">
+          <label class="field-label">Polymarket whale (1 wallet) <span class="field-key-tag">uncertainty_whale_single</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_whale_single" min="0" max="0.5" step="0.001" />
+          <span class="field-error" id="err-uncertainty_whale_single"></span>
+        </div>
+        <div class="field-row" data-key="uncertainty_whale_multi">
+          <label class="field-label">Polymarket whale (2+ wallets) <span class="field-key-tag">uncertainty_whale_multi</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_whale_multi" min="0" max="0.5" step="0.001" />
+          <span class="field-error" id="err-uncertainty_whale_multi"></span>
+        </div>
+        <div class="field-row" data-key="x_grok_uncertainty_threshold">
+          <label class="field-label">Grok uncertainty cutoff <span class="field-key-tag">x_grok_uncertainty_threshold</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-x_grok_uncertainty_threshold" min="0" max="0.5" step="0.001" />
+          <span class="field-error" id="err-x_grok_uncertainty_threshold"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Order Flow Agent -->
+    <div class="panel config-section">
+      <div class="config-section-title">Order Flow Agent</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="ofi_window_minutes">
+          <label class="field-label">OFI window (minutes) <span class="field-key-tag">ofi_window_minutes</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-ofi_window_minutes" min="1" max="1440" step="1" />
+          <span class="field-error" id="err-ofi_window_minutes"></span>
+        </div>
+        <div class="field-row" data-key="vpin_bucket_size_usd">
+          <label class="field-label">VPIN bucket size ($) <span class="field-key-tag">vpin_bucket_size_usd</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-vpin_bucket_size_usd" min="100" max="100000" step="100" />
+          <span class="field-error" id="err-vpin_bucket_size_usd"></span>
+        </div>
+        <div class="field-row" data-key="trade_count_window_minutes">
+          <label class="field-label">Trade count window (minutes) <span class="field-key-tag">trade_count_window_minutes</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-trade_count_window_minutes" min="1" max="1440" step="1" />
+          <span class="field-error" id="err-trade_count_window_minutes"></span>
+        </div>
+        <div class="field-row" data-key="ofi_prob_scale">
+          <label class="field-label">OFI &rarr; prob scale <span class="field-key-tag">ofi_prob_scale</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-ofi_prob_scale" min="0" max="1" step="0.01" />
+          <span class="field-error" id="err-ofi_prob_scale"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Market Maker Agent -->
+    <div class="panel config-section">
+      <div class="config-section-title">Market Maker Agent</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="mm_snapshot_count">
+          <label class="field-label">Snapshot count <span class="field-key-tag">mm_snapshot_count</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-mm_snapshot_count" min="2" max="20" step="1" />
+          <span class="field-error" id="err-mm_snapshot_count"></span>
+        </div>
+        <div class="field-row" data-key="mm_snapshot_delay_seconds">
+          <label class="field-label">Snapshot delay (seconds) <span class="field-key-tag">mm_snapshot_delay_seconds</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-mm_snapshot_delay_seconds" min="0.5" max="30" step="0.5" />
+          <span class="field-error" id="err-mm_snapshot_delay_seconds"></span>
+        </div>
+        <div class="field-row" data-key="mm_imbalance_prob_scale">
+          <label class="field-label">Imbalance &rarr; prob scale <span class="field-key-tag">mm_imbalance_prob_scale</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-mm_imbalance_prob_scale" min="0" max="1" step="0.01" />
+          <span class="field-error" id="err-mm_imbalance_prob_scale"></span>
+        </div>
+        <div class="field-row" data-key="mm_spread_withdrawal_cents">
+          <label class="field-label">Spread withdrawal threshold (¢) <span class="field-key-tag">mm_spread_withdrawal_cents</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-mm_spread_withdrawal_cents" min="1" max="50" step="1" />
+          <span class="field-error" id="err-mm_spread_withdrawal_cents"></span>
+        </div>
+        <div class="field-row" data-key="mm_spread_trend_threshold">
+          <label class="field-label">Spread trend threshold <span class="field-key-tag">mm_spread_trend_threshold</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-mm_spread_trend_threshold" min="0" max="2" step="0.01" />
+          <span class="field-error" id="err-mm_spread_trend_threshold"></span>
+        </div>
+        <div class="field-row" data-key="mm_directional_imbalance_threshold">
+          <label class="field-label">Directional imbalance threshold <span class="field-key-tag">mm_directional_imbalance_threshold</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-mm_directional_imbalance_threshold" min="0" max="1" step="0.01" />
+          <span class="field-error" id="err-mm_directional_imbalance_threshold"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Polymarket Agent -->
+    <div class="panel config-section">
+      <div class="config-section-title">Polymarket Agent</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="poly_min_gap_cents">
+          <label class="field-label">Min price gap to trade (¢) <span class="field-key-tag">poly_min_gap_cents</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_min_gap_cents" min="1" max="30" step="0.5" />
+          <span class="field-error" id="err-poly_min_gap_cents"></span>
+        </div>
+        <div class="field-row" data-key="poly_gap_scale">
+          <label class="field-label">Gap scale (confidence) <span class="field-key-tag">poly_gap_scale</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_gap_scale" min="0.01" max="1" step="0.01" />
+          <span class="field-error" id="err-poly_gap_scale"></span>
+        </div>
+        <div class="field-row" data-key="poly_whale_confidence_boost">
+          <label class="field-label">Whale confidence boost <span class="field-key-tag">poly_whale_confidence_boost</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_whale_confidence_boost" min="0" max="0.5" step="0.01" />
+          <span class="field-error" id="err-poly_whale_confidence_boost"></span>
+        </div>
+        <div class="field-row" data-key="poly_max_confidence">
+          <label class="field-label">Max confidence cap <span class="field-key-tag">poly_max_confidence</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_max_confidence" min="0.5" max="1" step="0.01" />
+          <span class="field-error" id="err-poly_max_confidence"></span>
+        </div>
+        <div class="field-row" data-key="poly_whale_min_size_usd">
+          <label class="field-label">Whale min trade size ($) <span class="field-key-tag">poly_whale_min_size_usd</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_whale_min_size_usd" min="10" max="100000" step="50" />
+          <span class="field-error" id="err-poly_whale_min_size_usd"></span>
+        </div>
+        <div class="field-row" data-key="poly_whale_lookback_seconds">
+          <label class="field-label">Whale lookback (seconds) <span class="field-key-tag">poly_whale_lookback_seconds</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_whale_lookback_seconds" min="60" max="86400" step="60" />
+          <span class="field-error" id="err-poly_whale_lookback_seconds"></span>
+        </div>
+        <div class="field-row" data-key="poly_match_min_score">
+          <label class="field-label">Market match min score <span class="field-key-tag">poly_match_min_score</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-poly_match_min_score" min="0" max="1" step="0.01" />
+          <span class="field-error" id="err-poly_match_min_score"></span>
+        </div>
+        <div class="field-row" data-key="polymarket_max_concurrent">
+          <label class="field-label">Max concurrent requests <span class="field-key-tag">polymarket_max_concurrent</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-polymarket_max_concurrent" min="1" max="20" step="1" />
+          <span class="field-error" id="err-polymarket_max_concurrent"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 6: Kalshi Bias Agent -->
+    <div class="panel config-section">
+      <div class="config-section-title">Kalshi Bias Agent</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="bias_political_adjustment">
+          <label class="field-label">Political adjustment (±) <span class="field-key-tag">bias_political_adjustment</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-bias_political_adjustment" min="0" max="0.3" step="0.001" />
+          <span class="field-error" id="err-bias_political_adjustment"></span>
+        </div>
+        <div class="field-row" data-key="bias_longshot_factor">
+          <label class="field-label">Longshot correction factor <span class="field-key-tag">bias_longshot_factor</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-bias_longshot_factor" min="0.1" max="1" step="0.01" />
+          <span class="field-error" id="err-bias_longshot_factor"></span>
+        </div>
+        <div class="field-row" data-key="bias_political_no_trade_zone">
+          <label class="field-label">Political no-trade zone <span class="field-key-tag">bias_political_no_trade_zone</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-bias_political_no_trade_zone" min="0" max="0.4" step="0.01" />
+          <span class="field-error" id="err-bias_political_no_trade_zone"></span>
+        </div>
+        <div class="field-row" data-key="bias_nonpolitical_no_trade_zone">
+          <label class="field-label">Non-political no-trade zone <span class="field-key-tag">bias_nonpolitical_no_trade_zone</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-bias_nonpolitical_no_trade_zone" min="0" max="0.5" step="0.01" />
+          <span class="field-error" id="err-bias_nonpolitical_no_trade_zone"></span>
+        </div>
+        <div class="field-row" data-key="bias_near_expiry_horizon">
+          <label class="field-label">Near-expiry horizon factor (&lt;12h) <span class="field-key-tag">bias_near_expiry_horizon</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-bias_near_expiry_horizon" min="0" max="1" step="0.01" />
+          <span class="field-error" id="err-bias_near_expiry_horizon"></span>
+        </div>
+        <div class="field-row" data-key="bias_mid_horizon">
+          <label class="field-label">Mid-horizon factor (&lt;48h) <span class="field-key-tag">bias_mid_horizon</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-bias_mid_horizon" min="0" max="1" step="0.01" />
+          <span class="field-error" id="err-bias_mid_horizon"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 7: Exit Strategy -->
+    <div class="panel config-section">
+      <div class="config-section-title">Exit Strategy</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="exit_take_profit_threshold">
+          <label class="field-label">Take-profit threshold <span class="field-key-tag">exit_take_profit_threshold</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-exit_take_profit_threshold" min="0.1" max="1" step="0.01" />
+          <span class="field-error" id="err-exit_take_profit_threshold"></span>
+        </div>
+        <div class="field-row" data-key="exit_stale_thesis_hours">
+          <label class="field-label">Stale thesis: max hours <span class="field-key-tag">exit_stale_thesis_hours</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-exit_stale_thesis_hours" min="1" max="168" step="1" />
+          <span class="field-error" id="err-exit_stale_thesis_hours"></span>
+        </div>
+        <div class="field-row" data-key="exit_stale_thesis_min_move">
+          <label class="field-label">Stale thesis: min price move <span class="field-key-tag">exit_stale_thesis_min_move</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-exit_stale_thesis_min_move" min="0.001" max="0.2" step="0.001" />
+          <span class="field-error" id="err-exit_stale_thesis_min_move"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 8: Market Filters -->
+    <div class="panel config-section">
+      <div class="config-section-title">Market Filters</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="filter_min_open_interest">
+          <label class="field-label">Min open interest <span class="field-key-tag">filter_min_open_interest</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-filter_min_open_interest" min="0" max="10000" step="100" />
+          <span class="field-error" id="err-filter_min_open_interest"></span>
+        </div>
+        <div class="field-row" data-key="filter_min_hours_to_close">
+          <label class="field-label">Min hours to close <span class="field-key-tag">filter_min_hours_to_close</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-filter_min_hours_to_close" min="0" max="24" step="1" />
+          <span class="field-error" id="err-filter_min_hours_to_close"></span>
+        </div>
+        <div class="field-row" data-key="filter_max_hours_to_close">
+          <label class="field-label">Max hours to close <span class="field-key-tag">filter_max_hours_to_close</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-filter_max_hours_to_close" min="24" max="8760" step="24" />
+          <span class="field-error" id="err-filter_max_hours_to_close"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 9: System & Models -->
+    <div class="panel config-section">
+      <div class="config-section-title">System &amp; Models</div>
+      <div class="config-fields">
+        <div class="field-row" data-key="specialist_model">
+          <label class="field-label">Specialist model <span class="field-key-tag">specialist_model</span></label>
+          <select class="field-input cfg-input" id="cfg-specialist_model">
+            <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+            <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+            <option value="claude-opus-4-5">claude-opus-4-5</option>
+            <option value="claude-opus-4-8">claude-opus-4-8</option>
+          </select>
+          <span class="field-error" id="err-specialist_model"></span>
+        </div>
+        <div class="field-row" data-key="coordinator_model">
+          <label class="field-label">Coordinator model <span class="field-key-tag">coordinator_model</span></label>
+          <select class="field-input cfg-input" id="cfg-coordinator_model">
+            <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+            <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+            <option value="claude-opus-4-5">claude-opus-4-5</option>
+            <option value="claude-opus-4-8">claude-opus-4-8</option>
+          </select>
+          <span class="field-error" id="err-coordinator_model"></span>
+        </div>
+        <div class="field-row" data-key="agent_max_iterations">
+          <label class="field-label">Agent max iterations <span class="field-key-tag">agent_max_iterations</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-agent_max_iterations" min="5" max="100" step="1" />
+          <span class="field-error" id="err-agent_max_iterations"></span>
+        </div>
+        <div class="field-row" data-key="x_max_concurrent_searches">
+          <label class="field-label">X max concurrent searches <span class="field-key-tag">x_max_concurrent_searches</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-x_max_concurrent_searches" min="1" max="10" step="1" />
+          <span class="field-error" id="err-x_max_concurrent_searches"></span>
+        </div>
+        <div class="field-row" data-key="ws_reconnect_delay_seconds">
+          <label class="field-label">WS reconnect delay (s) <span class="field-key-tag">ws_reconnect_delay_seconds</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-ws_reconnect_delay_seconds" min="1" max="60" step="1" />
+          <span class="field-error" id="err-ws_reconnect_delay_seconds"></span>
+        </div>
+        <div class="field-row" data-key="ws_watchdog_timeout_seconds">
+          <label class="field-label">WS watchdog timeout (s) <span class="field-key-tag">ws_watchdog_timeout_seconds</span></label>
+          <input type="number" class="field-input cfg-input" id="cfg-ws_watchdog_timeout_seconds" min="10" max="300" step="5" />
+          <span class="field-error" id="err-ws_watchdog_timeout_seconds"></span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-config -->
+
+  <!-- -------------------------------------------------------------------- -->
+  <!-- Tab 3: Agents                                                         -->
+  <!-- -------------------------------------------------------------------- -->
+  <div id="tab-agents" class="tab-pane">
+    <div class="agents-grid" id="agents-grid">
+      <!-- Cards rendered by JS -->
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- ====================================================================== -->
+<!-- Sticky Save Bar (Config tab)                                             -->
+<!-- ====================================================================== -->
+<div id="save-bar">
+  <button class="btn-primary" id="save-btn">Save Changes</button>
+  <button class="btn-secondary" id="reset-btn">Reset to Defaults</button>
+  <span id="saved-msg">&#10003; Saved — takes effect next cycle</span>
+</div>
+
+<!-- ====================================================================== -->
+<!-- JavaScript                                                               -->
+<!-- ====================================================================== -->
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// Agent metadata (static)
+// ---------------------------------------------------------------------------
+const AGENT_META = {
+  weather:      { label: 'WeatherAgent',       sources: 'NOAA NWS, temperature/precipitation forecasts',   enableKey: 'agent_weather_enabled' },
+  polymarket:   { label: 'PolymarketAgent',     sources: 'Polymarket price gap, whale trades',              enableKey: 'agent_polymarket_enabled' },
+  order_flow:   { label: 'OrderFlowAgent',      sources: 'Kalshi order book, OFI, VPIN',                    enableKey: 'agent_order_flow_enabled' },
+  market_maker: { label: 'MarketMakerAgent',    sources: 'Kalshi order book imbalance, spread dynamics',    enableKey: 'agent_market_maker_enabled' },
+  kalshi_bias:  { label: 'KalshiBiasAgent',     sources: 'Political bias, longshot correction, expiry',     enableKey: 'agent_kalshi_bias_enabled' },
+  x:            { label: 'XAgent',              sources: 'X / Grok, X / Claude sentiment search',           enableKey: 'agent_x_enabled' },
+};
+
+// ---------------------------------------------------------------------------
+// Tab switching
+// ---------------------------------------------------------------------------
+let activeTab = 'monitor';
+const tabBtns = document.querySelectorAll('.tab-btn');
+const statusBar = document.getElementById('status-bar');
+const saveBar = document.getElementById('save-bar');
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    if (tab === activeTab) return;
+    activeTab = tab;
+
+    // Update active button
+    tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+
+    // Show/hide panes
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      p.classList.toggle('active', p.id === 'tab-' + tab);
+    });
+
+    // Status bar only visible on monitor
+    statusBar.style.display = tab === 'monitor' ? 'flex' : 'none';
+
+    // Save bar only visible on config
+    saveBar.classList.toggle('visible', tab === 'config');
+
+    // Populate config on first visit
+    if (tab === 'config' && !configLoaded) {
+      loadConfig();
+    }
+  });
+});
+
+// Initially hide status bar only when not on monitor (it starts visible)
+statusBar.style.display = 'flex';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function fmt$(v) {
+  return '$' + Number(v).toFixed(2);
+}
+function fmtPct(v) {
+  return (v * 100).toFixed(0) + '%';
+}
+function fmtConf(v) {
+  return (v * 100).toFixed(0) + '%';
+}
+function pnlClass(v) {
+  if (v > 0) return 'pnl-pos';
+  if (v < 0) return 'pnl-neg';
+  return 'pnl-zer';
+}
+function timeSince(isoStr) {
+  if (!isoStr) return '—';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  return Math.floor(diff / 3600) + 'h ago';
+}
+function timeShort(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ---------------------------------------------------------------------------
+// Status bar update (always runs on every poll)
+// ---------------------------------------------------------------------------
+function updateStatusBar(state) {
+  const running = state.system_running;
+
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'dot' + (running ? ' running' : '');
+  txt.textContent = running ? 'RUNNING' : 'STOPPED';
+  txt.className = 'sys-status-text' + (running ? ' running' : '');
+
+  document.getElementById('stat-balance').textContent = fmt$(state.balance_dollars);
+
+  const pnl = state.daily_pnl_dollars;
+  const pnlEl = document.getElementById('stat-pnl');
+  pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(pnl);
+  pnlEl.className = 'stat-value ' + pnlClass(pnl);
+
+  document.getElementById('stat-exposure').textContent = fmt$(state.total_exposure_dollars);
+  document.getElementById('stat-cycle').textContent = '#' + state.cycle_number;
+  document.getElementById('stat-last-cycle').textContent = timeSince(state.last_cycle_at);
+  document.getElementById('stat-positions').textContent = (state.positions || []).length;
+
+  const btn = document.getElementById('toggle-btn');
+  if (running) {
+    btn.textContent = 'Stop System';
+    btn.className = 'stop';
+  } else {
+    btn.textContent = 'Start System';
+    btn.className = 'start';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Monitor tab: Positions
+// ---------------------------------------------------------------------------
+function renderPositions(positions) {
+  const tbody = document.getElementById('positions-tbody');
+  if (!positions || positions.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No open positions</td></tr>';
+    return;
+  }
+  tbody.innerHTML = positions.map(p => {
+    const upnl = p.unrealized_pnl_dollars ?? 0;
+    const sideBadge = p.side === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    return `<tr>
+      <td class="text-mono">${escHtml(p.ticker ?? '')}</td>
+      <td>${sideBadge}</td>
+      <td>${p.quantity ?? ''}</td>
+      <td>${fmt$(p.avg_price_dollars ?? 0)}</td>
+      <td>${fmt$(p.current_price_dollars ?? 0)}</td>
+      <td class="${pnlClass(upnl)}">${(upnl >= 0 ? '+' : '') + fmt$(upnl)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Monitor tab: Recent Ideas
+// ---------------------------------------------------------------------------
+function renderIdeas(ideas) {
+  const tbody = document.getElementById('ideas-tbody');
+  if (!ideas || ideas.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No recent ideas</td></tr>';
+    return;
+  }
+  tbody.innerHTML = ideas.map(idea => {
+    const sideBadge = idea.side === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    const confBadge = `<span class="badge badge-conf">${fmtConf(idea.confidence ?? 0)}</span>`;
+    let outcomeBadge;
+    if (idea.outcome === 'approved') {
+      outcomeBadge = `<span class="badge badge-approved">&#10003; ${fmt$(idea.amount_dollars ?? 0)}</span>`;
+    } else {
+      const reason = idea.rejection_reason ? escHtml(idea.rejection_reason) : 'rejected';
+      outcomeBadge = `<span class="badge badge-rejected">${reason}</span>`;
+    }
+    return `<tr>
+      <td class="text-mono">${escHtml(idea.ticker ?? '')}</td>
+      <td>${sideBadge}</td>
+      <td>${confBadge}</td>
+      <td>${outcomeBadge}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Monitor tab: Event log
+// ---------------------------------------------------------------------------
+let lastLogLength = 0;
+
+function renderEventLog(lines) {
+  if (!lines || lines.length === lastLogLength) return;
+  lastLogLength = lines.length;
+
+  const container = document.getElementById('event-log-lines');
+  container.innerHTML = lines.map(l => {
+    const ts = timeShort(l.timestamp);
+    return `<div class="log-line"><span class="log-ts">${ts}</span><span class="log-msg">${escHtml(l.message)}</span></div>`;
+  }).join('');
+
+  // Auto-scroll to bottom
+  const scroll = document.getElementById('event-log-scroll');
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Agents tab
+// ---------------------------------------------------------------------------
+let agentsGridRendered = false;
+
+function renderAgentsGrid(agentStatuses, config) {
+  const grid = document.getElementById('agents-grid');
+
+  // Build cards for known agents in order
+  const order = ['weather', 'polymarket', 'order_flow', 'market_maker', 'kalshi_bias', 'x'];
+  grid.innerHTML = order.map(key => {
+    const meta = AGENT_META[key];
+    if (!meta) return '';
+
+    const status = agentStatuses[key] || { enabled: true, status: 'idle', last_run_at: null, last_signal_count: 0, last_output_summary: {} };
+    const enabled = status.enabled;
+    const enableKey = meta.enableKey;
+    const checked = enabled ? 'checked' : '';
+    const dimClass = enabled ? '' : ' disabled';
+
+    const statusPill = renderStatusPill(status.status);
+    const lastRun = timeSince(status.last_run_at);
+
+    const summaryHtml = renderOutputSummary(status.last_output_summary);
+
+    return `<div class="agent-card${dimClass}" id="agent-card-${key}">
+      <div class="agent-card-header">
+        <div>
+          <div class="agent-name">${meta.label}</div>
+          <div class="agent-sources">${meta.sources}</div>
+        </div>
+        <label class="toggle-switch" title="${enabled ? 'Disable' : 'Enable'} ${meta.label}">
+          <input type="checkbox" class="agent-toggle" data-key="${enableKey}" data-agent="${key}" ${checked} />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="agent-card-body">
+        <div class="agent-meta-row">
+          ${statusPill}
+          <span class="agent-last-run">Last run: ${lastRun}</span>
+          <span class="agent-last-run" style="margin-left:auto;">${status.last_signal_count} signal${status.last_signal_count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="agent-output-summary">
+          ${summaryHtml}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Attach toggle event listeners
+  grid.querySelectorAll('.agent-toggle').forEach(toggle => {
+    toggle.addEventListener('change', onAgentToggle);
+  });
+}
+
+function renderStatusPill(status) {
+  const cls = status === 'running' ? 'badge-running' : status === 'error' ? 'badge-error' : 'badge-idle';
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+function renderOutputSummary(summary) {
+  if (!summary || Object.keys(summary).length === 0) {
+    return '<span class="no-summary">No data yet</span>';
+  }
+  return Object.entries(summary).map(([k, v]) => {
+    return `<div class="kv-row"><span class="kv-key">${escHtml(String(k))}</span><span class="kv-val">${escHtml(String(v))}</span></div>`;
+  }).join('');
+}
+
+async function onAgentToggle(e) {
+  const toggle = e.target;
+  const key = toggle.dataset.key;
+  const agentKey = toggle.dataset.agent;
+  const newVal = toggle.checked;
+
+  // Optimistic update of card dim class
+  const card = document.getElementById('agent-card-' + agentKey);
+  if (card) card.classList.toggle('disabled', !newVal);
+
+  try {
+    const resp = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: newVal }),
+    });
+    if (!resp.ok) {
+      throw new Error('HTTP ' + resp.status);
+    }
+  } catch (err) {
+    console.warn('Agent toggle failed, reverting:', err);
+    // Revert
+    toggle.checked = !newVal;
+    if (card) card.classList.toggle('disabled', newVal);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Config tab: load + populate
+// ---------------------------------------------------------------------------
+let configLoaded = false;
+let currentConfig = {};
+
+async function loadConfig() {
+  try {
+    const resp = await fetch('/api/config');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    currentConfig = await resp.json();
+    populateConfigForm(currentConfig);
+    configLoaded = true;
+  } catch (err) {
+    console.error('Failed to load config:', err);
+  }
+}
+
+function populateConfigForm(cfg) {
+  document.querySelectorAll('.cfg-input').forEach(el => {
+    const key = el.id.replace('cfg-', '');
+    const val = cfg[key];
+    if (val === undefined) return;
+
+    if (el.type === 'range') {
+      el.value = val;
+      const valEl = document.getElementById('val-' + key);
+      if (valEl) valEl.textContent = Number(val).toFixed(2);
+    } else if (el.tagName === 'SELECT') {
+      el.value = val;
+    } else {
+      el.value = val;
+    }
+  });
+}
+
+// Slider live update
+document.querySelectorAll('.cfg-slider').forEach(slider => {
+  slider.addEventListener('input', () => {
+    const key = slider.id.replace('cfg-', '');
+    const valEl = document.getElementById('val-' + key);
+    if (valEl) valEl.textContent = Number(slider.value).toFixed(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Config tab: save
+// ---------------------------------------------------------------------------
+const INT_KEYS = new Set([
+  'min_agents',
+  'ofi_window_minutes',
+  'trade_count_window_minutes',
+  'mm_snapshot_count',
+  'mm_spread_withdrawal_cents',
+  'poly_whale_lookback_seconds',
+  'polymarket_max_concurrent',
+  'filter_min_open_interest',
+  'filter_min_hours_to_close',
+  'filter_max_hours_to_close',
+  'agent_max_iterations',
+  'x_max_concurrent_searches',
+  'ws_reconnect_delay_seconds',
+  'ws_watchdog_timeout_seconds',
+  'exit_stale_thesis_hours',
+]);
+const STRING_KEYS = new Set(['specialist_model', 'coordinator_model']);
+
+function collectFormValues() {
+  const values = {};
+  document.querySelectorAll('.cfg-input').forEach(el => {
+    const key = el.id.replace('cfg-', '');
+    let val = el.value;
+
+    if (STRING_KEYS.has(key)) {
+      values[key] = String(val);
+    } else if (INT_KEYS.has(key)) {
+      values[key] = parseInt(val, 10);
+    } else {
+      values[key] = parseFloat(val);
+    }
+  });
+  return values;
+}
+
+function clearFieldErrors() {
+  document.querySelectorAll('.field-error').forEach(el => {
+    el.textContent = '';
+    el.classList.remove('visible');
+  });
+}
+
+function showFieldErrors(errors) {
+  for (const [key, msg] of Object.entries(errors)) {
+    const errEl = document.getElementById('err-' + key);
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.classList.add('visible');
+    }
+  }
+}
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  clearFieldErrors();
+  const values = collectFormValues();
+  try {
+    const resp = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    });
+    const data = await resp.json();
+    if (resp.status === 422 && data.errors) {
+      showFieldErrors(data.errors);
+      return;
+    }
+    if (data.ok) {
+      const msg = document.getElementById('saved-msg');
+      msg.classList.add('visible');
+      setTimeout(() => msg.classList.remove('visible'), 3000);
+      // Re-fetch to sync form
+      await loadConfig();
+    }
+  } catch (err) {
+    console.error('Save failed:', err);
+  }
+});
+
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  clearFieldErrors();
+  await loadConfig();
+});
+
+// ---------------------------------------------------------------------------
+// Start/Stop button
+// ---------------------------------------------------------------------------
+document.getElementById('toggle-btn').addEventListener('click', async () => {
+  const running = document.getElementById('status-dot').classList.contains('running');
+  const endpoint = running ? '/api/system/stop' : '/api/system/start';
+  try {
+    await fetch(endpoint, { method: 'POST' });
+    // State will update on next poll
+  } catch (err) {
+    console.error('System toggle failed:', err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Main poll loop
+// ---------------------------------------------------------------------------
+let lastState = null;
+
+async function poll() {
+  try {
+    const resp = await fetch('/api/state');
+    if (!resp.ok) return;
+    const state = await resp.json();
+    lastState = state;
+
+    // Status bar always updates
+    updateStatusBar(state);
+
+    // Tab-specific updates
+    if (activeTab === 'monitor') {
+      renderPositions(state.positions);
+      renderIdeas(state.recent_ideas);
+      renderEventLog(state.event_log);
+    } else if (activeTab === 'agents') {
+      renderAgentsGrid(state.agent_statuses || {}, currentConfig);
+    }
+    // Config tab doesn't auto-update from state (user is editing)
+  } catch (err) {
+    console.warn('Poll error:', err);
+  }
+}
+
+// Initial render + polling
+(async function init() {
+  await poll();
+  setInterval(poll, 2000);
+})();
+
+// ---------------------------------------------------------------------------
+// Utility: HTML escaping
+// ---------------------------------------------------------------------------
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+</script>
+</body>
+</html>
