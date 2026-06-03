@@ -30,18 +30,23 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 # ---------------------------------------------------------------------------
 
 async def _fetch_yes_price_cents(client: Any, ticker: str, concurrency_semaphore: asyncio.Semaphore) -> float | None:
-    """Fetch the current YES mid-price in cents for one ticker."""
+    """Fetch the current YES mid-price in cents for one ticker.
+
+    Prefers the live bid/ask midpoint over last_price. last_price is the most
+    recent executed trade, which can be arbitrarily stale on illiquid markets
+    while the bid/ask always reflects current quotes.
+    """
     async with concurrency_semaphore:
         try:
             response = await client.get_market(ticker)
             market_data = response.get("market", {})
-            last = market_data.get("last_price")
-            if last is not None:
-                return float(last)
             yes_bid = float(market_data.get("yes_bid", 0) or 0)
             yes_ask = float(market_data.get("yes_ask", 0) or 0)
             if yes_bid > 0 or yes_ask > 0:
                 return (yes_bid + yes_ask) / 2.0
+            last = market_data.get("last_price")
+            if last is not None:
+                return float(last)
         except Exception as caught_exception:
             logger.debug("Price fetch failed for %s: %s", ticker, caught_exception)
         return None

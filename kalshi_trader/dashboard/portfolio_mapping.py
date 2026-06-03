@@ -52,13 +52,20 @@ def _iso_utc(value: Any) -> str | None:
 
 
 def _current_yes_price_cents(market: Market | None) -> float | None:
-    """Best estimate of the current YES price in cents from joined market data."""
+    """Best estimate of the current YES price in cents from joined market data.
+
+    Prefers the live bid/ask midpoint over last_price. last_price is the most
+    recent executed trade, which can be arbitrarily stale on illiquid markets
+    while the bid/ask always reflects current quotes.
+    """
     if market is None:
         return None
+    midpoint = (market.yes_bid + market.yes_ask) / 2.0
+    if midpoint > 0:
+        return midpoint
     if market.last_price:
         return float(market.last_price)
-    midpoint = (market.yes_bid + market.yes_ask) / 2.0
-    return midpoint if midpoint > 0 else None
+    return None
 
 
 def map_balance(balance_raw: dict) -> dict:

@@ -912,11 +912,12 @@
               <th>Entry ¢</th>
               <th>Pred.</th>
               <th>Edge ¢</th>
+              <th>Live ¢</th>
               <th>Live P&amp;L ¢</th>
             </tr>
           </thead>
           <tbody id="history-tbody">
-            <tr class="empty-row"><td colspan="9">Loading…</td></tr>
+            <tr class="empty-row"><td colspan="10">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1324,7 +1325,7 @@ async function loadIdeasHistory() {
     }
   } catch (err) {
     console.error('Failed to load ideas history:', err);
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Failed to load history</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Failed to load history</td></tr>';
   }
 }
 
@@ -1364,7 +1365,7 @@ function renderIdeasHistory() {
     `${rows.length} idea${rows.length !== 1 ? 's' : ''}${liveLabel}`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No ideas match the filter</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No ideas match the filter</td></tr>';
     return;
   }
 
@@ -1381,6 +1382,12 @@ function renderIdeasHistory() {
     const livePnl = computeLivePnlCents(idea);
     const pnlText = livePnl === null ? '—' : (livePnl >= 0 ? '+' : '') + livePnl;
     const pnlCls = livePnl === null ? 'pnl-zer' : pnlClass(livePnl);
+    const yesPrice = livePricesMap[idea.ticker];
+    const side = String(idea.side || '').toUpperCase();
+    const liveSidePrice = yesPrice !== null && yesPrice !== undefined
+      ? (side === 'YES' ? yesPrice : (100 - yesPrice))
+      : null;
+    const livePriceText = liveSidePrice !== null ? Math.round(liveSidePrice) + '¢' : '—';
     const url = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
     const tickerEl = url
       ? `<a class="kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
@@ -1395,6 +1402,7 @@ function renderIdeasHistory() {
       <td>${idea.entry_price_cents ?? '—'}</td>
       <td>${escHtml(pred)}</td>
       <td>${idea.edge_cents ?? '—'}</td>
+      <td>${escHtml(livePriceText)}</td>
       <td class="${pnlCls}">${escHtml(pnlText)}</td>
     </tr>`;
 
@@ -1402,7 +1410,7 @@ function renderIdeasHistory() {
       `<span class="signal-tag">${escHtml(String(s))}</span>`
     ).join('');
     const detailRow = `<tr class="history-detail-row hidden" data-detail="${index}">
-      <td colspan="9">
+      <td colspan="10">
         <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">
           Cycle ${escHtml(idea.cycle_ts ?? '—')} &middot; ${idea.n_sources ?? 0} sources &middot; ${escHtml(idea.category ?? '')}
         </div>
