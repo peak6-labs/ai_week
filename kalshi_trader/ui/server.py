@@ -26,6 +26,62 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 # ---------------------------------------------------------------------------
+# Kalshi account poller — runs independently of the trading loop
+# ---------------------------------------------------------------------------
+
+async def _poll_kalshi_account(trading_state: TradingState) -> None:
+    """Poll Kalshi every 30 s for balance and positions, update TradingState."""
+    from kalshi_trader.client import KalshiClient
+
+    await asyncio.sleep(2)  # brief delay so server is fully up first
+    trading_state.log("Account poller started")
+
+    async with KalshiClient() as client:
+        while True:
+            try:
+                balance_resp = await client.get_balance()
+                balance_cents = balance_resp.get("balance", 0) or 0
+                trading_state.balance_dollars = balance_cents / 100.0
+
+                positions_resp = await client.get_positions()
+                raw_positions = positions_resp.get("market_positions") or []
+
+                total_exposure = 0.0
+                total_pnl = 0.0
+                parsed: list[dict] = []
+                for p in raw_positions:
+                    qty_fp = float(p.get("position_fp", "0") or 0)
+                    if qty_fp == 0:
+                        continue
+                    side = "YES" if qty_fp > 0 else "NO"
+                    qty = abs(int(qty_fp))
+                    exposure = float(p.get("market_exposure_dollars", "0") or 0)
+                    pnl = float(p.get("realized_pnl_dollars", "0") or 0)
+                    total_exposure += exposure
+                    total_pnl += pnl
+                    ticker = p.get("ticker", "")
+                    parsed.append({
+                        "ticker": ticker,
+                        "side": side,
+                        "quantity": qty,
+                        "avg_price_dollars": round(exposure / qty, 4) if qty else 0,
+                        "current_price_dollars": None,
+                        "unrealized_pnl_dollars": pnl,
+                    })
+
+                trading_state.positions = parsed
+                trading_state.total_exposure_dollars = total_exposure
+                trading_state.daily_pnl_dollars = total_pnl
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("Account poll failed: %s", exc)
+
+            await asyncio.sleep(30)
+
+
+# ---------------------------------------------------------------------------
 # Trading loop placeholder
 # ---------------------------------------------------------------------------
 
@@ -66,6 +122,10 @@ def create_app(
     app.state.trading_state = trading_state
     app.state.loop_task: asyncio.Task | None = None
     app.state.config_manager = config_manager
+
+    @app.on_event("startup")
+    async def _start_account_poller() -> None:
+        asyncio.create_task(_poll_kalshi_account(trading_state))
 
     # ------------------------------------------------------------------
     # Routes
