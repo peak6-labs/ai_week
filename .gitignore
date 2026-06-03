@@ -162,6 +162,12 @@ live_markets*.csv
 # Generated agent reports (regenerable via the market-scout agent)
 reports/
 
+# Paper-trading run output (regenerated on every run)
+data/
+
+# Scratch / stray run output
+output.txt
+
 # Secrets / API keys — NEVER commit these
 *.pem
 *.key
