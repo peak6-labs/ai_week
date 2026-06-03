@@ -12,6 +12,7 @@ import json
 import sys
 import kalshi_trader.config  # noqa: F401 — loads .env so API keys are set
 from kalshi_trader.agents.parsing import estimate_to_dict
+from kalshi_trader.agents.settlement_context import parse_settlement_arg, settlement_metadata
 from kalshi_trader.external.gdelt import GDELTClient
 from kalshi_trader.external.mentions_parser import parse_mention_title, base_rate_from_points
 from kalshi_trader.signals.mentions import build_mentions_signal
@@ -21,6 +22,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="GDELT mentions signal pipeline")
     parser.add_argument("--ticker", required=True)
     parser.add_argument("--title", required=True)
+    parser.add_argument(
+        "--settlement-json",
+        dest="settlement_json",
+        default=None,
+        help="JSON object of contract settlement context from market_rules.py. "
+        "Recorded on the signal's metadata as the settlement basis so the "
+        "downstream adversarial check sees what the contract actually settles on.",
+    )
     args = parser.parse_args()
 
     async def run() -> None:
@@ -44,6 +53,9 @@ def main() -> None:
                 base_rate=base_rate,
                 speaker=parsed["speaker"],
             )
+            basis = settlement_metadata(parse_settlement_arg(args.settlement_json))
+            if basis:
+                estimate.metadata["settlement_basis"] = basis
             print(json.dumps([estimate_to_dict(estimate)], default=str))
         except Exception as caught_exception:
             print(f"Error: {caught_exception}", file=sys.stderr)

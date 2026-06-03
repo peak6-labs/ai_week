@@ -1,0 +1,24 @@
+{
+  "KXHIGHLAX": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report",
+        "url": "https://forecast.weather.gov/product.php?site=LOX&product=CLI&issuedby=LAX"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LAXHIGH.pdf",
+    "contract_url": "https://kalshi-public-docs-staging.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LAXHIGH.pdf",
+    "fetched_at": "2026-06-03T16:39:33.736879+00:00"
+  },
+  "KXTEMPNYCH": {
+    "settlement_sources": [
+      {
+        "name": "AccuWeather",
+        "url": "https://www.accuweather.com"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NHIGHD.pdf",
+    "contract_url": "https://kalshi-public-docs-staging.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NHIGHD.pdf",
+    "fetched_at": "2026-06-03T16:39:33.732234+00:00"
+  }
+}

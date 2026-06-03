@@ -87,8 +87,15 @@ class WeatherAgent:
             system_prompt=system_prompt,
         )
 
-    async def run(self, ticker: str, title: str) -> list[SignalEstimate]:
+    async def run(
+        self, ticker: str, title: str, settlement_context: str | None = None
+    ) -> list[SignalEstimate]:
         prompt = f"Analyze this Kalshi weather market:\nticker: {ticker}\ntitle: {title}"
+        if settlement_context:
+            # The block carries the "measure-the-same-thing" instruction, so the
+            # agent forecasts off the contract's settlement source/station (e.g.
+            # AccuWeather, not NOAA) or down-weights when it cannot.
+            prompt += f"\n\n{settlement_context}"
         raw = await self._agent.run(prompt)
         return self._parse_estimates(raw)
 

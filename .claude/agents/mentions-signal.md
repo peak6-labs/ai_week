@@ -30,17 +30,23 @@ You need the caller to supply:
 - `TICKER` — the Kalshi market ticker
 - `TITLE` — the full market title string (quoted), e.g.
   `"Will Jerome Powell say 'recession' in his next hearing?"`
+- `SETTLEMENT_JSON` *(optional)* — the market's contract settlement context as a
+  JSON object (`rules_primary`, `settlement_sources`, `contract_terms_url`, …)
+  from `market_rules.py`. When supplied, pass it through so the base-rate signal
+  records what counts as a mention and which event the contract settles on.
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Add
+   `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it:
 
    ```bash
    cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "mentions-signal: fetching GDELT base rate for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.mentions \
      --ticker TICKER \
-     --title "TITLE"
+     --title "TITLE" \
+     --settlement-json 'SETTLEMENT_JSON'
    ```
 
    Set a Bash timeout of at least 60 000 ms. The CLI prints a JSON array of

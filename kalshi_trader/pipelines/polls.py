@@ -13,6 +13,7 @@ import json
 import sys
 import kalshi_trader.config  # noqa: F401 — loads .env so API keys are set
 from kalshi_trader.agents.parsing import estimate_to_dict
+from kalshi_trader.agents.settlement_context import parse_settlement_arg, settlement_metadata
 from kalshi_trader.external.fivethirtyeight import FiveThirtyEightClient
 from kalshi_trader.external.polls_parser import parse_election_title, recent_margin
 from kalshi_trader.signals.polls import build_polls_signal
@@ -22,6 +23,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="FiveThirtyEight polling signal pipeline")
     parser.add_argument("--ticker", required=True)
     parser.add_argument("--title", required=True)
+    parser.add_argument(
+        "--settlement-json",
+        dest="settlement_json",
+        default=None,
+        help="JSON object of contract settlement context from market_rules.py. "
+        "Recorded on the signal's metadata as the settlement basis so the "
+        "downstream adversarial check sees what the contract actually settles on.",
+    )
     args = parser.parse_args()
 
     async def run() -> None:
@@ -44,6 +53,9 @@ def main() -> None:
                 poll_type=parsed["poll_type"],
                 state=parsed["state"],
             )
+            basis = settlement_metadata(parse_settlement_arg(args.settlement_json))
+            if basis:
+                estimate.metadata["settlement_basis"] = basis
             print(json.dumps([estimate_to_dict(estimate)], default=str))
         except Exception as caught_exception:
             print(f"Error: {caught_exception}", file=sys.stderr)

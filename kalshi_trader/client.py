@@ -86,6 +86,17 @@ class KalshiClient:
         resp = await self.get("/series")
         return resp.get("series") or []
 
+    async def get_series_detail(self, series_ticker: str) -> dict:
+        """Return one series object, including settlement terms.
+
+        Unlike ``get_series`` (which lists every series), this hits the
+        per-series endpoint. The response carries ``settlement_sources``,
+        ``contract_terms_url``, and ``contract_url`` — the fields the signal
+        pipeline needs to know how a market actually settles. Mirrors
+        ``get_market``: a thin wrapper over the GET so callers get the raw dict.
+        """
+        return await self.get(f"/series/{series_ticker}")
+
     async def get_events(self, status: str = "open", cursor: str = "",
                          limit: int = 200, **kwargs) -> dict:
         params: dict[str, Any] = {"status": status, "limit": limit,
