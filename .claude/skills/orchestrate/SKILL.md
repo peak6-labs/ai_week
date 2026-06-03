@@ -21,9 +21,10 @@ pipeline is driven from here, not from inside an agent.
 not reimplement their logic inline. Specifically:
 
 - Find markets with the **`market-scout`** agent (not by calling scorers yourself).
-- Collect every signal with the **signal agents** (`polymarket-price-signal`,
-  `order-flow-signal`, `market-maker-signal`, `kalshi-bias-signal`,
-  `polymarket-whale-signal`, `weather-signal`, `x-signal`).
+- Collect every signal with the **signal agents** (`market-maker-signal`,
+  `weather-signal`, `mentions-signal`, `order-flow-signal`,
+  `polymarket-whale-signal`, `sportsbook-odds-signal`, `polls-signal`).
+  `polymarket-price-signal` and `x-signal` are **disabled** — do not dispatch.
 - Do all math with **`scripts/score_signals.py`** — never compute probabilities,
   edges, or Kelly fractions yourself.
 - Filter risk with the **`risk`** agent — never decide sizing or rejections yourself.
@@ -67,6 +68,37 @@ echo "BALANCE=$BALANCE"
 
 (Marking prior recommendations to market happens **last**, as a trailing
 low-priority step — see Step 10 — so it never delays analysis.)
+
+---
+
+## Step 0.5 — Portfolio evaluation
+
+Before scanning for new ideas, tend to open positions. This ensures we exit
+losing or winning positions before the cycle generates new recommendations,
+and prevents duplicate ideas for markets we are already exiting.
+
+```bash
+cd /Users/scorley/code
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/evaluate_portfolio.py \
+  --out /tmp/portfolio_eval_${TS}.json
+```
+
+Read `/tmp/portfolio_eval_${TS}.json` and log any exits:
+
+```bash
+# Log a line per triggered exit (substitute real values):
+.venv/bin/python scripts/ui_log.py "Portfolio: exited TICKER SIDE (REASON)" 2>/dev/null || true
+# Log overall summary:
+.venv/bin/python scripts/ui_log.py "Portfolio: N positions evaluated, K exits placed" 2>/dev/null || true
+```
+
+If `errors` is non-empty in the results, log each error at warning level:
+
+```bash
+.venv/bin/python scripts/ui_log.py "Portfolio error: TICKER — REASON" warning 2>/dev/null || true
+```
+
+Continue to Step 1 unconditionally — portfolio evaluation never blocks idea generation.
 
 ---
 
@@ -193,33 +225,50 @@ scout signals, which are correlated with each other):
 
 **Conditional (only when it applies — keeps dispatch load bounded):**
 
+For `weather-signal`, `mentions-signal`, and `polls-signal`, extract the market's
+settlement context from `/tmp/rules_${TS}.json` and pass it as `SETTLEMENT_JSON`:
+
+```python
+import json
+rules = json.load(open(f'/tmp/rules_{TS}.json'))
+settlement_json = json.dumps(rules.get('TICKER', {}))  # substitute real ticker
+```
+
+Pass this as the `SETTLEMENT_JSON` arg in the agent prompt. The agent forwards
+it to the pipeline's `--settlement-json` flag so it forecasts/counts against the
+contract's actual settlement source — not just the default (e.g. AccuWeather, not
+NOAA; prepared remarks only, not Q&A).
+
 - `mentions-signal` — for **"mentions"** markets (category `mentions`, or the title
   asks whether a person will *say/mention/utter* a word/phrase in a hearing,
-  briefing, floor speech, or press conference); args: ticker, title. Independent
-  base-rate signal (GDELT TV captions) — **always dispatch for mentions markets**.
-- `weather-signal` — only if `category` contains "weather" or "climate"; args: ticker, title
+  briefing, floor speech, or press conference); args: ticker, title, SETTLEMENT_JSON.
+  **Always dispatch for mentions markets.**
+- `weather-signal` — only if `category` contains "weather" or "climate";
+  args: ticker, title, SETTLEMENT_JSON. The pipeline now uses GEFS ensemble
+  (empirical-CDF) + X meteorologist authority as a second source — these run
+  internally; you just pass the same args. The settlement context ensures it
+  measures against the contract's actual station/provider.
+- `polls-signal` — for **federal elections only** (senate, house, governor,
+  generic-ballot — category `elections` and a federal race in the title);
+  args: ticker, title, SETTLEMENT_JSON. Returns empty cleanly for races 538 does
+  not cover (primaries, local offices, ballot measures) — no mismatch risk.
+  Do not dispatch for mayoral, runoff, or international races.
 - `sportsbook-odds-signal` — for **sports** markets (category sports, or ticker
-  contains a league like WTA/ATP/NBA/NHL/MLB/NFL/UFC); args: ticker, title.
+  contains a league like WTA/ATP/NBA/NHL/MLB/NFL/UFC); args: ticker, title,
+  plus `rules_primary` and `settlement_sources` from the rules file in the prompt
+  so the agent only signals when the external contract resolves on the same criterion.
 - `order-flow-signal` — only if `volume_24h > 500`; args: ticker, title
 - `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
-- `polymarket-price-signal` — **disabled**. Do not dispatch. Returns empty for nearly all markets and adds latency.
-- `polls-signal` — **disabled** (`agent_polls_enabled: false` in `runtime_config.json`). Do not dispatch.
-- `x-signal` — **disabled** (`agent_x_enabled: false` in `runtime_config.json`). Do not dispatch.
+- `polymarket-price-signal` — **disabled**. Do not dispatch.
+- `x-signal` — **disabled** (`agent_x_enabled: false`). Do not dispatch.
 
-**Pass the settlement block to the settlement-sensitive agents.** A market's edge
-dies quietly when an agent measures the *wrong thing* — forecasting NYC temp off
-NOAA when the contract settles on AccuWeather, or counting a phrase said in Q&A
-when only prepared remarks count. For each market in scope below, pass its
-settlement context from `/tmp/rules_${TS}.json` as a compact JSON object
-(`{rules_primary, rules_secondary, settlement_sources, contract_terms_url}`) so
-the agent measures the same source/criterion the contract resolves on (or
-down-weights and says why):
+Settlement context routing summary (for reference):
 
-| Agent | How to pass settlement context |
-|-------|-------------------------------|
-| `weather-signal`, `mentions-signal`, `polls-signal` | as `SETTLEMENT_JSON` — the agent forwards it to the pipeline's `--settlement-json` |
-| `sportsbook-odds-signal` | in the prompt: include `rules_primary` **and** `settlement_sources`, and only return a signal if the external contract resolves on the **same** criterion — guards against "looks identical, settles differently" |
-| `kalshi-bias`, `order-flow`, `market-maker`, `polymarket-whale`, scout `microstructure` | none — price/flow-derived; settlement criteria don't change order-book microstructure |
+| Agent | Settlement context |
+|-------|-------------------|
+| `weather-signal`, `mentions-signal`, `polls-signal` | pass as `SETTLEMENT_JSON` |
+| `sportsbook-odds-signal` | include `rules_primary` + `settlement_sources` in prompt |
+| `order-flow`, `market-maker`, `polymarket-whale`, scout signals | none needed — price/flow-derived |
 
 Each agent returns a JSON array of `SignalEstimate` objects. An empty array `[]`
 means **no signal** — record it as absent. Never fabricate a signal value to
@@ -352,14 +401,16 @@ candidate slate:
 1. **Settlement rule** — read the market's `rules_primary` and
    `settlement_sources` (from `/tmp/rules_${TS}.json`) and the contract-terms PDF
    (Tier 1, above). Does it actually resolve on what the title implies, on the
-   source the signals measured (e.g. did `weather-signal` forecast off the
-   contract's settlement provider, not just NOAA)? Does any cross-venue signal
-   (polymarket/sportsbook) reference the *same* criterion? If the rule or PDF has
-   a twist the signals didn't account for (specific date, strict threshold,
+   source the signals measured? Check the signal metadata's `data_quality` field:
+   a signal with `data_quality: unavailable` or `data_quality: stale` (>120 min
+   for weather) contributed a floor/fallback value, not a real forecast — treat it
+   as absent and do not count it toward source independence. Does any
+   cross-venue signal (sportsbook) reference the *same* criterion? If the rule or
+   PDF has a twist the signals didn't account for (specific date, strict threshold,
    source of truth, determination delay), drop the market. **Microstructure +
    kalshi_bias are price-derived and correlated** — a slate resting only on those
-   two is weak; prefer markets where an independent signal (sportsbook/polymarket)
-   agrees.
+   two is weak; prefer markets where an independent signal (sportsbook/weather/
+   mentions) agrees.
 2. **Bear case** — what specific mechanism makes the signal wrong?
 3. **Source independence** — are the agreeing signals from orthogonal data
    sources, or do they share a common input?
