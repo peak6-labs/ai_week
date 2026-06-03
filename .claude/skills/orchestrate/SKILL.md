@@ -168,6 +168,15 @@ scout signals, which are correlated with each other):
   This is the sharpest *independent* signal for sports — prioritize it there.
 - `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
 - `weather-signal` — only if `category` contains "weather" or "climate"; args: ticker, title
+- `mentions-signal` — for **"mentions"** markets (category `mentions`, or the title
+  asks whether a person will *say/mention/utter* a word/phrase in a hearing,
+  briefing, floor speech, or press conference); args: ticker, title. Independent
+  base-rate signal (GDELT TV captions) for a family that otherwise has no
+  independent source.
+- `polls-signal` — for **elections** markets (president, senate, house, governor,
+  generic ballot — category `elections` or those keywords in the title); args:
+  ticker, title. Independent FiveThirtyEight polling signal — prioritize it on
+  elections (which dominate the board) the way sportsbook is prioritized on sports.
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
 - `order-flow-signal` / `market-maker-signal` — only if `volume_24h > 5000`
   (sparse trade history makes them empty on thin markets); args: ticker, title
