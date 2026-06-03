@@ -148,9 +148,9 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
 
                 tickers = [p.get("ticker", "") for p in held_raws]
                 price_results = await asyncio.gather(
-                    *[_fetch_yes_price_cents(client, ticker, concurrency_semaphore) for ticker in tickers]
+                    *[_fetch_yes_price_data(client, ticker, concurrency_semaphore) for ticker in tickers]
                 )
-                yes_price_map: dict[str, float | None] = dict(zip(tickers, price_results))
+                price_data_map: dict[str, dict | None] = dict(zip(tickers, price_results))
 
                 total_exposure = 0.0
                 total_unrealized_pnl = 0.0
@@ -166,7 +166,8 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
 
                     avg_price_cents = (exposure / qty * 100.0) if qty else 0.0
 
-                    yes_price = yes_price_map.get(ticker)
+                    price_data = price_data_map.get(ticker)
+                    yes_price = price_data["mid"] if price_data else None
                     current_price_cents: float | None = None
                     unrealized_pnl: float | None = None
                     if yes_price is not None and qty > 0:
@@ -184,6 +185,8 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                         "quantity": int(qty),
                         "avg_price_dollars": round(avg_price_cents / 100.0, 4),
                         "current_price_dollars": round(current_price_cents / 100.0, 4) if current_price_cents is not None else None,
+                        "yes_bid": price_data["bid"] if price_data else None,
+                        "yes_ask": price_data["ask"] if price_data else None,
                         "total_cost_dollars": round(exposure, 2),
                         "total_cost_with_fees_dollars": round(exposure + fees, 2),
                         "unrealized_pnl_dollars": round(unrealized_pnl, 2) if unrealized_pnl is not None else None,

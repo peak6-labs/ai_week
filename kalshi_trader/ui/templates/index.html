@@ -814,6 +814,8 @@
                 <th>Side</th>
                 <th>Qty</th>
                 <th>Avg Price</th>
+                <th>Bid ¢</th>
+                <th>Ask ¢</th>
                 <th>Current</th>
                 <th>Cost</th>
                 <th>Cost+Fees</th>
@@ -822,7 +824,7 @@
               </tr>
             </thead>
             <tbody id="positions-tbody">
-              <tr class="empty-row"><td colspan="9">No open positions</td></tr>
+              <tr class="empty-row"><td colspan="11">No open positions</td></tr>
             </tbody>
           </table>
         </div>
@@ -1083,7 +1085,7 @@ function updateStatusBar(state) {
 function renderPositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions || positions.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No open positions</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No open positions</td></tr>';
     return;
   }
   tbody.innerHTML = positions.map(p => {
@@ -1096,6 +1098,8 @@ function renderPositions(positions) {
     const posTickerEl = posUrl
       ? `<a class="text-mono kalshi-link" href="${posUrl}" target="_blank" rel="noopener">${escHtml(p.ticker ?? '')}</a>`
       : `<span class="text-mono">${escHtml(p.ticker ?? '')}</span>`;
+    const bidDisplay = p.yes_bid != null ? p.yes_bid + '¢' : '—';
+    const askDisplay = p.yes_ask != null ? p.yes_ask + '¢' : '—';
     const currentDisplay = p.current_price_dollars !== null && p.current_price_dollars !== undefined
       ? fmt$(p.current_price_dollars) : '—';
     const upnlDisplay = upnl !== null && upnl !== undefined
@@ -1109,6 +1113,8 @@ function renderPositions(positions) {
       <td>${sideBadge}</td>
       <td>${p.quantity ?? ''}</td>
       <td>${fmt$(p.avg_price_dollars ?? 0)}</td>
+      <td style="color:var(--text-secondary)">${escHtml(bidDisplay)}</td>
+      <td style="color:var(--text-secondary)">${escHtml(askDisplay)}</td>
       <td>${currentDisplay}</td>
       <td>${fmt$(p.total_cost_dollars ?? 0)}</td>
       <td>${fmt$(p.total_cost_with_fees_dollars ?? 0)}</td>
