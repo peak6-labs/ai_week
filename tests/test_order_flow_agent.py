@@ -86,6 +86,37 @@ def test_recent_trade_count_filters_old():
 # --- tool handler unit tests ---
 
 @pytest.mark.asyncio
+async def test_fetch_and_compute_metrics_returns_all_keys():
+    client = AsyncMock()
+    trades = [_trade("yes") for _ in range(10)] + [_trade("no") for _ in range(5)]
+    client.get_trades = AsyncMock(return_value={"trades": trades})
+    agent = OrderFlowAgent.__new__(OrderFlowAgent)
+    agent._client = client
+    result = await agent._fetch_and_compute_metrics("TICKER")
+    assert "vpin_score" in result
+    assert "high_informed_trading" in result
+    assert "ofi_score" in result
+    assert "direction" in result
+    assert "buying_fraction" in result
+    assert "recent_trade_count" in result
+    assert result["total_trades"] == 15
+    # 10 buys vs 5 sells → OFI should be positive
+    assert result["ofi_score"] > 0
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_compute_metrics_empty_market():
+    client = AsyncMock()
+    client.get_trades = AsyncMock(return_value={"trades": []})
+    agent = OrderFlowAgent.__new__(OrderFlowAgent)
+    agent._client = client
+    result = await agent._fetch_and_compute_metrics("TICKER")
+    assert result["vpin_score"] == 0.0
+    assert result["ofi_score"] == 0.0
+    assert result["total_trades"] == 0
+
+
+@pytest.mark.asyncio
 async def test_get_market_trades_dict_response():
     client = AsyncMock()
     trades = [_trade("yes") for _ in range(5)]

@@ -11,17 +11,15 @@ Your job: detect informed trader accumulation by analyzing trade flow imbalance 
 
 | Tool | Returns |
 |------|---------|
-| `get_market_trades(ticker, limit)` | Recent trades: `[{side, count, price, timestamp}]` |
-| `compute_vpin(trades, n_buckets)` | `{vpin_score: float, high_informed_trading: bool}` |
-| `compute_ofi(trades)` | `{ofi_score: float, direction: "YES"\|"NO"\|"neutral", buying_fraction: float}` |
+| `fetch_and_compute_metrics(ticker)` | `{vpin_score, high_informed_trading, ofi_score, direction, buying_fraction, recent_trade_count, total_trades}` |
 | `build_order_flow_signal(ticker, vpin_result, ofi_result)` | SignalEstimate dict |
 
 ## Workflow
 
-1. Call `get_market_trades(ticker, limit=200)`.
-2. Call `compute_vpin(trades, n_buckets=10)` and `compute_ofi(trades)` in parallel.
-3. **Judgment point:** If `vpin_score > 0.4` OR `abs(ofi_score) > 0.3`, call `build_order_flow_signal` and return the result.
-4. If neither threshold is met, return `[]` — no significant informed flow detected.
+1. Call `fetch_and_compute_metrics(ticker)`.
+2. **Judgment point:** If `vpin_score > 0.4` OR `abs(ofi_score) > 0.3`, call `build_order_flow_signal`.
+   - Pass `vpin_result = {"vpin_score": <value>, "high_informed_trading": <value>}` and `ofi_result = {"ofi_score": <value>, "direction": <value>, "buying_fraction": <value>}` using the values from step 1.
+3. If neither threshold is met, return `[]` — no significant informed flow detected.
 
 ## Output format
 

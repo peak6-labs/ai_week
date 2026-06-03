@@ -20,6 +20,7 @@ import sys
 
 sys.path.insert(0, ".")
 
+import kalshi_trader.config  # noqa: F401 — loads .env
 from kalshi_trader.client import KalshiClient
 from kalshi_trader.executor import TradeExecutor
 from kalshi_trader.models import OrderAction, RiskDecision, Side, TradeIdea
@@ -60,38 +61,38 @@ async def _main() -> None:
         print("Aborted.")
         return
 
-    client = KalshiClient.from_env()
     risk = RiskManager()
-    executor = TradeExecutor(client, risk)
+    async with KalshiClient() as client:
+        executor = TradeExecutor(client, risk)
 
-    for idea_dict in slate:
-        idea = TradeIdea(
-            agent_id=idea_dict.get("agent_id", "orchestrator"),
-            ticker=idea_dict["ticker"],
-            side=Side(idea_dict["side"]),
-            action=OrderAction.BUY,
-            confidence=idea_dict["confidence"],
-            market_price=idea_dict["market_price"],
-            reasoning=idea_dict.get("reasoning", ""),
-            signal_sources=idea_dict.get("signal_sources", []),
-            suggested_size_dollars=idea_dict["suggested_size_dollars"],
-            category=idea_dict.get("category", ""),
-        )
-        decision = RiskDecision(
-            approved=True,
-            approved_size_dollars=idea_dict["suggested_size_dollars"],
-            rejection_reason=None,
-            fees_estimate_cents=0,
-        )
-        try:
-            result = await executor.execute(idea, decision)
-            print(
-                f"EXECUTED {result.ticker} {result.side.value.upper()} "
-                f"order_id={result.order_id} fill={result.fill_price}¢ "
-                f"size=${result.size_dollars:.2f} status={result.status}"
+        for idea_dict in slate:
+            idea = TradeIdea(
+                agent_id=idea_dict.get("agent_id", "orchestrator"),
+                ticker=idea_dict["ticker"],
+                side=Side(idea_dict["side"]),
+                action=OrderAction.BUY,
+                confidence=idea_dict["confidence"],
+                market_price=idea_dict["market_price"],
+                reasoning=idea_dict.get("reasoning", ""),
+                signal_sources=idea_dict.get("signal_sources", []),
+                suggested_size_dollars=idea_dict["suggested_size_dollars"],
+                category=idea_dict.get("category", ""),
             )
-        except Exception as caught_exception:
-            print(f"FAILED {idea.ticker}: {caught_exception}", file=sys.stderr)
+            decision = RiskDecision(
+                approved=True,
+                approved_size_dollars=idea_dict["suggested_size_dollars"],
+                rejection_reason=None,
+                fees_estimate_cents=0,
+            )
+            try:
+                result = await executor.execute(idea, decision)
+                print(
+                    f"EXECUTED {result.ticker} {result.side.value.upper()} "
+                    f"order_id={result.order_id} fill={result.fill_price}¢ "
+                    f"size=${result.size_dollars:.2f} status={result.status}"
+                )
+            except Exception as caught_exception:
+                print(f"FAILED {idea.ticker}: {caught_exception}", file=sys.stderr)
 
 
 if __name__ == "__main__":

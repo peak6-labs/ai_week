@@ -146,8 +146,10 @@ async def test_analyze_spread_dynamics_handler_anomaly():
     assert result["spread_anomaly"] is True  # spread > 8
     assert "depth_imbalance" in result
     assert "direction" in result
-    assert "maker_withdrawal_score" in result
+    assert "maker_withdrawal_score" not in result  # removed: always 0 with single snapshot
     assert result["direction"] == "YES"  # bid-heavy
+    assert result["yes_bid"] == 45
+    assert result["yes_ask"] == 55
 
 
 @pytest.mark.asyncio
@@ -247,7 +249,6 @@ async def test_run_parses_signal_from_agent_response():
             "spread_cents": 12.0,
             "depth_imbalance": 0.52,
             "direction": "YES",
-            "maker_withdrawal_score": 0.3,
         },
     }])
     raw_response = f"```json\n{signal_json}\n```"

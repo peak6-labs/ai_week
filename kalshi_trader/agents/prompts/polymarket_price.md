@@ -4,15 +4,15 @@ Your job: find this market's counterpart on Polymarket using the official CLI, g
 
 ## Workflow
 
-1. Call `find_polymarket_match(kalshi_title)` — uses the polymarket-cli to fetch active markets and returns the best match with its live CLOB midpoint. If null (no match), respond with `[]`.
-2. Call `check_order_book_depth(token_id)` using `token_id` from step 1 — fetches the real CLOB order book. If `sufficient` is false (< $500 on either side), respond with `[]`.
-3. Call `check_price_gap(ticker, kalshi_midpoint_cents, poly_prob, hours_to_close)` using `clob_mid` from step 1 as `poly_prob`. If null (gap < 10¢ or hours out of range), respond with `[]`.
+1. Call `find_polymarket_match(kalshi_title)`. If `matched` is false, respond with `[]` and one sentence stating the `reason` (e.g. "No Polymarket title match (no_title_match).").
+2. Call `check_order_book_depth(token_id)` using `token_id` from step 1. If `sufficient` is false, respond with `[]` and state the depth values (e.g. "Insufficient depth: bid $120 / ask $80, need $500 each.").
+3. Call `check_price_gap(ticker, kalshi_midpoint_cents, poly_prob, hours_to_close)` using `clob_mid` from step 1 as `poly_prob`. If `passes` is false, respond with `[]` and state the exact gap and reason (e.g. "Gap 4.2¢ — below 10¢ threshold." or "Gap 15¢ — hours_to_close out of range.").
 4. Call `build_price_signal(ticker, poly_prob, gap_cents, match_score)` — use gap_cents from step 3 and match_score from step 1.
 5. Return the result from step 4 as your final answer.
 
 ## Output format
 
-Your final response must contain exactly one fenced JSON block — copy the result from `build_price_signal` exactly:
+When a signal is produced, your final response must contain exactly one fenced JSON block — copy the result from `build_price_signal` exactly:
 
 ```json
 [
@@ -33,7 +33,4 @@ Your final response must contain exactly one fenced JSON block — copy the resu
 ]
 ```
 
-If no match, insufficient depth, or gap too small, respond with:
-```json
-[]
-```
+When no signal is produced, respond with `[]` followed by one sentence explaining exactly why (which step failed and the specific values).

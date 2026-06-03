@@ -118,7 +118,7 @@ _SCHEMAS: list[dict] = [
     },
     {
         "name": "build_market_maker_signal",
-        "description": "Build a SignalEstimate dict from spread analysis. Returns the signal dict if spread_anomaly or abs(depth_imbalance) > 0.4, otherwise returns {\"signal\": null}.",
+        "description": "Build a SignalEstimate dict from spread analysis. Pass the full analysis dict from analyze_spread_dynamics (including yes_bid/yes_ask so probability is anchored to the market mid). Returns the signal dict if spread_anomaly or abs(depth_imbalance) > 0.4, otherwise returns {\"signal\": null}.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -194,7 +194,11 @@ class MarketMakerAgent:
             "spread_anomaly": spread_anomaly,
             "depth_imbalance": imbalance,
             "direction": direction,
-            "maker_withdrawal_score": maker_withdrawal_score,
+            # maker_withdrawal_score requires multiple snapshots over time to be
+            # meaningful; with a single snapshot the trend is always 0. Omit it
+            # rather than report a misleading 0.0.
+            "yes_bid": orderbook.get("yes_bid"),
+            "yes_ask": orderbook.get("yes_ask"),
         }
 
     async def _build_market_maker_signal(self, ticker: str, analysis: dict) -> dict:
@@ -206,10 +210,18 @@ class MarketMakerAgent:
 
         spread_cents = analysis.get("spread_cents") or 0.0
         direction = analysis.get("direction", "neutral")
-        maker_withdrawal_score = analysis.get("maker_withdrawal_score", 0.0)
 
-        # Derive probability from depth imbalance
-        prob = 0.5 + depth_imbalance * cfg.get("mm_imbalance_prob_scale")
+        # Anchor probability to the market mid-price, then adjust by depth imbalance.
+        # Anchoring at 0.5 (the old approach) created large spurious edges on markets
+        # far from 50¢: a bid-heavy book at 95¢ would produce prob=0.685, implying a
+        # 26.5¢ NO edge even though the imbalance simply reflects the high price.
+        yes_bid = analysis.get("yes_bid")
+        yes_ask = analysis.get("yes_ask")
+        if yes_bid is not None and yes_ask is not None:
+            mid_price = (yes_bid + yes_ask) / 200.0  # cents → fraction
+        else:
+            mid_price = 0.5
+        prob = mid_price + depth_imbalance * cfg.get("mm_imbalance_prob_scale")
         prob = max(0.10, min(0.90, prob))
 
         if spread_anomaly and abs(depth_imbalance) > 0.4:
@@ -241,7 +253,6 @@ class MarketMakerAgent:
                 "spread_cents": spread_cents,
                 "depth_imbalance": depth_imbalance,
                 "direction": direction,
-                "maker_withdrawal_score": maker_withdrawal_score,
             },
         )
         return estimate_to_dict(estimate)

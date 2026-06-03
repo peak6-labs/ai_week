@@ -22,12 +22,6 @@ raw JSON signal array, and summarize order book withdrawal findings.
 - **No invention.** Every spread or depth claim must come from the JSON output.
   If the array is empty, say so — do not infer market maker behavior from absent
   data.
-- **Pipeline not yet implemented.** The CLI at
-  `kalshi_trader/pipelines/market_maker.py` does not yet exist. If the Bash
-  call fails with a ModuleNotFoundError, report that the pipeline CLI must be
-  created before this signal is available, and return an empty signal array
-  `[]`.
-
 ## Inputs required
 
 You need the caller to supply:
@@ -51,18 +45,23 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the call fails because the module does not exist:
+   - If the call fails with `ModuleNotFoundError` or `No module named`:
      ```bash
      cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: pipeline CLI not yet implemented" warning
      ```
      Return `[]`.
+   - If the call fails for any other reason (timeout, API error, etc.), log the actual error:
+     ```bash
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → pipeline error: <first line of stderr>" warning
+     ```
+     Return `[]`.
    - If the array is empty (`[]`):
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → no signal (book normal)" warning
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → no signal (book normal)"
      ```
-   - If non-empty: log spread, depth withdrawal, and implied direction.
+   - If non-empty: log spread and implied direction.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → spread=<s>¢ withdrawal=<bool> direction=<dir>"
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → spread=<s>¢ imbalance=<imb> direction=<dir>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error

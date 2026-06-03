@@ -189,30 +189,22 @@ scout signals, which are correlated with each other):
 
 | Agent | Args to pass in the prompt |
 |-------|----------------------------|
-| `polymarket-price-signal` | ticker, title, midpoint = live `yes_ask` from `/tmp/live_prices_${TS}.json` (fallback: scout row `yes_ask`), hours_to_close |
+| `market-maker-signal` | ticker, title. Orderbook-snapshot signal — no volume gate, run on every market. |
 
 **Conditional (only when it applies — keeps dispatch load bounded):**
 
-- `sportsbook-odds-signal` — for **sports** markets (category sports, or ticker
-  contains a league like WTA/ATP/NBA/NHL/MLB/NFL/UFC); args: ticker, title.
-  This is the sharpest *independent* signal for sports — prioritize it there.
-- `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
-- `weather-signal` — only if `category` contains "weather" or "climate"; args: ticker, title
 - `mentions-signal` — for **"mentions"** markets (category `mentions`, or the title
   asks whether a person will *say/mention/utter* a word/phrase in a hearing,
   briefing, floor speech, or press conference); args: ticker, title. Independent
-  base-rate signal (GDELT TV captions) for a family that otherwise has no
-  independent source.
-- `polls-signal` — **disabled** (`agent_polls_enabled: false` in `runtime_config.json`).
-  Returns no data outside a U.S. general-election cycle. Re-enable in fall 2026
-  when 538 has live polling for federal races.
+  base-rate signal (GDELT TV captions) — **always dispatch for mentions markets**.
+- `weather-signal` — only if `category` contains "weather" or "climate"; args: ticker, title
+- `sportsbook-odds-signal` — for **sports** markets (category sports, or ticker
+  contains a league like WTA/ATP/NBA/NHL/MLB/NFL/UFC); args: ticker, title.
+- `order-flow-signal` — only if `volume_24h > 500`; args: ticker, title
+- `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
+- `polymarket-price-signal` — **disabled**. Do not dispatch. Returns empty for nearly all markets and adds latency.
+- `polls-signal` — **disabled** (`agent_polls_enabled: false` in `runtime_config.json`). Do not dispatch.
 - `x-signal` — **disabled** (`agent_x_enabled: false` in `runtime_config.json`). Do not dispatch.
-- `market-maker-signal` — **every market in the deep-signal subset**; args:
-  ticker, title. This is an orderbook-snapshot signal — it does not require
-  trade history and is the highest-value signal we have. Dispatch it for every
-  market in every batch, no volume gate.
-- `order-flow-signal` — only if `volume_24h > 500` (reads live trade tape;
-  returns empty on thin markets); args: ticker, title
 
 **Pass the settlement block to the settlement-sensitive agents.** A market's edge
 dies quietly when an agent measures the *wrong thing* — forecasting NYC temp off
@@ -226,8 +218,7 @@ down-weights and says why):
 | Agent | How to pass settlement context |
 |-------|-------------------------------|
 | `weather-signal`, `mentions-signal`, `polls-signal` | as `SETTLEMENT_JSON` — the agent forwards it to the pipeline's `--settlement-json` |
-| `polymarket-price-signal`, `sportsbook-odds-signal` | in the prompt: include `rules_primary` **and** `settlement_sources`, and only return a signal if the external contract resolves on the **same** criterion — guards against "looks identical, settles differently" |
-| `x-signal` | in the prompt (light): state the resolving question + `settlement_sources` so sentiment stays on-criterion |
+| `sportsbook-odds-signal` | in the prompt: include `rules_primary` **and** `settlement_sources`, and only return a signal if the external contract resolves on the **same** criterion — guards against "looks identical, settles differently" |
 | `kalshi-bias`, `order-flow`, `market-maker`, `polymarket-whale`, scout `microstructure` | none — price/flow-derived; settlement criteria don't change order-book microstructure |
 
 Each agent returns a JSON array of `SignalEstimate` objects. An empty array `[]`
@@ -316,7 +307,7 @@ Read `/tmp/scored_${TS}.json`. Each entry has `ticker`, `title`, `category`,
 `sources`, `edge_cents`, `fee_adjusted_edge`, `worth_trading`, `kelly_fraction`,
 and `side`.
 
-Keep only markets where **`worth_trading == true`** AND **`n_sources >= 2`**.
+Keep only markets where **`worth_trading == true`**.
 Log the survivor count.
 
 **Persist this cycle** (scored-market snapshots + run stats → Supabase, with a

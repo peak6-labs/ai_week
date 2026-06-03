@@ -29,7 +29,12 @@ _SCHEMAS: list[dict] = [
         "description": (
             "Fetch active Polymarket markets via CLI and find the best title match. "
             "Also fetches the live CLOB midpoint for the matched market. "
-            "Returns {condition_id, token_id, clob_mid, match_score} or null."
+            "Returns {matched: true, condition_id, token_id, clob_mid, match_score} on success, "
+            "or {matched: false, reason} where reason is one of: "
+            "'no_title_match' (Jaccard < 0.20 or < 2 shared words), "
+            "'different_subjects' (both titles name different people/entities), "
+            "'no_token_ids' (market found but CLOB token missing), "
+            "'clob_price_unavailable' (could not fetch live or snapshot price)."
         ),
         "input_schema": {
             "type": "object",
@@ -54,7 +59,10 @@ _SCHEMAS: list[dict] = [
         "name": "check_price_gap",
         "description": (
             "Check whether the Polymarket/Kalshi price gap passes filters. "
-            "Returns {gap_cents} or null (gap < 10¢ or hours out of range)."
+            "Always returns {gap_cents, passes, reason}. "
+            "'passes' is true only when gap ≥ 10¢ and hours are in range. "
+            "'reason' is 'actionable' when passing, or a short explanation when not "
+            "(e.g. 'gap 4.2¢ below 10¢ threshold', 'hours_to_close out of range')."
         ),
         "input_schema": {
             "type": "object",
@@ -120,18 +128,18 @@ class PolymarketPriceAgent:
     def _parse_estimates(self, raw: str) -> list[SignalEstimate]:
         return parse_signal_estimates(raw)
 
-    async def _find_polymarket_match(self, kalshi_title: str) -> dict | None:
+    async def _find_polymarket_match(self, kalshi_title: str) -> dict:
         # Full paginated market list via Gamma keyset API (38k+ markets)
         markets = await self._client.get_markets_cached()
         result = self._client.match_market_with_score(kalshi_title, markets)
         if result is None:
-            return None
+            return {"matched": False, "reason": "no_title_match"}
         market, score = result
         try:
             token_ids = json.loads(market["clobTokenIds"])
             token_id = token_ids[0]  # YES token
         except (KeyError, json.JSONDecodeError, IndexError):
-            return None
+            return {"matched": False, "reason": "no_token_ids"}
         # CLI: get live CLOB midpoint (more accurate than Gamma's outcomePrices snapshot)
         try:
             clob_mid = float(_cli(["clob", "midpoint", token_id])["midpoint"])  # type: ignore[index]
@@ -140,8 +148,9 @@ class PolymarketPriceAgent:
             try:
                 clob_mid = float(json.loads(market["outcomePrices"])[0])
             except Exception:
-                return None
+                return {"matched": False, "reason": "clob_price_unavailable"}
         return {
+            "matched": True,
             "condition_id": market["conditionId"],
             "token_id": token_id,
             "clob_mid": clob_mid,
@@ -164,7 +173,8 @@ class PolymarketPriceAgent:
         kalshi_midpoint_cents: float,
         poly_prob: float,
         hours_to_close: float,
-    ) -> dict | None:
+    ) -> dict:
+        gap_cents = round((poly_prob - kalshi_midpoint_cents / 100.0) * 100.0, 2)
         close_time = datetime.now(tz=timezone.utc) + timedelta(hours=hours_to_close)
         market = Market(
             ticker=ticker,
@@ -180,9 +190,13 @@ class PolymarketPriceAgent:
         )
         result = score_market(market, poly_prob)
         if result is None:
-            return None
-        gap_cents = (poly_prob - kalshi_midpoint_cents / 100.0) * 100.0
-        return {"gap_cents": round(gap_cents, 2)}
+            abs_gap = abs(gap_cents)
+            if abs_gap < 10.0:
+                reason = f"gap {abs_gap:.1f}¢ below 10¢ threshold"
+            else:
+                reason = "hours_to_close out of range"
+            return {"gap_cents": gap_cents, "passes": False, "reason": reason}
+        return {"gap_cents": gap_cents, "passes": True, "reason": "actionable"}
 
     async def _build_price_signal(
         self,

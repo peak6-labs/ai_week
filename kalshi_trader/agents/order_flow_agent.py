@@ -119,50 +119,18 @@ def _recent_trade_count(trades: list[dict], window_minutes: int = 60) -> int:
 
 _SCHEMAS: list[dict] = [
     {
-        "name": "get_market_trades",
-        "description": "Fetch recent trades for a Kalshi market. Returns a list of trade dicts with side, count, price, and timestamp.",
+        "name": "fetch_and_compute_metrics",
+        "description": (
+            "Fetch recent trades for a Kalshi market and compute all order flow metrics in one call. "
+            "Returns vpin_score, high_informed_trading, ofi_score, direction, buying_fraction, "
+            "recent_trade_count (last 60 min), and total_trades."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "ticker": {"type": "string"},
-                "limit": {"type": "integer", "default": 200},
             },
             "required": ["ticker"],
-        },
-    },
-    {
-        "name": "compute_vpin",
-        "description": "Compute VPIN (Volume-synchronized Probability of Informed Trading) from a list of trades. Returns vpin_score and high_informed_trading flag.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "trades": {
-                    "type": "array",
-                    "items": {"type": "object"},
-                    "description": "List of trade dicts from get_market_trades",
-                },
-                "n_buckets": {
-                    "type": "integer",
-                    "default": 10,
-                    "description": "Number of equal-volume buckets to use",
-                },
-            },
-            "required": ["trades"],
-        },
-    },
-    {
-        "name": "compute_ofi",
-        "description": "Compute Order Flow Imbalance from a list of trades. Returns ofi_score, direction (YES/NO/neutral), and buying_fraction.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "trades": {
-                    "type": "array",
-                    "items": {"type": "object"},
-                    "description": "List of trade dicts from get_market_trades",
-                },
-            },
-            "required": ["trades"],
         },
     },
     {
@@ -196,9 +164,7 @@ class OrderFlowAgent:
         self._agent = BaseAgent(
             tools=_SCHEMAS,
             handlers={
-                "get_market_trades": self._get_market_trades,
-                "compute_vpin": self._compute_vpin,
-                "compute_ofi": self._compute_ofi,
+                "fetch_and_compute_metrics": self._fetch_and_compute_metrics,
                 "build_order_flow_signal": self._build_order_flow_signal,
             },
             system_prompt=system_prompt,
@@ -214,6 +180,21 @@ class OrderFlowAgent:
         if isinstance(result, list):
             return result
         return result.get("trades", [])
+
+    async def _fetch_and_compute_metrics(self, ticker: str) -> dict:
+        """Fetch trades and compute all metrics in one call so no trade data passes through the LLM."""
+        trades = await self._get_market_trades(ticker, limit=200)
+        vpin_result = await self._compute_vpin(trades)
+        ofi_result = await self._compute_ofi(trades)
+        return {
+            "vpin_score": vpin_result["vpin_score"],
+            "high_informed_trading": vpin_result["high_informed_trading"],
+            "ofi_score": ofi_result["ofi_score"],
+            "direction": ofi_result["direction"],
+            "buying_fraction": ofi_result["buying_fraction"],
+            "recent_trade_count": _recent_trade_count(trades, window_minutes=cfg.get("trade_count_window_minutes")),
+            "total_trades": len(trades),
+        }
 
     async def _compute_vpin(self, trades: list[dict], n_buckets: int = 10) -> dict:
         # Derive bucket_size_usd from total volume / n_buckets so we get ~n_buckets buckets

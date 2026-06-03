@@ -53,7 +53,7 @@
   "ws_reconnect_delay_seconds": 5,
   "ws_watchdog_timeout_seconds": 60,
   "agent_weather_enabled": true,
-  "agent_polymarket_enabled": true,
+  "agent_polymarket_enabled": false,
   "agent_order_flow_enabled": true,
   "agent_market_maker_enabled": true,
   "agent_kalshi_bias_enabled": true,

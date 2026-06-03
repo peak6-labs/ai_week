@@ -155,6 +155,18 @@ def _tokenize(title: str) -> tuple[set[str], list[float]]:
     return words, numbers
 
 
+def _different_subjects(words_a: set[str], words_b: set[str]) -> bool:
+    """True when the two titles appear to name different people or entities.
+
+    If each title has ≥2 long tokens (>3 chars) that don't appear in the other,
+    they are likely naming different subjects (e.g. McGregor vs Carmelo Anthony)
+    and the match should be rejected even if shared event words inflate Jaccard.
+    """
+    unique_a = {w for w in words_a - words_b if len(w) > 3}
+    unique_b = {w for w in words_b - words_a if len(w) > 3}
+    return len(unique_a) >= 2 and len(unique_b) >= 2
+
+
 def _numbers_compatible(a: list[float], b: list[float]) -> bool:
     """True when both titles have no numbers, or when at least one pair matches within 20%."""
     if not a or not b:
@@ -243,6 +255,8 @@ class PolymarketClient:
         best_words, _ = _tokenize(best_market["question"])
         if len(kalshi_words & best_words) < 2:
             return None
+        if _different_subjects(kalshi_words, best_words):
+            return None
         return best_market
 
     def match_market_with_score(
@@ -267,6 +281,8 @@ class PolymarketClient:
             return None
         best_words, _ = _tokenize(best_market["question"])
         if len(kalshi_words & best_words) < 2:
+            return None
+        if _different_subjects(kalshi_words, best_words):
             return None
         return best_market, best_score
 

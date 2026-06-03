@@ -13,7 +13,7 @@ Your job: detect market maker withdrawal and directional order book imbalance, w
 | Tool | Returns |
 |------|---------|
 | `get_orderbook(ticker)` | `{yes_bid, yes_ask, spread_cents, bid_depth, ask_depth, timestamp}` |
-| `analyze_spread_dynamics(ticker, orderbook)` | `{spread_cents, spread_anomaly: bool, depth_imbalance: float, direction: "YES"\|"NO"\|"neutral", maker_withdrawal_score: float}` |
+| `analyze_spread_dynamics(ticker, orderbook)` | `{spread_cents, spread_anomaly: bool, depth_imbalance: float, direction: "YES"\|"NO"\|"neutral", yes_bid, yes_ask}` |
 | `build_market_maker_signal(ticker, analysis)` | SignalEstimate dict |
 
 ## Workflow
@@ -41,8 +41,7 @@ Your final response must contain exactly one fenced JSON block — copy the resu
       "data_quality": "fresh",
       "spread_cents": 12.0,
       "depth_imbalance": 0.52,
-      "direction": "YES",
-      "maker_withdrawal_score": 0.61
+      "direction": "YES"
     }
   }
 ]
