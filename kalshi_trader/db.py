@@ -243,6 +243,7 @@ async def insert_recommendation(rec: dict) -> None:
         "category": rec.get("category", ""),
         "suggested_size_dollars": rec.get("suggested_size_dollars"),
         "status": "open",
+        "disposition": rec.get("disposition", "candidate"),
         "paper_only": True,
     }
     await client.table("recommendations").upsert(row, on_conflict="id").execute()

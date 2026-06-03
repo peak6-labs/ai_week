@@ -391,6 +391,9 @@ def score_market(market_data: dict, cfg: dict) -> dict:
         "title": market_data.get("title", ""),
         "category": market_data.get("category", ""),
         "yes_ask": yes_ask,
+        # Carry yes_bid through so downstream consumers can price the NO side
+        # (NO entry = 100 - yes_bid). Defaults to yes_ask when the input omits it.
+        "yes_bid": float(market_data.get("yes_bid", yes_ask)),
         "hours_to_close": market_data.get("hours_to_close", 0),
         "scored_signals": scored,
         **combined,

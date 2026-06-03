@@ -342,11 +342,20 @@ Write two files with the **Write** tool:
 `reasoning`, `signal_sources`, `category`, `agent_id`, `selection_summary`.
 
 **Record the slate as paper recommendations** (for the calibration loop — marked
-to market on later cycles; no execution):
+to market on later cycles; no execution). Record the risk-approved slate first
+(disposition `approved`), then record **all other** scored 2+ source markets
+(disposition `worth_trading` if they cleared the edge bar but risk/challenge
+dropped them, else `insufficient_edge`). Recording the rejected ones too lets us
+mark them to market and judge whether the 5¢ edge bar is set correctly —
+`paper_track.py report --by-edge-bucket --by-disposition` reads it back:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/paper_track.py record \
-  --ideas-file reports/orchestrator-${TS}.json --cycle-ts ${TS} || true
+  --ideas-file reports/orchestrator-${TS}.json --cycle-ts ${TS} \
+  --disposition approved || true
+PYTHONPATH=. .venv/bin/python scripts/paper_track.py record-scored \
+  --scored-file /tmp/scored_${TS}.json --cycle-ts ${TS} \
+  --exclude-file reports/orchestrator-${TS}.json --min-sources 2 || true
 ```
 
 **`reports/orchestrator-${TS}.md`** — a human-readable ranked table: ticker

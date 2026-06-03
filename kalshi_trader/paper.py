@@ -109,8 +109,18 @@ def record_recommendation(
     sources: list[str],
     category: str = "",
     suggested_size_dollars: float | None = None,
+    disposition: str = "candidate",
 ) -> str:
-    """Append one open recommendation to the local store. Returns its id."""
+    """Append one open recommendation to the local store. Returns its id.
+
+    ``status`` is the *lifecycle* (open → resolved). ``disposition`` is the
+    orthogonal *classification* the pipeline assigned at record time —
+    ``approved`` (risk passed it onto the slate), ``worth_trading`` (cleared the
+    edge+source bar but risk/challenge dropped it), or ``insufficient_edge``
+    (scored but below the fee-adjusted edge bar). Recording every disposition,
+    not just approved ones, lets us mark them all to market and check whether the
+    edge bar is set at the right level — see ``performance_by_edge_bucket``.
+    """
     rec_id = str(uuid.uuid4())
     _append_jsonl(_RECS_FILE, {
         "rec_id": rec_id,
@@ -126,6 +136,7 @@ def record_recommendation(
         "category": category,
         "suggested_size_dollars": suggested_size_dollars,
         "status": "open",
+        "disposition": disposition,
     })
     return rec_id
 
@@ -188,3 +199,52 @@ def performance_by_source() -> dict[str, dict]:
         for source in (recs.get(rec_id, {}).get("sources") or ["unknown"]):
             by_source.setdefault(source, []).append(mark)
     return {source: _scorecard(marks) for source, marks in by_source.items()}
+
+
+def performance_by_disposition() -> dict[str, dict]:
+    """Scorecard sliced by each recommendation's disposition.
+
+    Compares how approved trades fared against the worth_trading-but-dropped and
+    insufficient-edge candidates we recorded for backtest. If the rejected
+    buckets win at a similar rate, our filters are leaving money on the table.
+    """
+    latest = _latest_marks()
+    recs = {r["rec_id"]: r for r in load_recommendations()}
+    by_disposition: dict[str, list[dict]] = {}
+    for rec_id, mark in latest.items():
+        disposition = recs.get(rec_id, {}).get("disposition") or "unknown"
+        by_disposition.setdefault(disposition, []).append(mark)
+    return {disposition: _scorecard(marks) for disposition, marks in by_disposition.items()}
+
+
+# Fee-adjusted edge buckets in cents. The 5.0 boundary is the current
+# worth_trading bar — splitting at it lets us read win-rate/avg-P&L on either
+# side and judge whether the bar belongs higher or lower.
+_EDGE_BUCKET_EDGES: list[float] = [0.0, 2.5, 5.0, 7.5, 10.0]
+
+
+def _edge_bucket_label(edge_cents: float) -> str:
+    if edge_cents < _EDGE_BUCKET_EDGES[0]:
+        return "(-inf,0)"
+    for low, high in zip(_EDGE_BUCKET_EDGES, _EDGE_BUCKET_EDGES[1:]):
+        if low <= edge_cents < high:
+            return f"[{low:g},{high:g})"
+    return f"[{_EDGE_BUCKET_EDGES[-1]:g},inf)"
+
+
+def performance_by_edge_bucket() -> dict[str, dict]:
+    """Scorecard bucketed by the recommendation's edge_cents at record time.
+
+    This is the calibration test for the edge threshold: each bucket's realized
+    win-rate and avg P&L show whether the would-be profit actually rises with
+    predicted edge, and where it crosses break-even.
+    """
+    latest = _latest_marks()
+    recs = {r["rec_id"]: r for r in load_recommendations()}
+    by_bucket: dict[str, list[dict]] = {}
+    for rec_id, mark in latest.items():
+        edge_cents = recs.get(rec_id, {}).get("edge_cents")
+        if edge_cents is None:
+            continue
+        by_bucket.setdefault(_edge_bucket_label(float(edge_cents)), []).append(mark)
+    return {bucket: _scorecard(marks) for bucket, marks in by_bucket.items()}
