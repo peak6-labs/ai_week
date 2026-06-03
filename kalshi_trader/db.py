@@ -28,7 +28,7 @@ except Exception:  # pragma: no cover - truststore optional
 from supabase import AsyncClient, acreate_client
 
 from kalshi_trader import config
-from kalshi_trader.ideas_history import join_recommendations_and_marks
+from kalshi_trader.ideas_history import join_recommendations_and_marks, parse_iso_timestamp
 from kalshi_trader.models import OrderResult, RiskDecision, SignalEstimate, TradeIdea
 
 logger = logging.getLogger(__name__)
@@ -709,3 +709,34 @@ async def recommendations_with_marks() -> list[dict]:
     ]
     marks = [_normalize_mark_row(row) for row in (mark_response.data or [])]
     return join_recommendations_and_marks(recommendations, marks)
+
+
+async def fetch_open_recommendations(
+    max_age_minutes: float | None = None, now: datetime | None = None
+) -> list[dict]:
+    """Open recommendations from Supabase, normalized to the local rec shape.
+
+    The dashboard reads ideas from Supabase, and ideas may be recorded by any
+    machine, so marking must source open recommendations from Supabase (not just
+    the local JSONL store) to keep every shared idea marked. ``max_age_minutes``
+    bounds a low-priority pass to recently-recorded ideas; a recommendation whose
+    ``recorded_at`` cannot be parsed is kept (age unknown).
+    """
+    client = await _get_client()
+    response = await (
+        client.table("recommendations").select("*").eq("status", "open").execute()
+    )
+    recommendations = [_normalize_recommendation_row(row) for row in (response.data or [])]
+    if max_age_minutes is None:
+        return recommendations
+
+    reference_time = now or datetime.now(tz=timezone.utc)
+    recent: list[dict] = []
+    for recommendation in recommendations:
+        recorded_at = parse_iso_timestamp(recommendation.get("recorded_at"))
+        if recorded_at is None:
+            recent.append(recommendation)
+            continue
+        if (reference_time - recorded_at).total_seconds() / 60.0 <= max_age_minutes:
+            recent.append(recommendation)
+    return recent

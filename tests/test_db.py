@@ -377,3 +377,52 @@ async def test_insert_recommendation_mark_writes_checked_at():
         await db_module.insert_recommendation_mark("rec-1", mark)
     inserted = mock_client.table.return_value.insert.call_args[0][0]
     assert inserted["checked_at"] == "2026-06-03T05:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_fetch_open_recommendations_normalizes_and_filters_status():
+    import kalshi_trader.db as db_module
+    db_module._client = None
+    rows = [
+        {"id": "uuid-a", "created_at": "2026-06-03T04:00:00+00:00", "ticker": "KXTEST-A",
+         "side": "no", "entry_price_cents": 54.0, "status": "open", "disposition": "approved"},
+    ]
+    builder = MagicMock()
+    builder.select.return_value.eq.return_value.execute = AsyncMock(
+        return_value=MagicMock(data=rows))
+    mock_client = MagicMock()
+    mock_client.table.return_value = builder
+
+    with patch.object(db_module, "_get_client", AsyncMock(return_value=mock_client)):
+        recs = await db_module.fetch_open_recommendations()
+
+    # filtered to status='open' via the builder
+    builder.select.return_value.eq.assert_called_once_with("status", "open")
+    assert len(recs) == 1
+    assert recs[0]["rec_id"] == "uuid-a"           # normalized id -> rec_id
+    assert recs[0]["recorded_at"] == "2026-06-03T04:00:00+00:00"
+    assert recs[0]["ticker"] == "KXTEST-A"
+
+
+@pytest.mark.asyncio
+async def test_fetch_open_recommendations_applies_max_age_minutes():
+    import kalshi_trader.db as db_module
+    from datetime import datetime, timezone, timedelta
+    db_module._client = None
+    now = datetime(2026, 6, 3, 12, 0, 0, tzinfo=timezone.utc)
+    rows = [
+        {"id": "young", "created_at": (now - timedelta(minutes=20)).isoformat(),
+         "ticker": "KX-Y", "side": "yes", "entry_price_cents": 40.0, "status": "open"},
+        {"id": "old", "created_at": (now - timedelta(minutes=300)).isoformat(),
+         "ticker": "KX-O", "side": "yes", "entry_price_cents": 40.0, "status": "open"},
+    ]
+    builder = MagicMock()
+    builder.select.return_value.eq.return_value.execute = AsyncMock(
+        return_value=MagicMock(data=rows))
+    mock_client = MagicMock()
+    mock_client.table.return_value = builder
+
+    with patch.object(db_module, "_get_client", AsyncMock(return_value=mock_client)):
+        recs = await db_module.fetch_open_recommendations(max_age_minutes=130, now=now)
+
+    assert [r["rec_id"] for r in recs] == ["young"]
