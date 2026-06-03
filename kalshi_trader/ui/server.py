@@ -29,6 +29,28 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 # Kalshi account poller — runs independently of the trading loop
 # ---------------------------------------------------------------------------
 
+async def _fetch_yes_price_data(client: Any, ticker: str, concurrency_semaphore: asyncio.Semaphore) -> dict | None:
+    """Fetch YES bid, ask, and mid-price in cents for one ticker.
+
+    Returns {"bid": float|None, "ask": float|None, "mid": float} or None on error.
+    Prefers live bid/ask; falls back to last_price if no active quote.
+    """
+    async with concurrency_semaphore:
+        try:
+            response = await client.get_market(ticker)
+            market_data = response.get("market", {})
+            yes_bid = float(market_data.get("yes_bid", 0) or 0)
+            yes_ask = float(market_data.get("yes_ask", 0) or 0)
+            if yes_bid > 0 or yes_ask > 0:
+                return {"bid": yes_bid, "ask": yes_ask, "mid": (yes_bid + yes_ask) / 2.0}
+            last = market_data.get("last_price")
+            if last is not None:
+                return {"bid": None, "ask": None, "mid": float(last)}
+        except Exception as caught_exception:
+            logger.debug("Price data fetch failed for %s: %s", ticker, caught_exception)
+        return None
+
+
 async def _fetch_yes_price_cents(client: Any, ticker: str, concurrency_semaphore: asyncio.Semaphore) -> float | None:
     """Fetch the current YES mid-price in cents for one ticker.
 
@@ -66,11 +88,37 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
         client = ReadOnlyKalshiClient(raw_client)
         while True:
             try:
-                balance_resp = await client.get_balance()
+                balance_resp, positions_resp, orders_resp = await asyncio.gather(
+                    client.get_balance(),
+                    client.get_positions(),
+                    client.get_orders(status="resting"),
+                )
                 balance_cents = balance_resp.get("balance", 0) or 0
                 trading_state.balance_dollars = balance_cents / 100.0
 
-                positions_resp = await client.get_positions()
+                raw_orders = orders_resp.get("orders") or []
+                mapped_orders: list[dict] = []
+                for raw_order in raw_orders:
+                    remaining = float(raw_order.get("remaining_count_fp", "0") or 0)
+                    if remaining <= 0:
+                        continue
+                    outcome_side = raw_order.get("outcome_side") or raw_order.get("side") or "yes"
+                    price_dollars = float(
+                        raw_order.get("no_price_dollars") if outcome_side == "no"
+                        else (raw_order.get("yes_price_dollars") or 0)
+                    )
+                    mapped_orders.append({
+                        "order_id": raw_order.get("order_id", ""),
+                        "ticker": raw_order.get("ticker", ""),
+                        "side": outcome_side,
+                        "price_cents": round(price_dollars * 100.0, 2),
+                        "remaining": int(remaining),
+                        "filled": int(float(raw_order.get("fill_count_fp", "0") or 0)),
+                        "total": int(float(raw_order.get("initial_count_fp", "0") or 0)),
+                        "created_time": raw_order.get("created_time"),
+                    })
+                trading_state.orders = mapped_orders
+
                 raw_positions = positions_resp.get("market_positions") or []
                 held_raws = [p for p in raw_positions if float(p.get("position_fp", "0") or 0) != 0]
 
@@ -316,11 +364,12 @@ def create_app(
 
     @app.get("/api/markets/prices")
     async def get_market_prices(tickers: str = "") -> JSONResponse:
-        """Return the current YES price in cents for each requested ticker.
+        """Return YES bid, ask, and mid-price in cents for each requested ticker.
 
         Accepts a comma-separated ``tickers`` query parameter (e.g.
-        ``?tickers=FOO-1,BAR-2``).  Up to 40 tickers are fetched in parallel
-        with a concurrency limit of 5.  Returns ``{ticker: price_or_null}``.
+        ``?tickers=FOO-1,BAR-2``).  Up to 20 tickers are fetched in parallel
+        with a concurrency limit of 5.  Returns
+        ``{ticker: {"bid": float|null, "ask": float|null, "mid": float} | null}``.
         """
         from kalshi_trader.client import KalshiClient
         from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
@@ -329,7 +378,7 @@ def create_app(
             return JSONResponse({})
 
         raw_tickers = [ticker.strip() for ticker in tickers.split(",") if ticker.strip()]
-        unique_tickers = list(dict.fromkeys(raw_tickers))[:40]
+        unique_tickers = list(dict.fromkeys(raw_tickers))[:20]
         if not unique_tickers:
             return JSONResponse({})
 
@@ -338,7 +387,7 @@ def create_app(
             async with KalshiClient() as raw_client:
                 client = ReadOnlyKalshiClient(raw_client)
                 price_results = await asyncio.gather(
-                    *[_fetch_yes_price_cents(client, ticker, concurrency_semaphore)
+                    *[_fetch_yes_price_data(client, ticker, concurrency_semaphore)
                       for ticker in unique_tickers]
                 )
             return JSONResponse(dict(zip(unique_tickers, price_results)))

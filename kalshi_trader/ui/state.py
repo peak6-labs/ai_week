@@ -53,6 +53,7 @@ class TradingState:
     daily_pnl_dollars: float = 0.0
     total_exposure_dollars: float = 0.0
     positions: list[dict] = field(default_factory=list)
+    orders: list[dict] = field(default_factory=list)
     recent_ideas: list[dict] = field(default_factory=list)  # last 50 trade ideas, serializable dicts
     pending_ideas: list[dict] = field(default_factory=list)   # awaiting review
     reviewed_ideas: list[dict] = field(default_factory=list)  # last 50 reviewed, newest first
@@ -77,7 +78,7 @@ class TradingState:
             "system_running", "cycle_number", "balance_dollars",
             "daily_pnl_dollars", "total_exposure_dollars", "last_error",
         }
-        list_fields = {"positions", "recent_ideas", "pending_ideas", "reviewed_ideas"}
+        list_fields = {"positions", "orders", "recent_ideas", "pending_ideas", "reviewed_ideas"}
 
         for field_name, value in partial.items():
             if field_name in scalar_fields:
@@ -106,6 +107,7 @@ class TradingState:
             "daily_pnl_dollars": self.daily_pnl_dollars,
             "total_exposure_dollars": self.total_exposure_dollars,
             "positions": self.positions,
+            "orders": self.orders,
             "recent_ideas": self.recent_ideas,
             "pending_ideas": list(self.pending_ideas),
             "reviewed_ideas": list(self.reviewed_ideas),

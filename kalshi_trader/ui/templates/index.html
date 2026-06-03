@@ -823,6 +823,28 @@
       </div>
     </div>
 
+    <!-- Resting Orders -->
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header">Resting Orders</div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Side</th>
+              <th>Price ¢</th>
+              <th>Remaining</th>
+              <th>Filled</th>
+              <th>Age</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody">
+            <tr class="empty-row"><td colspan="6">No resting orders</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Event Log -->
     <div class="panel" id="event-log-panel">
       <div class="panel-header">Event Log</div>
@@ -912,12 +934,13 @@
               <th>Entry ¢</th>
               <th>Pred.</th>
               <th>Edge ¢</th>
-              <th>Live ¢</th>
+              <th>Bid ¢</th>
+              <th>Ask ¢</th>
               <th>Live P&amp;L ¢</th>
             </tr>
           </thead>
           <tbody id="history-tbody">
-            <tr class="empty-row"><td colspan="10">Loading…</td></tr>
+            <tr class="empty-row"><td colspan="11">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1067,6 +1090,34 @@ function renderPositions(positions) {
 }
 
 // ---------------------------------------------------------------------------
+// Monitor tab: Resting Orders
+// ---------------------------------------------------------------------------
+function renderOrders(orders) {
+  const tbody = document.getElementById('orders-tbody');
+  if (!orders || orders.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No resting orders</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.map(o => {
+    const sideBadge = String(o.side || '').toUpperCase() === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    const url = o.ticker ? `https://kalshi.com/markets/${o.ticker.split('-')[0].toLowerCase()}` : null;
+    const tickerEl = url
+      ? `<a class="text-mono kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(o.ticker ?? '')}</a>`
+      : `<span class="text-mono">${escHtml(o.ticker ?? '')}</span>`;
+    return `<tr>
+      <td>${tickerEl}</td>
+      <td>${sideBadge}</td>
+      <td>${o.price_cents ?? '—'}¢</td>
+      <td>${o.remaining ?? ''}</td>
+      <td style="color:var(--text-tertiary)">${o.filled ?? 0}/${o.total ?? 0}</td>
+      <td style="color:var(--text-tertiary)">${timeSince(o.created_time)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
 // Monitor tab: Recent Ideas
 // ---------------------------------------------------------------------------
 function renderIdeas(ideas) {
@@ -1138,6 +1189,7 @@ async function poll() {
 
     if (activeTab === 'monitor') {
       renderPositions(state.positions);
+      renderOrders(state.orders || []);
       renderIdeas(state.recent_ideas);
       renderEventLog(state.event_log);
     } else if (activeTab === 'ideas') {
@@ -1288,7 +1340,7 @@ let liveHistoryPollTimer = null;
 async function fetchLivePricesForHistory() {
   if (!ideasHistory || ideasHistory.length === 0) return;
   const openIdeas = ideasHistory.filter(idea => idea.status !== 'resolved' && idea.ticker);
-  const uniqueTickers = [...new Set(openIdeas.slice(0, 40).map(idea => idea.ticker))];
+  const uniqueTickers = [...new Set(openIdeas.slice(0, 20).map(idea => idea.ticker))];
   if (uniqueTickers.length === 0) return;
   try {
     const resp = await fetch('/api/markets/prices?tickers=' + uniqueTickers.join(','));
@@ -1302,12 +1354,14 @@ async function fetchLivePricesForHistory() {
 }
 
 function computeLivePnlCents(idea) {
-  const yesPrice = livePricesMap[idea.ticker];
-  if (yesPrice === null || yesPrice === undefined) return null;
+  const priceData = livePricesMap[idea.ticker];
+  if (!priceData) return null;
+  const mid = priceData.mid;
+  if (mid === null || mid === undefined) return null;
   const entryCents = idea.entry_price_cents;
   if (entryCents === null || entryCents === undefined) return null;
   const side = String(idea.side || '').toUpperCase();
-  const currentSideCents = side === 'YES' ? yesPrice : (100 - yesPrice);
+  const currentSideCents = side === 'YES' ? mid : (100 - mid);
   return Math.round(currentSideCents - entryCents);
 }
 
@@ -1325,7 +1379,7 @@ async function loadIdeasHistory() {
     }
   } catch (err) {
     console.error('Failed to load ideas history:', err);
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Failed to load history</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Failed to load history</td></tr>';
   }
 }
 
@@ -1365,7 +1419,7 @@ function renderIdeasHistory() {
     `${rows.length} idea${rows.length !== 1 ? 's' : ''}${liveLabel}`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No ideas match the filter</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No ideas match the filter</td></tr>';
     return;
   }
 
@@ -1382,12 +1436,9 @@ function renderIdeasHistory() {
     const livePnl = computeLivePnlCents(idea);
     const pnlText = livePnl === null ? '—' : (livePnl >= 0 ? '+' : '') + livePnl;
     const pnlCls = livePnl === null ? 'pnl-zer' : pnlClass(livePnl);
-    const yesPrice = livePricesMap[idea.ticker];
-    const side = String(idea.side || '').toUpperCase();
-    const liveSidePrice = yesPrice !== null && yesPrice !== undefined
-      ? (side === 'YES' ? yesPrice : (100 - yesPrice))
-      : null;
-    const livePriceText = liveSidePrice !== null ? Math.round(liveSidePrice) + '¢' : '—';
+    const priceData = livePricesMap[idea.ticker];
+    const bidText = priceData?.bid != null ? Math.round(priceData.bid) + '¢' : '—';
+    const askText = priceData?.ask != null ? Math.round(priceData.ask) + '¢' : '—';
     const url = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
     const tickerEl = url
       ? `<a class="kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
@@ -1402,7 +1453,8 @@ function renderIdeasHistory() {
       <td>${idea.entry_price_cents ?? '—'}</td>
       <td>${escHtml(pred)}</td>
       <td>${idea.edge_cents ?? '—'}</td>
-      <td>${escHtml(livePriceText)}</td>
+      <td>${escHtml(bidText)}</td>
+      <td>${escHtml(askText)}</td>
       <td class="${pnlCls}">${escHtml(pnlText)}</td>
     </tr>`;
 
@@ -1410,7 +1462,7 @@ function renderIdeasHistory() {
       `<span class="signal-tag">${escHtml(String(s))}</span>`
     ).join('');
     const detailRow = `<tr class="history-detail-row hidden" data-detail="${index}">
-      <td colspan="10">
+      <td colspan="11">
         <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">
           Cycle ${escHtml(idea.cycle_ts ?? '—')} &middot; ${idea.n_sources ?? 0} sources &middot; ${escHtml(idea.category ?? '')}
         </div>
