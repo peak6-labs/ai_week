@@ -32,11 +32,16 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 async def _poll_kalshi_account(trading_state: TradingState) -> None:
     """Poll Kalshi every 30 s for balance and positions, update TradingState."""
     from kalshi_trader.client import KalshiClient
+    from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
 
     await asyncio.sleep(2)  # brief delay so server is fully up first
     trading_state.log("Account poller started")
 
-    async with KalshiClient() as client:
+    # The dashboard runs against the prod (real-money) account, so wrap the raw
+    # client in the read-only facade: the poller can only read balance/positions
+    # and is structurally incapable of placing or cancelling an order.
+    async with KalshiClient() as raw_client:
+        client = ReadOnlyKalshiClient(raw_client)
         while True:
             try:
                 balance_resp = await client.get_balance()
