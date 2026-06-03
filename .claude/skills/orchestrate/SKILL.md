@@ -142,11 +142,13 @@ KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/live_prices.py \
   --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/live_prices_${TS}.json
 ```
 
-Read `/tmp/live_prices_${TS}.json` ({ticker: {yes_bid, yes_ask, last_price}}). In
-Step 3, **override each subset market's `yes_bid`/`yes_ask` with these live values**
-(a ticker mapping to nulls is illiquid/unquoted — drop it from the subset rather
-than score a stale price). This guarantees every scored-and-recommended idea
-carries a live entry price.
+Read `/tmp/live_prices_${TS}.json` ({ticker: {yes_bid, yes_ask, last_price}}).
+**Immediately override each subset market's `yes_bid`/`yes_ask` with these live
+values right now** — before dispatching any signal agents in Step 2. A ticker
+mapping to nulls is illiquid/unquoted — drop it from the subset rather than run
+agents on a stale price. Carry the updated prices forward into Step 2 (agent
+dispatch) and Step 3 (signals file). This guarantees signal agents see the live
+market price, not the potentially-stale scout snapshot.
 
 If the file is empty or missing, log and stop:
 
@@ -180,7 +182,7 @@ scout signals, which are correlated with each other):
 
 | Agent | Args to pass in the prompt |
 |-------|----------------------------|
-| `polymarket-price-signal` | ticker, title, midpoint=`yes_ask` (int), hours_to_close |
+| `polymarket-price-signal` | ticker, title, midpoint = live `yes_ask` from `/tmp/live_prices_${TS}.json` (fallback: scout row `yes_ask`), hours_to_close |
 
 **Conditional (only when it applies — keeps dispatch load bounded):**
 
@@ -242,12 +244,12 @@ deep-signal subset additionally append the agent estimates you collected. Market
 outside the subset simply carry their two deterministic scout signals — that's
 fine; they still get scored and (if 2+ sources) recorded for the backtest.
 
-**Apply the live prices.** For every subset market, replace its `yes_bid`/`yes_ask`
-with the live values from `/tmp/live_prices_${TS}.json` (Step 1) before writing
-the signals file. These feed the edge math (Step 4) and the candidate entry price
-(Step 6), so the recommended ideas are priced off the live market, never the
-snapshot. (Coverage-set markets outside the subset keep snapshot prices — they
-are recorded for calibration, not recommended.)
+**Confirm live prices.** Subset markets already have their `yes_bid`/`yes_ask`
+updated from `/tmp/live_prices_${TS}.json` (done at the end of Step 1, before
+agent dispatch). Write these same live values into the signals file — do not
+fall back to the scout row prices for subset markets. Coverage-set markets
+outside the subset keep snapshot prices (recorded for calibration only, never
+recommended).
 
 Use the **Write** tool to create `/tmp/signals_<TS>.json` as an array of market
 objects:
