@@ -1,10 +1,18 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime
-from kalshi_trader.executor import TradeExecutor
-from kalshi_trader.risk import RiskManager
-from kalshi_trader.models import TradeIdea, RiskDecision, Side, OrderAction
+
+# DISABLED for this session — the user turned off all trade execution. The
+# TradeExecutor module is a hard-disabled guard (kalshi_trader/executor.py), so
+# this whole test module is skipped at collection time and never runs. Do NOT
+# re-enable until the user says it is okay. To restore: remove the skip below.
+pytest.skip("executor disabled for this session — no execution allowed",
+            allow_module_level=True)
+
+import asyncio  # noqa: E402
+from unittest.mock import AsyncMock, MagicMock  # noqa: E402
+from datetime import datetime  # noqa: E402
+from kalshi_trader.executor import TradeExecutor  # noqa: E402
+from kalshi_trader.risk import RiskManager  # noqa: E402
+from kalshi_trader.models import TradeIdea, RiskDecision, Side, OrderAction  # noqa: E402
 
 
 @pytest.fixture
@@ -91,7 +99,16 @@ async def test_executor_no_side_price_flip(mock_client, risk, approved_decision)
 
 @pytest.mark.asyncio
 async def test_live_demo_trade():
-    """Places a real $10 paper trade on the demo account. Skips if balance is zero."""
+    """Places a real $10 order on the demo account — opt-in only.
+
+    This is the one test in the suite that actually *executes* a trade. It is
+    gated behind KALSHI_ALLOW_LIVE_DEMO_TRADE=1 so a normal ``pytest tests/`` run
+    never sends an order (and never fails on demo-API connectivity). Set the env
+    var deliberately when you want to exercise the live demo path.
+    """
+    import os
+    if os.environ.get("KALSHI_ALLOW_LIVE_DEMO_TRADE") != "1":
+        pytest.skip("live demo trade disabled — set KALSHI_ALLOW_LIVE_DEMO_TRADE=1 to opt in")
     try:
         from kalshi_trader.client import KalshiClient
         from kalshi_trader.scanner import MarketScanner
