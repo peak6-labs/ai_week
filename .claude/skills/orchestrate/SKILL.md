@@ -80,10 +80,12 @@ Dispatch the **`market-scout`** agent with the `Agent` tool. Tell it explicitly
 to write its scored JSON to a path you control so you can read it back
 deterministically. Pass this prompt (substituting the real `TS`):
 
-> Scan and score the live Kalshi board. Write the full scored JSON (the
-> `score_markets.py --json` output) to `/tmp/market_scout_<TS>.json` and also
-> save your markdown report. In your final message, return the JSON path you
-> wrote and a one-line summary of the hottest themes.
+> Scan and score the live Kalshi board. You are in **pipeline mode**: write the
+> full scored JSON (the `score_markets.py --json` output) to
+> `/tmp/market_scout_<TS>.json` and do **NOT** write the markdown report or
+> enumerate events — generating it is slow and bloats the round-trip. In your
+> final message, return only the JSON path you wrote plus a one-line summary of
+> the hottest themes.
 
 When the agent returns, read `/tmp/market_scout_<TS>.json`. It is a list of event
 rows sorted by `average_score` descending. Each row has: `event_ticker`,
@@ -101,10 +103,16 @@ x), so we only spend those on a prioritized **deep-signal subset**.
 
 - **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
   scoring and, if it reaches 2+ sources, gets recorded for the backtest.
-- **Deep-signal subset (≤ ~15)** = the rows most worth an external lookup:
-  weather/climate markets (NOAA), sports (sportsbook), high-volume markets
-  (`volume_24h > 5000`, for polymarket/whale/order-flow), and the top rows by
-  `average_score`. Only these get Step 2's agent dispatch.
+- **Deep-signal subset (≤ ~40)** = the rows most worth an external lookup.
+  Prefer breadth: include **every** market that has a *category-specialized
+  independent* signal available — all weather/climate (NOAA), all sports
+  (sportsbook), all mentions (GDELT), all elections (FiveThirtyEight polls) —
+  plus high-volume markets (`volume_24h > 5000`, for polymarket/whale/order-flow)
+  and the top rows by `average_score`. These independent signals are the whole
+  point of widening; the cheap category scripts should hit as much of the board
+  as the ~40 cap and rate limits allow. (Scaling external signals to **all** ~200
+  markets is planned via a batched signal-runner; until that lands, widen toward
+  ~40 here.) Only this subset gets Step 2's agent dispatch.
 
 For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
 as the tradeable `ticker`.
@@ -138,11 +146,12 @@ If the file is empty or missing, log and stop:
 
 ## Step 2 — Dispatch signal agents in parallel
 
-Process the **deep-signal subset** (≤ ~15) in **batches of 5**. For each batch,
-spawn all applicable signal agents **in a single message** (multiple `Agent`
-tool calls) so they run concurrently. Wait for the whole batch before starting
-the next. This keeps concurrent API load bounded — never fan out the whole board
-at once. The rest of the coverage set rides on its deterministic scout signals.
+Process the **deep-signal subset** (≤ ~40) in **batches of 5 markets**. For each
+batch, spawn all applicable signal agents **in a single message** (multiple
+`Agent` tool calls) so they run concurrently. Wait for the whole batch before
+starting the next. Batching is what keeps concurrent API load bounded while still
+covering a wide subset — never fan out the whole board in one message. The rest
+of the coverage set rides on its deterministic scout signals.
 
 Log before each batch:
 
