@@ -72,12 +72,14 @@ class MarketScanner:
         cursor = ""
         page = 0
         while True:
-            resp = await self._client.get_markets(status="open", cursor=cursor, limit=1000)
+            response = await with_retry(
+                self._client.get_markets, status="open", cursor=cursor, limit=1000
+            )
             page += 1
-            batch = resp.get("markets", [])
+            batch = response.get("markets", [])
             for market_data in batch:
                 markets.append(self._parse_market(market_data))
-            cursor = resp.get("cursor", "")
+            cursor = response.get("cursor", "")
             _log.info("Page %d: %d this page, %d total so far%s",
                       page, len(batch), len(markets),
                       "" if cursor else " — last page")
@@ -87,6 +89,7 @@ class MarketScanner:
                 markets = markets[:limit]
                 _log.info("Reached --limit %d, stopping early", limit)
                 break
+            await asyncio.sleep(0.1)  # pace requests between pages to stay under the rate limit
         if category:
             markets = [market for market in markets if market.category == category]
         return markets
@@ -113,8 +116,8 @@ class MarketScanner:
         async def _fetch(event_ticker: str) -> tuple[str, str]:
             async with concurrency_semaphore:
                 try:
-                    resp = await self._client.get(f"/events/{event_ticker}", {})
-                    category = resp.get("event", {}).get("category", "") or ""
+                    response = await with_retry(self._client.get, f"/events/{event_ticker}", {})
+                    category = response.get("event", {}).get("category", "") or ""
                     return event_ticker, category.lower()
                 except Exception:
                     return event_ticker, "unknown"
