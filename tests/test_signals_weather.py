@@ -86,6 +86,37 @@ def test_build_weather_signal_temp_below():
     assert sig.probability > 0.5
 
 
+def test_build_weather_signal_temp_high_below_threshold_is_low_prob():
+    # Regression: forecast HIGH is 83°F, threshold <79°F. P(high < 79) must be
+    # LOW — the high is above the threshold. The old code centered on the
+    # daily-average midpoint (72°F) and returned ~0.90, badly wrong.
+    forecast = {"temp_high": 83, "temp_low": 61, "precip_pct": 0, "data_age_minutes": 30}
+    sig = build_weather_signal(
+        ticker="KXHIGHTDC-26JUN03-T79", metric="temp_high",
+        threshold=79.0, operator="below", forecast=forecast,
+    )
+    assert sig.probability < 0.35
+
+
+def test_build_weather_signal_temp_high_above_threshold_is_high_prob():
+    forecast = {"temp_high": 83, "temp_low": 61, "precip_pct": 0, "data_age_minutes": 30}
+    sig = build_weather_signal(
+        ticker="KXHIGHTDC-26JUN03-T79", metric="temp_high",
+        threshold=79.0, operator="above", forecast=forecast,
+    )
+    assert sig.probability > 0.65
+
+
+def test_build_weather_signal_temp_low_centered_on_low_not_midpoint():
+    # Forecast LOW is 60°F; P(low < 45) must be near-zero (low is well above 45).
+    forecast = {"temp_high": 82, "temp_low": 60, "precip_pct": 0, "data_age_minutes": 30}
+    sig = build_weather_signal(
+        ticker="KXLOWTBOS-26JUN03-T45", metric="temp_low",
+        threshold=45.0, operator="below", forecast=forecast,
+    )
+    assert sig.probability < 0.10
+
+
 def test_build_weather_signal_temp_uncertainty():
     forecast = {"temp_high": 90, "temp_low": 70, "precip_pct": 0, "data_age_minutes": 30}
     sig = build_weather_signal(

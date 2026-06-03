@@ -83,6 +83,56 @@ def compute_bias_adjustment(
     return adjusted
 
 
+def build_bias_estimate(
+    ticker: str,
+    title: str,
+    category: str,
+    hours_to_resolution: float,
+    price_cents: float,
+) -> SignalEstimate | None:
+    """Deterministic kalshi_bias signal — no LLM.
+
+    Applies the calibration-bias correction (favorite-longshot + political
+    underconfidence, horizon-scaled) directly. Returns a SignalEstimate when the
+    correction is meaningful, else None (no edge). This is what the LLM agent was
+    supposed to do, but reliably and in microseconds.
+    """
+    if price_cents <= 0 or price_cents >= 100:
+        return None
+    price_prob = price_cents / 100.0
+    is_political = _is_political(category, title)
+    adjusted = compute_bias_adjustment(price_prob, is_political, hours_to_resolution)
+
+    delta = adjusted - price_prob
+    if abs(delta) < 0.01:
+        return None  # no meaningful edge
+
+    bias_type = "political_underconfidence" if is_political else "favorite_longshot"
+    direction = "yes" if delta > 0 else "no"
+    narrative = (
+        f"{bias_type} bias: {price_prob*100:.1f}¢ market → corrected "
+        f"{adjusted*100:.1f}¢ ({delta*100:+.1f}¢, push {direction})."
+    )
+    return SignalEstimate(
+        source="kalshi_bias",
+        probability=round(adjusted, 4),
+        uncertainty=float(cfg.get("uncertainty_kalshi_bias")),
+        weight=float(cfg.get("weight_kalshi_bias")),
+        data_issued_at=datetime.now(tz=timezone.utc),
+        metadata={
+            "ticker": ticker,
+            "narrative": narrative,
+            "data_quality": "fresh",
+            "raw_prob": round(price_prob, 4),
+            "corrected_prob": round(adjusted, 4),
+            "delta_cents": round(delta * 100, 2),
+            "bias_type": bias_type,
+            "direction": direction,
+            "is_political": is_political,
+        },
+    )
+
+
 _SCHEMAS: list[dict] = [
     {
         "name": "apply_bias_corrections",

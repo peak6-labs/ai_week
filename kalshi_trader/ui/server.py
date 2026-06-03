@@ -26,14 +26,59 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 # ---------------------------------------------------------------------------
-# Trading loop placeholder
+# Kalshi account poller — runs independently of the trading loop
 # ---------------------------------------------------------------------------
 
-async def _trading_loop(trading_state: TradingState) -> None:
-    """Placeholder trading loop.  The real loop will replace this later."""
-    trading_state.log("trading loop started")
-    while True:
-        await asyncio.sleep(3600)
+async def _poll_kalshi_account(trading_state: TradingState) -> None:
+    """Poll Kalshi every 30 s for balance and positions, update TradingState."""
+    from kalshi_trader.client import KalshiClient
+
+    await asyncio.sleep(2)  # brief delay so server is fully up first
+    trading_state.log("Account poller started")
+
+    async with KalshiClient() as client:
+        while True:
+            try:
+                balance_resp = await client.get_balance()
+                balance_cents = balance_resp.get("balance", 0) or 0
+                trading_state.balance_dollars = balance_cents / 100.0
+
+                positions_resp = await client.get_positions()
+                raw_positions = positions_resp.get("market_positions") or []
+
+                total_exposure = 0.0
+                total_pnl = 0.0
+                parsed: list[dict] = []
+                for p in raw_positions:
+                    qty_fp = float(p.get("position_fp", "0") or 0)
+                    if qty_fp == 0:
+                        continue
+                    side = "YES" if qty_fp > 0 else "NO"
+                    qty = abs(int(qty_fp))
+                    exposure = float(p.get("market_exposure_dollars", "0") or 0)
+                    pnl = float(p.get("realized_pnl_dollars", "0") or 0)
+                    total_exposure += exposure
+                    total_pnl += pnl
+                    ticker = p.get("ticker", "")
+                    parsed.append({
+                        "ticker": ticker,
+                        "side": side,
+                        "quantity": qty,
+                        "avg_price_dollars": round(exposure / qty, 4) if qty else 0,
+                        "current_price_dollars": None,
+                        "unrealized_pnl_dollars": pnl,
+                    })
+
+                trading_state.positions = parsed
+                trading_state.total_exposure_dollars = total_exposure
+                trading_state.daily_pnl_dollars = total_pnl
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("Account poll failed: %s", exc)
+
+            await asyncio.sleep(30)
 
 
 # ---------------------------------------------------------------------------
@@ -64,8 +109,11 @@ def create_app(
 
     # Attach shared objects to app state so route handlers can reach them.
     app.state.trading_state = trading_state
-    app.state.loop_task: asyncio.Task | None = None
     app.state.config_manager = config_manager
+
+    @app.on_event("startup")
+    async def _start_account_poller() -> None:
+        asyncio.create_task(_poll_kalshi_account(trading_state))
 
     # ------------------------------------------------------------------
     # Routes
@@ -103,6 +151,26 @@ def create_app(
             return JSONResponse({"errors": errors}, status_code=422)
         return JSONResponse({"ok": True})
 
+    @app.post("/api/state")
+    async def post_state(request: Request) -> JSONResponse:
+        """Merge a partial state update pushed by the orchestrate pipeline.
+
+        Accepts a JSON object with any subset of: ``cycle_number``,
+        ``last_cycle_at``, ``daily_pnl_dollars``, ``positions``,
+        ``recent_ideas``, ``agent_statuses``. Unknown keys are ignored. Always
+        returns 200 — telemetry must never break the pipeline. (Balance and
+        live positions are owned by the account poller; the pipeline should not
+        push those.)
+        """
+        state: TradingState = request.app.state.trading_state
+        try:
+            body: dict = await request.json()
+            if isinstance(body, dict):
+                state.apply_update(body)
+        except Exception:
+            pass
+        return JSONResponse({"ok": True})
+
     @app.post("/api/log")
     async def post_log(request: Request) -> JSONResponse:
         """Append a log line from an external agent or script.
@@ -123,6 +191,25 @@ def create_app(
         except Exception:
             pass
         return JSONResponse({"ok": True})
+
+    @app.get("/api/ideas/history")
+    async def get_ideas_history() -> JSONResponse:
+        """Return every recorded recommendation joined with its marks timeline.
+
+        Read-only view of the paper-trade store: each idea carries its record-time
+        fields (ticker, side, disposition, prices, edge, sources, status) plus an
+        ordered ``marks`` list of (checked_at, current_value_cents, pnl_cents,
+        resolved, elapsed_seconds) snapshots so the UI can plot how each idea
+        moved over the intervals after it was presented. Never executes anything.
+        """
+        from kalshi_trader import paper
+
+        try:
+            ideas = paper.recommendations_with_marks()
+        except Exception as exc:  # never let a malformed store break the page
+            logger.warning("ideas history read failed: %s", exc)
+            ideas = []
+        return JSONResponse({"ideas": ideas})
 
     @app.post("/api/ideas")
     async def post_ideas(request: Request) -> JSONResponse:
@@ -168,43 +255,6 @@ def create_app(
             await insert_reviewed_idea(idea, "rejected")
         except Exception as exc:
             logger.error("DB save failed for rejected idea %s: %s", idea_id, exc)
-        return JSONResponse({"ok": True})
-
-    @app.post("/api/system/start")
-    async def system_start(request: Request) -> JSONResponse:
-        """Start the trading loop asyncio Task."""
-        state: TradingState = request.app.state.trading_state
-
-        if state.system_running:
-            return JSONResponse({"error": "already running"}, status_code=409)
-
-        state.system_running = True
-        task = asyncio.create_task(_trading_loop(state))
-
-        def _on_done(t: asyncio.Task) -> None:
-            exc = t.exception() if not t.cancelled() else None
-            if exc is not None:
-                state.system_running = False
-                state.log(f"ERROR: {exc}")
-
-        task.add_done_callback(_on_done)
-        request.app.state.loop_task = task
-        return JSONResponse({"ok": True})
-
-    @app.post("/api/system/stop")
-    async def system_stop(request: Request) -> JSONResponse:
-        """Cancel the trading loop asyncio Task."""
-        state: TradingState = request.app.state.trading_state
-
-        if not state.system_running:
-            return JSONResponse({"error": "not running"}, status_code=409)
-
-        existing: asyncio.Task | None = request.app.state.loop_task
-        if existing is not None and not existing.done():
-            existing.cancel()
-
-        state.system_running = False
-        request.app.state.loop_task = None
         return JSONResponse({"ok": True})
 
     return app

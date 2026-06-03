@@ -112,6 +112,12 @@ class ScoredMarket:
     weekly_hl_score: Optional[float] = None
     ofi_score: Optional[float] = None
     orderbook_skew_score: Optional[float] = None
+    # Signed microstructure components (direction, not magnitude) for the
+    # deterministic microstructure trade signal. Populated during scoring/enrich.
+    signed_momentum_cents: Optional[float] = None
+    range_position: Optional[float] = None
+    signed_ofi: Optional[float] = None
+    signed_orderbook_skew: Optional[float] = None
 
 
 @dataclass

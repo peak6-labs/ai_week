@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import json
 import sys
+import kalshi_trader.config  # noqa: F401 — loads .env so API keys are set
 from kalshi_trader.agents.polymarket_price_agent import PolymarketPriceAgent
 from kalshi_trader.agents.parsing import estimate_to_dict
 
@@ -16,7 +17,8 @@ def main() -> None:
     parser.add_argument("--ticker", required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--midpoint", type=float, required=True, help="Kalshi yes midpoint in cents (0-100)")
-    parser.add_argument("--open-interest", type=int, required=True, dest="open_interest")
+    parser.add_argument("--open-interest", type=int, default=0, dest="open_interest",
+                        help="Accepted for caller compatibility; not used by the price agent.")
     parser.add_argument("--hours-to-close", type=float, required=True, dest="hours_to_close")
     args = parser.parse_args()
 
@@ -25,7 +27,7 @@ def main() -> None:
         try:
             estimates = await agent.run(
                 args.ticker, args.title,
-                args.midpoint, args.open_interest, args.hours_to_close,
+                args.midpoint, args.hours_to_close,
             )
             print(json.dumps([estimate_to_dict(e) for e in estimates], default=str))
         except Exception as exc:

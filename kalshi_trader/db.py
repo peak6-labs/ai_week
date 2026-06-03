@@ -16,6 +16,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+# Route SSL through the system trust store so the Supabase httpx client works
+# behind the corporate proxy (Zscaler self-signed cert). inject_into_ssl()
+# patches the stdlib ssl module httpx builds its default context from.
+try:
+    import truststore as _truststore
+    _truststore.inject_into_ssl()
+except Exception:  # pragma: no cover - truststore optional
+    pass
+
 from supabase import AsyncClient, acreate_client
 
 from kalshi_trader import config
@@ -210,6 +219,77 @@ async def insert_reviewed_idea(
     }
     resp = await client.table("reviewed_ideas").insert(row).execute()
     return resp.data[0]["id"]
+
+
+# ---------------------------------------------------------------------------
+# paper-trade calibration (recommendations + marks + cycles)
+# Tables are created by sql/001_paper_calibration.sql. These helpers no-op
+# gracefully (caller wraps in try/except) until that migration is applied.
+# ---------------------------------------------------------------------------
+
+async def insert_recommendation(rec: dict) -> None:
+    """Insert one paper recommendation. ``rec`` carries the local rec_id as id."""
+    client = await _get_client()
+    row = {
+        "id": rec["rec_id"],
+        "cycle_ts": rec.get("cycle_ts", ""),
+        "ticker": rec["ticker"],
+        "side": rec["side"],
+        "entry_price_cents": rec["entry_price_cents"],
+        "predicted_prob": rec.get("predicted_prob"),
+        "edge_cents": rec.get("edge_cents"),
+        "n_sources": rec.get("n_sources"),
+        "sources": rec.get("sources", []),
+        "category": rec.get("category", ""),
+        "suggested_size_dollars": rec.get("suggested_size_dollars"),
+        "status": "open",
+        "disposition": rec.get("disposition", "candidate"),
+        "paper_only": True,
+    }
+    await client.table("recommendations").upsert(row, on_conflict="id").execute()
+
+
+async def insert_recommendation_mark(recommendation_id: str, mark: dict) -> None:
+    """Insert one mark-to-market check for a recommendation."""
+    client = await _get_client()
+    await client.table("recommendation_marks").insert({
+        "recommendation_id": recommendation_id,
+        "current_value_cents": mark.get("current_value_cents"),
+        "pnl_cents": mark.get("pnl_cents"),
+        "would_profit": mark.get("would_profit"),
+        "resolved": bool(mark.get("resolved")),
+    }).execute()
+
+
+async def resolve_recommendation(recommendation_id: str) -> None:
+    """Mark a recommendation resolved (idempotent)."""
+    client = await _get_client()
+    await (
+        client.table("recommendations")
+        .update({"status": "resolved"})
+        .eq("id", recommendation_id)
+        .execute()
+    )
+
+
+async def upsert_cycle(cycle_ts: str, stats: dict) -> None:
+    """Record per-cycle pipeline stats (markets scored, candidates, ideas)."""
+    client = await _get_client()
+    row = {"cycle_ts": cycle_ts, **stats}
+    await client.table("cycles").upsert(row, on_conflict="cycle_ts").execute()
+
+
+async def upsert_scored_markets(rows: list[dict]) -> int:
+    """Upsert per-cycle scored-market snapshots in batches. Returns rows written."""
+    if not rows:
+        return 0
+    client = await _get_client()
+    written = 0
+    for i in range(0, len(rows), 500):
+        batch = rows[i:i + 500]
+        await client.table("scored_markets").upsert(batch, on_conflict="cycle_ts,ticker").execute()
+        written += len(batch)
+    return written
 
 
 async def close_trade(
@@ -431,6 +511,109 @@ async def upsert_polymarket_markets(markets: list[dict]) -> int:
             )
 
     return total
+
+
+# ---------------------------------------------------------------------------
+# markets (Kalshi catalog — live_markets.json snapshot ingest)
+# ---------------------------------------------------------------------------
+
+_MARKETS_BATCH_SIZE = 500
+
+
+def _to_timestamp(raw_value) -> str | None:
+    """Normalise a Kalshi close_time string to an ISO UTC timestamp, or None."""
+    if not raw_value:
+        return None
+    if isinstance(raw_value, str):
+        return raw_value.replace("Z", "+00:00")
+    return None
+
+
+def _to_number(raw_value) -> float | None:
+    """Coerce a value to float, returning None when missing or unparseable."""
+    if raw_value is None or raw_value == "":
+        return None
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_integer(raw_value) -> int | None:
+    """Coerce a value to int, returning None when missing or unparseable."""
+    if raw_value is None or raw_value == "":
+        return None
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def prepare_market_row(market: dict, snapshot_at: str | None = None) -> dict:
+    """Map a live_markets.json market dict to a public.markets row.
+
+    Only fields the table has are kept; the full source dict is preserved in
+    ``raw`` for fidelity. ``snapshot_at`` is the snapshot's saved_at timestamp.
+    """
+    return {
+        "ticker": market["ticker"],
+        "event_ticker": market.get("event_ticker") or None,
+        "series_ticker": market.get("series_ticker") or None,
+        "title": market.get("title") or None,
+        "category": market.get("category") or None,
+        "status": market.get("status") or None,
+        "yes_bid": _to_number(market.get("yes_bid")),
+        "yes_ask": _to_number(market.get("yes_ask")),
+        "last_price": _to_number(market.get("last_price")),
+        "volume_24h": _to_integer(market.get("volume_24h")),
+        "open_interest": _to_integer(market.get("open_interest")),
+        "close_time": _to_timestamp(market.get("close_time")),
+        "raw": market,
+        "snapshot_at": snapshot_at,
+        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+
+async def upsert_markets(rows: list[dict]) -> int:
+    """Upsert prepared public.markets rows in batches of 500.
+
+    ``rows`` must already be prepared via ``prepare_market_row`` (each carries a
+    ticker primary key). Dedupes on ticker. Best-effort per batch — a failed
+    batch is logged and skipped. Returns the number of rows successfully written.
+    """
+    if not rows:
+        return 0
+
+    client = await _get_client()
+    written = 0
+    for start_index in range(0, len(rows), _MARKETS_BATCH_SIZE):
+        batch = rows[start_index : start_index + _MARKETS_BATCH_SIZE]
+        try:
+            await (
+                client.table("markets")
+                .upsert(batch, on_conflict="ticker")
+                .execute()
+            )
+            written += len(batch)
+        except Exception as caught_exception:
+            logger.warning(
+                "markets upsert failed for batch %d-%d: %s",
+                start_index, start_index + len(batch) - 1, caught_exception,
+            )
+
+    return written
+
+
+async def count_markets() -> int:
+    """Return the total row count of the public.markets table."""
+    client = await _get_client()
+    response = await (
+        client.table("markets")
+        .select("ticker", count="exact")
+        .limit(1)
+        .execute()
+    )
+    return response.count or 0
 
 
 # ---------------------------------------------------------------------------

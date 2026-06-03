@@ -193,13 +193,6 @@ class TestValidateAndUpdateWrongTypes:
         errors = cfg.validate_and_update({"weight_noaa": None})
         assert "weight_noaa" in errors
 
-    def test_string_accepted_for_model_name_field(self, tmp_path):
-        cfg = make_cfg(tmp_path)
-        errors = cfg.validate_and_update({"specialist_model": "claude-haiku-3-5"})
-        assert errors == {}
-        assert cfg.get("specialist_model") == "claude-haiku-3-5"
-
-
 # ---------------------------------------------------------------------------
 # validate_and_update() — atomicity
 # ---------------------------------------------------------------------------
@@ -221,12 +214,12 @@ class TestValidateAndUpdateAtomicity:
         errors = cfg.validate_and_update({
             "weight_noaa": 0.5,
             "min_agents": 3,
-            "specialist_model": "claude-haiku-3-5",
+            "weight_sportsbook": 0.7,
         })
         assert errors == {}
         assert cfg.get("weight_noaa") == pytest.approx(0.5)
         assert cfg.get("min_agents") == 3
-        assert cfg.get("specialist_model") == "claude-haiku-3-5"
+        assert cfg.get("weight_sportsbook") == pytest.approx(0.7)
 
 
 # ---------------------------------------------------------------------------

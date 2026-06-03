@@ -36,8 +36,14 @@ def build_weather_signal(
     if metric in ("temp_high", "temp_low"):
         high = forecast["temp_high"] if forecast.get("temp_high") is not None else 85.0
         low = forecast["temp_low"] if forecast.get("temp_low") is not None else 65.0
-        mean = (high + low) / 2.0
-        std = max((high - low) / 4.0, 1.0)
+        # Center the distribution on the metric actually being traded — the daily
+        # HIGH for temp_high markets, the daily LOW for temp_low — NOT the
+        # daily-average midpoint (which put temp_high markets ~10°F below the
+        # forecast high and produced backwards probabilities). std is a
+        # forecast-error proxy from the diurnal range; its exact calibration is
+        # left to the paper-trade loop (#25).
+        mean = high if metric == "temp_high" else low
+        std = max((high - low) / 6.0, 2.0)
         dist = scipy.stats.norm(mean, std)
         raw_prob = float(dist.sf(threshold) if operator == "above" else dist.cdf(threshold))
         uncertainty = cfg.get("uncertainty_noaa_temp")

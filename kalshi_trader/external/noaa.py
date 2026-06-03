@@ -1,10 +1,27 @@
 from __future__ import annotations
 import re
+import ssl
 from datetime import date, datetime
 import aiohttp
 
 NWS_BASE = "https://api.weather.gov"
 _HEADERS = {"User-Agent": "kalshi-trader/1.0 scorley@peak6.com", "Accept": "application/geo+json"}
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    """SSL context that trusts the OS trust store.
+
+    Behind the corporate proxy (Zscaler) the NWS cert chain ends in a
+    self-signed root that only lives in the system trust store, not certifi's
+    bundle — so a default aiohttp context fails verification. truststore reads
+    the OS store and fixes this (same reason db.py injects truststore for httpx).
+    Falls back to the default context if truststore is unavailable.
+    """
+    try:
+        import truststore
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except Exception:  # pragma: no cover - truststore optional
+        return ssl.create_default_context()
 
 
 def _parse_wind_mph(wind_str: str) -> float:
@@ -22,7 +39,8 @@ class NOAAClient:
 
     async def _get(self, url: str) -> dict:
         if self._session is None:
-            self._session = aiohttp.ClientSession(headers=_HEADERS)
+            connector = aiohttp.TCPConnector(ssl=_build_ssl_context())
+            self._session = aiohttp.ClientSession(headers=_HEADERS, connector=connector)
         async with self._session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             resp.raise_for_status()
             return await resp.json()

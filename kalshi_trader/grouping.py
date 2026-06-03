@@ -7,9 +7,13 @@ dashboard's /api/ideas endpoint — so all three present events identically.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from kalshi_trader.actionability.scorer import MarketScorer
+from kalshi_trader.agents.kalshi_bias_agent import build_bias_estimate
+from kalshi_trader.agents.parsing import estimate_to_dict
 from kalshi_trader.models import ScoredMarket
+from kalshi_trader.signals.microstructure import estimate_from_signed
 from kalshi_trader.web_links import kalshi_market_url
 
 
@@ -65,6 +69,33 @@ def serialize_event_group(
     market = best_market.market
     spread_cents = market.yes_ask - market.yes_bid
     event_ticker = market.event_ticker or market.ticker
+    midpoint_cents = (market.yes_bid + market.yes_ask) / 2.0
+    close_time = market.close_time
+    if close_time.tzinfo is None:
+        close_time = close_time.replace(tzinfo=timezone.utc)
+    hours_to_close = max(
+        0.0, (close_time - datetime.now(timezone.utc)).total_seconds() / 3600.0
+    )
+
+    # Deterministic signal estimates computed from data the scout already
+    # fetched — emitted so the pipeline gets real signals with no extra calls.
+    signal_estimates: list[dict] = []
+    microstructure = estimate_from_signed(
+        price_cents=midpoint_cents,
+        momentum_cents=best_market.signed_momentum_cents,
+        ofi=best_market.signed_ofi,
+        skew=best_market.signed_orderbook_skew,
+        position=best_market.range_position,
+        ticker=market.ticker,
+    )
+    if microstructure is not None:
+        signal_estimates.append(estimate_to_dict(microstructure))
+    bias = build_bias_estimate(
+        market.ticker, market.title, market.category, hours_to_close, midpoint_cents
+    )
+    if bias is not None:
+        signal_estimates.append(estimate_to_dict(bias))
+
     return {
         "event_ticker": event_ticker,
         "best_market_ticker": market.ticker,
@@ -82,6 +113,7 @@ def serialize_event_group(
         "open_interest": market.open_interest,
         "volume_24h": market.volume_24h,
         "signals": MarketScorer._scores_dict(best_market),
+        "signal_estimates": signal_estimates,
         "close_time": market.close_time.isoformat(),
         "series_url": kalshi_market_url(event_ticker),
     }

@@ -33,36 +33,51 @@ report plus an inline summary. You generate ideas; a human decides.
 - **No invention.** Every "why now" claim must trace to a signal value in the
   data. If the evidence is thin (low coverage), say so rather than overstating.
 
+## Pipeline mode (read this first)
+
+If the caller gave you an **explicit output JSON path** (e.g. the orchestrate
+pipeline passes `/tmp/market_scout_<TS>.json`), you are in **pipeline mode**. Your
+*only* deliverables are: (1) the scored JSON written to that path, and (2) a
+**two-line final message** — the exact JSON path plus a one-line hot-theme
+summary. **Do NOT write the markdown report, and do NOT enumerate the events in
+your final message.** Generating the full report/table is slow and bloats the
+result round-trip (it has caused dispatch failures). Just do step 1 below, then
+stop and return the path. Skip steps 2–7 entirely in pipeline mode.
+
 ## Workflow
 
 1. **Generate the data (snapshot-first — this is the fast path).** Work from the
-   repo root (`/Users/llewis/ai_week`). The slow part of a full-board scan is
+   repo root (`/Users/scorley/code`). The slow part of a full-board scan is
    pulling the entire ~480-page market list from the API (minutes). The actual
    signal data — candles, trades, orderbooks — is always fetched live and is
-   cheap. So score from a **same-day market-list snapshot**: the signals stay
+   cheap, and the top markets get live orderbook bid/ask enrichment at score
+   time. So score from the existing market-list snapshot: the signals stay
    current even when the market list is a few hours old, and a run takes seconds
    instead of minutes.
 
-   a. Check the snapshot's age: `stat -f '%Sm' live_markets.json`. If it exists
-      and is from **today**, use it. If it is missing or stale, refresh it ONCE
-      first — this is the slow ~480-page pull:
-
-      ```bash
-      KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/fetch_markets.py
-      ```
+   a. **Do NOT refresh the snapshot.** Always score from the existing
+      `live_markets.json` as-is — never run `scripts/fetch_markets.py`. The
+      ~480-page refresh is slow and heavy on the API; the snapshot being a few
+      hours (or a day) old is fine because live signals and top-market orderbook
+      prices are re-fetched at score time. If `live_markets.json` is missing
+      entirely, stop and report that — do not trigger a refresh yourself.
 
    b. Score from the snapshot and emit JSON (seconds when the candle cache is
-      warm):
+      warm). If the **caller gave you an explicit output JSON path** (e.g. the
+      orchestrate pipeline passes one so it can read the file back), write there;
+      otherwise default to a timestamped `/tmp` path:
 
       ```bash
-      TS=$(date -u +%Y%m%dT%H%M%SZ)
+      OUTPUT_JSON="${OUTPUT_JSON:-/tmp/market_scout_$(date -u +%Y%m%dT%H%M%SZ).json}"
       KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/score_markets.py \
-          --json --markets-file live_markets.json > "/tmp/market_scout_$TS.json"
-      echo "TS=$TS  ->  /tmp/market_scout_$TS.json"
+          --json --markets-file live_markets.json > "$OUTPUT_JSON"
+      echo "wrote -> $OUTPUT_JSON"
       ```
 
-   Note the `TS` it prints; reuse it for the report filename. Set a high Bash
-   timeout (e.g. 600000 ms) to cover a snapshot refresh or a cold candle cache.
+   Reuse the timestamp in `OUTPUT_JSON` for the report filename, and **report the
+   exact JSON path back in your final message** so the caller can read it. Set a
+   high Bash timeout (e.g. 600000 ms) to cover a snapshot refresh or a cold
+   candle cache.
 
 2. **Read the JSON.** `Read` `/tmp/market_scout_<TS>.json`. It is a list of event
    rows, already sorted by `average_score` descending. Each row has:

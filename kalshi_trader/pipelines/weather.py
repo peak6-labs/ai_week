@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import json
 import sys
+import kalshi_trader.config  # noqa: F401 — loads .env so API keys are set
 from kalshi_trader.agents.weather_agent import WeatherAgent
 from kalshi_trader.agents.parsing import estimate_to_dict
 

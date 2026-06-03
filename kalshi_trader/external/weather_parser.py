@@ -23,7 +23,65 @@ CITY_COORDS: dict[str, tuple[float, float]] = {
     "las vegas": (36.1699, -115.1398),
     "portland": (45.5051, -122.6750),
     "nashville": (36.1627, -86.7816),
+    "san francisco": (37.7749, -122.4194),
+    "austin": (30.2672, -97.7431),
+    "washington": (38.9072, -77.0369),
 }
+
+# Kalshi encodes the city in the *ticker* (e.g. KXLOWTBOS = low-temp Boston),
+# not always in the title. Map the ticker city code → CITY_COORDS key. Used as a
+# fallback when the title has no recognizable city name.
+TICKER_CITY_CODES: dict[str, str] = {
+    "NYC": "new york", "NY": "new york",
+    "LAX": "los angeles", "LA": "los angeles",
+    "CHI": "chicago", "MIA": "miami", "HOU": "houston", "PHIL": "philadelphia",
+    "PHX": "phoenix", "PHO": "phoenix",
+    "DAL": "dallas", "SEA": "seattle", "BOS": "boston", "DEN": "denver",
+    "ATL": "atlanta", "MSP": "minneapolis", "MIN": "minneapolis",
+    "LV": "las vegas", "LAS": "las vegas",
+    "POR": "portland", "PDX": "portland", "NAS": "nashville",
+    "SFO": "san francisco", "SF": "san francisco",
+    "AUS": "austin", "DC": "washington", "DCA": "washington",
+}
+
+# Ticker metric prefixes (after the leading KX), longest first so HIGHT beats HIGH.
+_TICKER_METRIC_PREFIXES: list[tuple[str, str]] = [
+    ("LOWTEMP", "temp_low"), ("HIGHTEMP", "temp_high"),
+    ("LOWT", "temp_low"), ("HIGHT", "temp_high"),
+    ("LOW", "temp_low"), ("HIGH", "temp_high"),
+    ("RAIN", "precipitation"), ("WIND", "wind"),
+]
+
+
+def _city_from_ticker(ticker: str) -> tuple[str, float, float] | None:
+    """Extract (city, lat, lon) from a Kalshi weather ticker's first segment.
+
+    Strips the leading ``KX`` and a known metric prefix, then matches the
+    remaining leading letters against TICKER_CITY_CODES (longest code first).
+    """
+    head = ticker.upper().split("-", 1)[0]
+    if head.startswith("KX"):
+        head = head[2:]
+    for prefix, _metric in _TICKER_METRIC_PREFIXES:
+        if head.startswith(prefix):
+            head = head[len(prefix):]
+            break
+    for code in sorted(TICKER_CITY_CODES, key=len, reverse=True):
+        if head.startswith(code):
+            city_name = TICKER_CITY_CODES[code]
+            lat, lon = CITY_COORDS[city_name]
+            return city_name, lat, lon
+    return None
+
+
+def _metric_from_ticker(ticker: str) -> str | None:
+    head = ticker.upper().split("-", 1)[0]
+    if head.startswith("KX"):
+        head = head[2:]
+    for prefix, metric in _TICKER_METRIC_PREFIXES:
+        if head.startswith(prefix):
+            return metric
+    return None
 
 _MONTH_MAP = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -42,7 +100,9 @@ def parse_title(ticker: str, title: str) -> dict | None:
     """Parse Kalshi weather market title → structured question. Returns None on no match."""
     t = title.lower()
 
-    # City — try longer names first to avoid partial matches
+    # City — try the title first (longer names first to avoid partial matches),
+    # then fall back to the city code embedded in the ticker (Kalshi's compact
+    # weather titles, e.g. KXLOWTBOS, often omit the city from the title).
     city_name = lat = lon = None
     for name in sorted(CITY_COORDS, key=len, reverse=True):
         if name in t:
@@ -50,34 +110,54 @@ def parse_title(ticker: str, title: str) -> dict | None:
             lat, lon = CITY_COORDS[name]
             break
     if lat is None:
+        from_ticker = _city_from_ticker(ticker)
+        if from_ticker is not None:
+            city_name, lat, lon = from_ticker
+    if lat is None:
         return None
 
-    # Metric
-    if "high temp" in t or "high temperature" in t:
+    # Metric — title phrasing first (incl. "minimum/maximum temperature"), then
+    # the ticker prefix (LOWT/HIGHT) as a fallback.
+    if "high temp" in t or "high temperature" in t or "maximum temp" in t:
         metric = "temp_high"
-    elif "low temp" in t or "low temperature" in t:
+    elif "low temp" in t or "low temperature" in t or "minimum temp" in t:
         metric = "temp_low"
     elif "rain" in t or "precipitation" in t or "precip" in t:
         metric = "precipitation"
     elif "wind" in t:
         metric = "wind"
     else:
-        return None
+        metric = _metric_from_ticker(ticker)
+        if metric is None:
+            return None
 
-    # Operator
-    if any(kw in t for kw in ["above", "exceed", "or more", "at least", "over"]):
+    # Operator — symbols (< / >) take precedence, then keyword phrasing.
+    if "<" in title:
+        operator = "below"
+    elif ">" in title:
+        operator = "above"
+    elif any(kw in t for kw in ["above", "exceed", "or more", "at least", "over"]):
         operator = "above"
     elif any(kw in t for kw in ["below", "under", "less than"]):
         operator = "below"
     else:
         operator = "above"
 
-    # Threshold (temperature °F or wind mph)
+    # Threshold — a number tied to a comparator (< / > or a keyword) or written
+    # with °F. Never a bare integer (which could be the day-of-month in the date).
     threshold = None
-    m = re.search(r"(\d+)\s*°?\s*f\b", t)
+    m = re.search(r"[<>]\s*(\d+(?:\.\d+)?)", t)
     if m:
         threshold = float(m.group(1))
-    elif metric == "wind":
+    if threshold is None:
+        m = re.search(r"(\d+(?:\.\d+)?)\s*°?\s*f\b", t)
+        if m:
+            threshold = float(m.group(1))
+    if threshold is None:
+        m = re.search(r"(?:above|below|under|over|exceed|at least|or more|less than)\s*(\d+(?:\.\d+)?)", t)
+        if m:
+            threshold = float(m.group(1))
+    if threshold is None and metric == "wind":
         m = re.search(r"(\d+)\s*mph", t)
         if m:
             threshold = float(m.group(1))
@@ -85,7 +165,8 @@ def parse_title(ticker: str, title: str) -> dict | None:
     if threshold is None and metric not in ("precipitation",):
         return None
 
-    # Date
+    # Date — month/day from the title, plus an explicit 4-digit year if present
+    # (otherwise assume the current year).
     target_date = None
     m = re.search(
         r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
@@ -96,7 +177,8 @@ def parse_title(ticker: str, title: str) -> dict | None:
     if m:
         month = _MONTH_MAP.get(m.group(1)[:3])
         day = int(m.group(2))
-        year = datetime.utcnow().year
+        year_match = re.search(r"\b(20\d{2})\b", t)
+        year = int(year_match.group(1)) if year_match else datetime.now().year
         if month:
             target_date = date(year, month, day)
 
