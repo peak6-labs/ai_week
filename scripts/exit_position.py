@@ -59,14 +59,13 @@ async def exit_position(
             order_type="limit",
             yes_price=yes_price,
         )
-
-    order_data = order_response.get("order", {})
-    result["order_id"] = order_data.get("order_id")
-    result["order_status"] = order_data.get("status")
-    print(
-        f"EXITED {ticker} {side.upper()} qty={quantity} "
-        f"yes_price={yes_price}¢ order={result['order_id']}"
-    )
+        order_data = order_response.get("order", {})
+        result["order_id"] = order_data.get("order_id")
+        result["order_status"] = order_data.get("status")
+        print(
+            f"EXITED {ticker} {side.upper()} qty={quantity} "
+            f"yes_price={yes_price}¢ order={result['order_id']}"
+        )
     return result
 
 
