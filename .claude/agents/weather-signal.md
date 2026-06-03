@@ -28,17 +28,23 @@ You need the caller to supply:
 
 - `TICKER` — the Kalshi market ticker (e.g. `KXHIGH-25JUN01-T72`)
 - `TITLE` — the full market title string (quoted)
+- `SETTLEMENT_JSON` *(optional)* — the market's contract settlement context as a
+  JSON object (`rules_primary`, `settlement_sources`, `contract_terms_url`, …)
+  from `market_rules.py`. When supplied, pass it through so the forecast is built
+  off the contract's settlement source/station (e.g. AccuWeather vs NOAA).
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Add
+   `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it:
 
    ```bash
    cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: fetching NOAA forecast for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.weather \
      --ticker TICKER \
-     --title "TITLE"
+     --title "TITLE" \
+     --settlement-json 'SETTLEMENT_JSON'
    ```
 
    Set a Bash timeout of at least 60 000 ms. The CLI prints a JSON array of

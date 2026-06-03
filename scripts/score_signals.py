@@ -219,6 +219,11 @@ def score_kalshi_bias(raw: dict, cfg: dict, yes_ask: float) -> dict | None:
     }
 
 
+# Lower bound on combined uncertainty after the agreement boost — keeps a tight
+# corroboration from collapsing confidence to an unrealistic near-zero.
+_AGREEMENT_UNCERTAINTY_FLOOR: float = 0.02
+
+
 def combine_signals(signals: list[dict], cfg: dict) -> dict:
     """Staleness-discounted weighted average of signal probabilities."""
     if not signals:
@@ -241,12 +246,28 @@ def combine_signals(signals: list[dict], cfg: dict) -> dict:
     combined_prob = w_prob / total_w
     combined_unc = w_unc / total_w
 
-    # Disagreement penalty
     probs = [float(s["probability"]) for s in signals]
-    if len(probs) > 1:
-        spread = max(probs) - min(probs)
-        if spread > 0.10:
-            combined_unc += spread * 0.5
+    spread = (max(probs) - min(probs)) if len(probs) > 1 else 0.0
+
+    # Disagreement penalty
+    if spread > 0.10:
+        combined_unc += spread * 0.5
+
+    # Independence-gated agreement boost: when >= 2 distinct source families
+    # corroborate within a tight spread AND none is flagged non-independent,
+    # tighten combined uncertainty (bounded by a floor). Probability is NOT
+    # altered — the boost only sharpens confidence so a real edge clears the bar;
+    # moving the probability would distort calibration. An NWS-office weather
+    # authority sets independent_of_noaa False, so its agreement with noaa_gfs is
+    # excluded (same model family — circular, not corroboration).
+    if bool(cfg.get("agreement_boost_enabled", True)) and len(signals) >= 2:
+        agreement_spread_threshold = float(cfg.get("agreement_spread_threshold", 0.03))
+        agreement_uncertainty_factor = float(cfg.get("agreement_uncertainty_factor", 0.85))
+        all_independent = all(bool(s.get("independent_of_noaa", True)) for s in signals)
+        if spread <= agreement_spread_threshold and all_independent:
+            combined_unc = max(
+                _AGREEMENT_UNCERTAINTY_FLOOR, combined_unc * agreement_uncertainty_factor
+            )
 
     return {
         "combined_probability": round(combined_prob, 4),
@@ -373,6 +394,10 @@ def usable_estimates(estimates: list[dict]) -> list[dict]:
             "uncertainty": uncertainty,
             "weight": weight,
             "data_age_minutes": age_minutes,
+            # Independence flag for the agreement boost. Absent → independent.
+            # An NWS-office weather authority stamps this False (same model
+            # family as noaa_gfs, so its agreement is circular, not corroboration).
+            "independent_of_noaa": metadata.get("independent_of_noaa", True),
         })
     return usable
 
@@ -421,6 +446,8 @@ def collapse_source_families(estimates: list[dict]) -> list[dict]:
             "uncertainty": sum(float(m["uncertainty"]) for m in members) / count,
             "weight": sum(float(m["weight"]) for m in members) / count,
             "data_age_minutes": min(float(m.get("data_age_minutes", 0)) for m in members),
+            # The family is independent only if every slice is.
+            "independent_of_noaa": all(m.get("independent_of_noaa", True) for m in members),
         })
     return collapsed
 

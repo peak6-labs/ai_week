@@ -62,7 +62,9 @@ WHALE_SCORER_V2: bool = os.environ.get("WHALE_SCORER_V2", "true").lower() not in
 
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"
-XAI_MODEL = "grok-3"
+# Agent Tools API (/v1/responses + x_search) requires a reasoning model; the old
+# grok-3 live-search (/chat/completions + search_parameters) was deprecated (410).
+XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4.3")
 X_GROK_UNCERTAINTY_THRESHOLD = 0.15
 X_MAX_CONCURRENT_SEARCHES = 3
 X_GROK_SIGNAL_WEIGHT = 0.6

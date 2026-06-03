@@ -10,7 +10,11 @@ Usage:
     KALSHI_ENV=prod python scripts/market_rules.py --tickers KXFOO-1 KXBAR-2 [...]
 
 Prints a JSON object: { ticker: {rules_primary, rules_secondary, subtitle,
-yes_sub_title, no_sub_title} }. Bounded concurrency; never raises per ticker.
+yes_sub_title, no_sub_title, settlement_sources, contract_terms_url} }. The last
+two come from the market's **series** (one lookup per distinct series, cached in
+series_contract_terms.json — a strike ladder costs one call, zero next cycle) so
+the pipeline knows what source/criterion the contract actually settles on.
+Bounded concurrency; never raises per ticker.
 """
 from __future__ import annotations
 
@@ -21,8 +25,14 @@ import sys
 
 import kalshi_trader.config  # noqa: F401 — loads .env
 from kalshi_trader.client import KalshiClient
+from kalshi_trader.contract_terms import get_or_fetch_many
 
 _FIELDS = ("rules_primary", "rules_secondary", "subtitle", "yes_sub_title", "no_sub_title")
+
+
+def _series_ticker(ticker: str) -> str:
+    """Reduce a market/event ticker to its series prefix (part before first '-')."""
+    return ticker.split("-", 1)[0].upper()
 
 
 async def _run(tickers: list[str]) -> None:
@@ -39,9 +49,20 @@ async def _run(tickers: list[str]) -> None:
                 return ticker, {"error": str(exc)[:120]}
 
     results = await asyncio.gather(*[fetch(t) for t in tickers])
-    if hasattr(client, "close"):
-        await client.close()
-    print(json.dumps({ticker: rules for ticker, rules in results}, default=str))
+    rules_by_ticker = {ticker: rules for ticker, rules in results}
+
+    # Tier 0: merge per-series settlement context. Dedup to distinct series so a
+    # strike ladder is one lookup, and the cache makes it free on later cycles.
+    series_by_ticker = {ticker: _series_ticker(ticker) for ticker in rules_by_ticker}
+    terms_by_series = await get_or_fetch_many(series_by_ticker.values(), client)
+    for ticker, rules in rules_by_ticker.items():
+        terms = terms_by_series.get(series_by_ticker[ticker])
+        if terms:
+            rules["settlement_sources"] = terms.get("settlement_sources") or []
+            rules["contract_terms_url"] = terms.get("contract_terms_url")
+
+    await client.aclose()
+    print(json.dumps(rules_by_ticker, default=str))
 
 
 def main() -> None:

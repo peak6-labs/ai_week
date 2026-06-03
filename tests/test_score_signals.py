@@ -8,6 +8,7 @@ so NO opportunities were silently dropped.
 from __future__ import annotations
 
 import importlib.util
+from datetime import datetime, timezone
 from pathlib import Path
 
 _MODULE_PATH = Path(__file__).resolve().parent.parent / "scripts" / "score_signals.py"
@@ -57,6 +58,18 @@ def test_usable_estimates_drops_noninformative() -> None:
     ]
     usable = score_signals.usable_estimates(estimates)
     assert [u["source"] for u in usable] == ["kalshi_bias"]
+
+
+def test_usable_estimates_drops_empty_ensemble() -> None:
+    # An ensemble estimate flagged empty (Open-Meteo down / too few members) must
+    # be dropped so the parametric NOAA fallback carries the market instead.
+    estimates = [
+        {"source": "noaa_gfs", "probability": 0.7, "uncertainty": 0.08, "weight": 0.85},
+        {"source": "gfs_ensemble", "probability": 0.5, "uncertainty": 1.0, "weight": 0.85,
+         "metadata": {"data_quality": "empty", "member_count": 3}},
+    ]
+    usable = score_signals.usable_estimates(estimates)
+    assert [u["source"] for u in usable] == ["noaa_gfs"]
 
 
 def test_score_market_uses_signal_estimates_directly() -> None:
@@ -191,3 +204,104 @@ def test_edge_bar_is_configurable() -> None:
         cfg={"min_edge_cents": 15.0}, yes_bid_cents=46.0)
     assert result["fee_adjusted_edge"] < 15.0
     assert result["worth_trading"] is False
+
+
+# --- independence-gated agreement boost (weather NOAA + X authority) ---
+
+def _recent_iso() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()
+
+
+def test_independent_agreement_reduces_combined_uncertainty() -> None:
+    signals = [
+        {"source": "noaa_gfs", "probability": 0.70, "uncertainty": 0.08,
+         "weight": 0.85, "data_age_minutes": 0.0, "independent_of_noaa": True},
+        {"source": "x_weather_authority", "probability": 0.71, "uncertainty": 0.10,
+         "weight": 0.70, "data_age_minutes": 0.0, "independent_of_noaa": True},
+    ]
+    boosted = score_signals.combine_signals(signals, {})  # default enabled
+    disabled = score_signals.combine_signals(signals, {"agreement_boost_enabled": False})
+    assert boosted["n_sources"] == 2
+    assert boosted["uncertainty"] < disabled["uncertainty"]
+
+
+def test_nws_office_authority_agreement_gets_no_boost() -> None:
+    # NWS-office authority (independent_of_noaa False) agreeing with noaa_gfs is
+    # circular — the boost must NOT fire.
+    signals = [
+        {"source": "noaa_gfs", "probability": 0.70, "uncertainty": 0.08,
+         "weight": 0.85, "data_age_minutes": 0.0, "independent_of_noaa": True},
+        {"source": "x_weather_authority", "probability": 0.71, "uncertainty": 0.15,
+         "weight": 0.70, "data_age_minutes": 0.0, "independent_of_noaa": False},
+    ]
+    enabled = score_signals.combine_signals(signals, {})
+    disabled = score_signals.combine_signals(signals, {"agreement_boost_enabled": False})
+    assert enabled["uncertainty"] == disabled["uncertainty"]
+
+
+def test_disagreeing_pair_gets_penalty_not_boost() -> None:
+    signals = [
+        {"source": "noaa_gfs", "probability": 0.70, "uncertainty": 0.08,
+         "weight": 0.85, "data_age_minutes": 0.0, "independent_of_noaa": True},
+        {"source": "x_weather_authority", "probability": 0.50, "uncertainty": 0.10,
+         "weight": 0.70, "data_age_minutes": 0.0, "independent_of_noaa": True},
+    ]
+    result = score_signals.combine_signals(signals, {})
+    plain_weighted = (0.85 * 0.08 + 0.70 * 0.10) / (0.85 + 0.70)
+    # spread 0.20 > 0.10 → disagreement penalty raises uncertainty above the
+    # plain weighted average; no boost.
+    assert result["uncertainty"] > plain_weighted + 0.05
+
+
+def test_weather_authority_counts_as_distinct_source_no_collapse() -> None:
+    now = _recent_iso()
+    market = {
+        "ticker": "KXHIGHTDAL-26JUN05-T85", "yes_ask": 50.0,
+        "signal_estimates": [
+            {"source": "noaa_gfs", "probability": 0.70, "uncertainty": 0.08,
+             "weight": 0.85, "data_issued_at": now,
+             "metadata": {"forecast_model": "noaa_gfs"}},
+            {"source": "x_weather_authority", "probability": 0.71, "uncertainty": 0.10,
+             "weight": 0.70, "data_issued_at": now,
+             "metadata": {"forecast_model": "x_weather_authority",
+                          "post_count": 2, "independent_of_noaa": True}},
+        ],
+    }
+    result = score_signals.score_market(market, DEFAULT_CONFIG)
+    assert result["n_sources"] == 2
+    assert sorted(result["sources"]) == ["noaa_gfs", "x_weather_authority"]
+
+
+def test_score_market_independent_authority_beats_nws_office_uncertainty() -> None:
+    now = _recent_iso()
+
+    def build_market(independent: bool) -> dict:
+        return {
+            "ticker": "KXHIGHTBOS-26JUN05-T85", "yes_ask": 50.0,
+            "signal_estimates": [
+                {"source": "noaa_gfs", "probability": 0.70, "uncertainty": 0.08,
+                 "weight": 0.85, "data_issued_at": now, "metadata": {}},
+                {"source": "x_weather_authority", "probability": 0.71, "uncertainty": 0.10,
+                 "weight": 0.70, "data_issued_at": now,
+                 "metadata": {"post_count": 2, "independent_of_noaa": independent}},
+            ],
+        }
+
+    independent_result = score_signals.score_market(build_market(True), DEFAULT_CONFIG)
+    nws_office_result = score_signals.score_market(build_market(False), DEFAULT_CONFIG)
+    # Same inputs except the independence flag: the independent pair is boosted
+    # (lower combined uncertainty), the NWS-office pair is not.
+    assert independent_result["uncertainty"] < nws_office_result["uncertainty"]
+
+
+def test_agreement_boost_respects_uncertainty_floor() -> None:
+    # Two ultra-confident agreeing sources cannot drive combined uncertainty
+    # below the floor even with an aggressive factor.
+    signals = [
+        {"source": "noaa_gfs", "probability": 0.70, "uncertainty": 0.01,
+         "weight": 0.85, "data_age_minutes": 0.0, "independent_of_noaa": True},
+        {"source": "x_weather_authority", "probability": 0.70, "uncertainty": 0.01,
+         "weight": 0.70, "data_age_minutes": 0.0, "independent_of_noaa": True},
+    ]
+    result = score_signals.combine_signals(signals, {"agreement_uncertainty_factor": 0.5})
+    assert result["uncertainty"] >= score_signals._AGREEMENT_UNCERTAINTY_FLOOR

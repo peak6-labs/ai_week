@@ -118,18 +118,25 @@ as the tradeable `ticker`.
 Step 2 only needs to add the signals that require live lookups or judgment.
 
 **Fetch settlement rules — only for the deep-signal subset (and later any
-candidates).** `market_rules.py` makes one API call per ticker, so do NOT fetch
-rules for all ~200; fetch them for the deep-signal subset now, and (in Step 5)
-for any market that becomes a candidate:
+candidates).** `market_rules.py` makes one API call per ticker for `rules_*`,
+plus one **per distinct series** for the settlement context — and that series
+call is deduped (a strike ladder is one lookup) and cached across cycles in
+`series_contract_terms.json`, so it stays cheap. Still do NOT fetch rules for all
+~200; fetch them for the deep-signal subset now, and (in Step 5) for any market
+that becomes a candidate:
 
 ```bash
 KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
   --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/rules_${TS}.json
 ```
 
-Read `/tmp/rules_${TS}.json` ({ticker: {rules_primary, subtitle, ...}}). Carry
-each market's `rules_primary` forward — Step 2 passes it to the cross-venue
-agents, and Step 5 checks it.
+Read `/tmp/rules_${TS}.json` ({ticker: {rules_primary, subtitle,
+`settlement_sources`, `contract_terms_url`, ...}}). The last two come from the
+market's **series** and say what *source/criterion the contract actually settles
+on* (e.g. NYC temp settles on AccuWeather, not NOAA). Carry each market's
+`rules_primary` **and** its settlement context forward — Step 2 passes them to
+the settlement-sensitive agents, and Step 5 reads `contract_terms_url` for the
+full mechanics.
 
 **Live-price the deep-signal subset.** The snapshot is the market *universe* only;
 its prices may be stale. Every market we evaluate deeply (and might recommend)
@@ -207,11 +214,21 @@ scout signals, which are correlated with each other):
 - `order-flow-signal` — only if `volume_24h > 500` (reads live trade tape;
   returns empty on thin markets); args: ticker, title
 
-When dispatching the **cross-venue** agents (`polymarket-price-signal`,
-`sportsbook-odds-signal`), include the market's `rules_primary` in the prompt and
-tell the agent to only return a signal if the external contract resolves on the
-**same** criterion — this guards against "looks identical, settles differently"
-mismatches.
+**Pass the settlement block to the settlement-sensitive agents.** A market's edge
+dies quietly when an agent measures the *wrong thing* — forecasting NYC temp off
+NOAA when the contract settles on AccuWeather, or counting a phrase said in Q&A
+when only prepared remarks count. For each market in scope below, pass its
+settlement context from `/tmp/rules_${TS}.json` as a compact JSON object
+(`{rules_primary, rules_secondary, settlement_sources, contract_terms_url}`) so
+the agent measures the same source/criterion the contract resolves on (or
+down-weights and says why):
+
+| Agent | How to pass settlement context |
+|-------|-------------------------------|
+| `weather-signal`, `mentions-signal`, `polls-signal` | as `SETTLEMENT_JSON` — the agent forwards it to the pipeline's `--settlement-json` |
+| `polymarket-price-signal`, `sportsbook-odds-signal` | in the prompt: include `rules_primary` **and** `settlement_sources`, and only return a signal if the external contract resolves on the **same** criterion — guards against "looks identical, settles differently" |
+| `x-signal` | in the prompt (light): state the resolving question + `settlement_sources` so sentiment stays on-criterion |
+| `kalshi-bias`, `order-flow`, `market-maker`, `polymarket-whale`, scout `microstructure` | none — price/flow-derived; settlement criteria don't change order-book microstructure |
 
 Each agent returns a JSON array of `SignalEstimate` objects. An empty array `[]`
 means **no signal** — record it as absent. Never fabricate a signal value to
@@ -323,16 +340,35 @@ KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
   --tickers CANDIDATE_TICKER... >> /tmp/rules_${TS}.json   # merge/extend
 ```
 
+Then, **for the surviving candidates only, download the full contract-terms
+PDFs** (Tier 1 — deduped by series and cache-by-series, so typically 1–3 reads):
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/contract_terms_doc.py \
+  --tickers CANDIDATE_TICKER... > /tmp/contract_docs_${TS}.json
+```
+
+This writes each survivor series' PDF to `/tmp/contract_terms_<series>.pdf`.
+**Read** the PDF for each survivor (the Read tool parses PDFs natively) and fold
+its mechanics into question 1 below: strict inequality (`>` vs `>=`),
+determination-delay clauses (e.g. delayed to 11 AM ET on METAR inconsistency),
+"first official report governs", exact expiration time, and the source hierarchy.
+These are the boundary/timing traps the API `rules_primary` text omits.
+
 For each surviving market, answer these five questions before letting it onto the
 candidate slate:
 
-1. **Settlement rule** — read the market's `rules_primary` (from `/tmp/rules_${TS}.json`).
-   Does it actually resolve on what the title implies, and does any cross-venue
-   signal (polymarket/sportsbook) reference the *same* criterion? If the rule has
-   a twist the signals didn't account for (specific date, threshold, source of
-   truth), drop the market. **Microstructure + kalshi_bias are price-derived and
-   correlated** — a slate resting only on those two is weak; prefer markets where
-   an independent signal (sportsbook/polymarket) agrees.
+1. **Settlement rule** — read the market's `rules_primary` and
+   `settlement_sources` (from `/tmp/rules_${TS}.json`) and the contract-terms PDF
+   (Tier 1, above). Does it actually resolve on what the title implies, on the
+   source the signals measured (e.g. did `weather-signal` forecast off the
+   contract's settlement provider, not just NOAA)? Does any cross-venue signal
+   (polymarket/sportsbook) reference the *same* criterion? If the rule or PDF has
+   a twist the signals didn't account for (specific date, strict threshold,
+   source of truth, determination delay), drop the market. **Microstructure +
+   kalshi_bias are price-derived and correlated** — a slate resting only on those
+   two is weak; prefer markets where an independent signal (sportsbook/polymarket)
+   agrees.
 2. **Bear case** — what specific mechanism makes the signal wrong?
 3. **Source independence** — are the agreeing signals from orthogonal data
    sources, or do they share a common input?
