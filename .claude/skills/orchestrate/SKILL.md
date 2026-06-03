@@ -173,10 +173,15 @@ scout signals, which are correlated with each other):
   briefing, floor speech, or press conference); args: ticker, title. Independent
   base-rate signal (GDELT TV captions) for a family that otherwise has no
   independent source.
-- `polls-signal` — for **elections** markets (president, senate, house, governor,
-  generic ballot — category `elections` or those keywords in the title); args:
-  ticker, title. Independent FiveThirtyEight polling signal — prioritize it on
-  elections (which dominate the board) the way sportsbook is prioritized on sports.
+- `polls-signal` — for **general-election** markets for U.S. president, senate,
+  house, governor, or the generic ballot (category `elections` or those office
+  keywords in the title); args: ticker, title. Independent FiveThirtyEight
+  polling signal — prioritize it on these races (which dominate the board) the
+  way sportsbook is prioritized on sports. **Do NOT dispatch** for races 538 does
+  not poll: mayoral/municipal/local offices, party **primaries**, runoffs, or
+  caucuses, ballot measures/propositions, and **vote-share-threshold** markets
+  (e.g. "receive at least 30% of the vote", "first round") — 538 yields a
+  head-to-head win margin, not a vote-share, so the agent returns no signal there.
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
 - `order-flow-signal` / `market-maker-signal` — only if `volume_24h > 5000`
   (sparse trade history makes them empty on thin markets); args: ticker, title

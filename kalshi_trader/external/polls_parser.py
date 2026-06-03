@@ -9,6 +9,28 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+# 538 publishes general-election head-to-head polls only. A title naming one of
+# these race families has no 538 polling data even when it also mentions a
+# chamber (e.g. a "Senate primary" or "at least 55% of the vote ... Senate
+# race") — matching the chamber keyword there would fetch the general-election
+# file and emit a bogus signal for the wrong question. Reject up front.
+_UNSUPPORTED_RACE_KEYWORDS = [
+    "mayor",  # also catches "mayoral"
+    "city council", "council member", "councilmember",
+    "school board", "district attorney", "sheriff", "comptroller", "alderman",
+    "ballot measure", "proposition", "referendum", "ballot initiative",
+    "primary", "runoff", "run-off", "caucus", "recall",
+]
+
+# Vote-share *threshold* framings ("at least 30%", "55 percent of the vote",
+# "first round"). 538 yields a win-margin → binary-win probability, which cannot
+# answer a "candidate receives X% of the vote" question, so these are rejected
+# regardless of which chamber they name.
+_VOTE_SHARE_THRESHOLD_PATTERN = re.compile(
+    r"\d{1,3}\s?%|\d{1,3}\s?percent|first[\s-]round",
+    re.IGNORECASE,
+)
+
 # Title keyword → 538 poll-file type.
 _POLL_TYPE_KEYWORDS: list[tuple[str, str]] = [
     ("generic ballot", "generic_ballot"),
@@ -46,6 +68,14 @@ def parse_election_title(ticker: str, title: str) -> dict | None:
     or None if the title is not a recognizable election market.
     """
     lowered = title.lower()
+
+    # Race families 538 does not poll — reject before keyword matching so a stray
+    # chamber word in a primary / mayoral / threshold title can't fabricate a
+    # general-election signal for the wrong question.
+    if any(keyword in lowered for keyword in _UNSUPPORTED_RACE_KEYWORDS):
+        return None
+    if _VOTE_SHARE_THRESHOLD_PATTERN.search(title):
+        return None
 
     poll_type: str | None = None
     for keyword, mapped_type in _POLL_TYPE_KEYWORDS:
