@@ -36,3 +36,11 @@ def test_portfolio_state_defaults():
     assert state.daily_realized_pnl == 0.0
     assert state.total_exposure_dollars == 0.0
     assert state.exposure_by_category == {}
+
+
+def test_exit_signal_fields():
+    from kalshi_trader.models import ExitSignal
+    signal = ExitSignal(reason="stop_loss", exit_price_cents=34.0, description="down 30% from cost basis")
+    assert signal.reason == "stop_loss"
+    assert signal.exit_price_cents == 34.0
+    assert signal.description == "down 30% from cost basis"

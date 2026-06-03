@@ -158,3 +158,10 @@ class ScanMetadata:
 class ScanResult:
     ranked_markets: list[ScoredMarket]
     metadata: ScanMetadata
+
+
+@dataclass
+class ExitSignal:
+    reason: str           # "stop_loss" | "profit_target"
+    exit_price_cents: float
+    description: str      # e.g. "down 31% from cost basis"
