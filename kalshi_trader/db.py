@@ -278,6 +278,19 @@ async def upsert_cycle(cycle_ts: str, stats: dict) -> None:
     await client.table("cycles").upsert(row, on_conflict="cycle_ts").execute()
 
 
+async def upsert_scored_markets(rows: list[dict]) -> int:
+    """Upsert per-cycle scored-market snapshots in batches. Returns rows written."""
+    if not rows:
+        return 0
+    client = await _get_client()
+    written = 0
+    for i in range(0, len(rows), 500):
+        batch = rows[i:i + 500]
+        await client.table("scored_markets").upsert(batch, on_conflict="cycle_ts,ticker").execute()
+        written += len(batch)
+    return written
+
+
 async def close_trade(
     trade_id: str,
     exit_reason: str,

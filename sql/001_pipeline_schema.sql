@@ -13,6 +13,7 @@
 -- Paper-trade calibration: record recommendations, mark them to market.
 -- ===========================================================================
 create table if not exists public.recommendations (
+    
     id                      uuid primary key default gen_random_uuid(),
     created_at              timestamptz not null default now(),
     cycle_ts                text not null,

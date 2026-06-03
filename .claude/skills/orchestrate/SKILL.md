@@ -65,6 +65,13 @@ BALANCE=${BALANCE:-${KALSHI_BALANCE:-1000}}
 echo "BALANCE=$BALANCE"
 ```
 
+**Mark prior paper recommendations to market** (updates would-be P&L on past
+recommendations; read-only, never executes):
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/paper_track.py mark || true
+```
+
 ---
 
 ## Step 1 — Find markets with the market-scout agent
@@ -89,6 +96,11 @@ Take the **top 20** rows by `average_score`. For each, compute
 `hours_to_close` from `close_time` relative to now. Use `best_market_ticker` as
 the tradeable `ticker`.
 
+**Each scout row already carries a `signal_estimates` list** — the deterministic
+`microstructure` (directional price/volume/orderbook) and `kalshi_bias`
+(calibration) signals, computed during the scan with no extra calls. Keep these;
+Step 2 only needs to add the signals that require live lookups or judgment.
+
 If the file is empty or missing, log and stop:
 
 ```bash
@@ -110,20 +122,24 @@ Log before each batch:
 .venv/bin/python scripts/ui_log.py "Orchestrator: collecting signals for TICKER1, TICKER2, ..."
 ```
 
+`microstructure` and `kalshi_bias` already come from the scout row — **do not
+dispatch agents for those.** Dispatch only the signals that need a live lookup or
+judgment, and prefer independent sources (they corroborate the price-derived
+scout signals, which are correlated with each other):
+
 **Dispatch for every market in the batch:**
 
 | Agent | Args to pass in the prompt |
 |-------|----------------------------|
 | `polymarket-price-signal` | ticker, title, midpoint=`yes_ask` (int), hours_to_close |
-| `order-flow-signal` | ticker, title |
-| `market-maker-signal` | ticker, title |
-| `kalshi-bias-signal` | ticker, title, category, hours_to_close, midpoint=`yes_ask` |
 
-**Conditional:**
+**Conditional (only when it applies — keeps dispatch load bounded):**
 
 - `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
 - `weather-signal` — only if `category` contains "weather" or "climate"; args: ticker, title
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
+- `order-flow-signal` / `market-maker-signal` — only if `volume_24h > 5000`
+  (sparse trade history makes them empty on thin markets); args: ticker, title
 
 Each agent returns a JSON array of `SignalEstimate` objects. An empty array `[]`
 means **no signal** — record it as absent. Never fabricate a signal value to
@@ -146,10 +162,11 @@ state change is fine):
 
 Each signal agent returns a JSON **array of `SignalEstimate` objects** — each
 with `source`, `probability`, `uncertainty`, `weight`, `data_issued_at`, and
-`metadata`. For every market, **flatten all of these arrays from all of its
-agents into one `signal_estimates` list** (an agent like `x-signal` may return
-several estimates — keep them all; each is a source). Do **not** unwrap to the
-`metadata` field — the scorer combines the estimates' own
+`metadata`. For every market, build one `signal_estimates` list by **starting
+with the scout row's `signal_estimates`** (microstructure + kalshi_bias) and
+**appending every estimate from the agents you dispatched** (an agent like
+`x-signal` may return several — keep them all; each is a source). Do **not**
+unwrap to the `metadata` field — the scorer combines the estimates' own
 `probability`/`uncertainty`/`weight` directly.
 
 Use the **Write** tool to create `/tmp/signals_<TS>.json` as an array of market
@@ -198,6 +215,15 @@ and `side`.
 
 Keep only markets where **`worth_trading == true`** AND **`n_sources >= 2`**.
 Log the survivor count.
+
+**Persist this cycle** (scored-market snapshots + run stats → Supabase, with a
+local fallback; best-effort, never blocks):
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/persist_cycle.py \
+  --scout-file /tmp/market_scout_${TS}.json \
+  --scored-file /tmp/scored_${TS}.json --cycle-ts ${TS} || true
+```
 
 ---
 
@@ -285,6 +311,14 @@ Write two files with the **Write** tool:
 **`reports/orchestrator-${TS}.json`** — the approved slate, one object per idea:
 `ticker`, `side`, `confidence`, `market_price`, `suggested_size_dollars`,
 `reasoning`, `signal_sources`, `category`, `agent_id`, `selection_summary`.
+
+**Record the slate as paper recommendations** (for the calibration loop — marked
+to market on later cycles; no execution):
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/paper_track.py record \
+  --ideas-file reports/orchestrator-${TS}.json --cycle-ts ${TS} || true
+```
 
 **`reports/orchestrator-${TS}.md`** — a human-readable ranked table: ticker
 (backtick-formatted, link via the row's `series_url`), side, edge, size,
