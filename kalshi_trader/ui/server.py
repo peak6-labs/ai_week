@@ -29,14 +29,36 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 # Kalshi account poller — runs independently of the trading loop
 # ---------------------------------------------------------------------------
 
-async def _poll_kalshi_account(trading_state: TradingState) -> None:
-    """Poll Kalshi every 30 s for balance and positions, update TradingState."""
-    from kalshi_trader.client import KalshiClient
+async def _fetch_yes_price_cents(client: Any, ticker: str, concurrency_semaphore: asyncio.Semaphore) -> float | None:
+    """Fetch the current YES mid-price in cents for one ticker."""
+    async with concurrency_semaphore:
+        try:
+            response = await client.get_market(ticker)
+            market_data = response.get("market", {})
+            last = market_data.get("last_price")
+            if last is not None:
+                return float(last)
+            yes_bid = float(market_data.get("yes_bid", 0) or 0)
+            yes_ask = float(market_data.get("yes_ask", 0) or 0)
+            if yes_bid > 0 or yes_ask > 0:
+                return (yes_bid + yes_ask) / 2.0
+        except Exception as caught_exception:
+            logger.debug("Price fetch failed for %s: %s", ticker, caught_exception)
+        return None
 
-    await asyncio.sleep(2)  # brief delay so server is fully up first
+
+async def _poll_kalshi_account(trading_state: TradingState) -> None:
+    """Poll Kalshi every 10 s for balance, live position prices, unrealized P&L, and fees."""
+    from kalshi_trader.client import KalshiClient
+    from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+
+    await asyncio.sleep(2)
     trading_state.log("Account poller started")
 
-    async with KalshiClient() as client:
+    concurrency_semaphore = asyncio.Semaphore(5)
+
+    async with KalshiClient() as raw_client:
+        client = ReadOnlyKalshiClient(raw_client)
         while True:
             try:
                 balance_resp = await client.get_balance()
@@ -45,40 +67,63 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
 
                 positions_resp = await client.get_positions()
                 raw_positions = positions_resp.get("market_positions") or []
+                held_raws = [p for p in raw_positions if float(p.get("position_fp", "0") or 0) != 0]
+
+                tickers = [p.get("ticker", "") for p in held_raws]
+                price_results = await asyncio.gather(
+                    *[_fetch_yes_price_cents(client, ticker, concurrency_semaphore) for ticker in tickers]
+                )
+                yes_price_map: dict[str, float | None] = dict(zip(tickers, price_results))
 
                 total_exposure = 0.0
-                total_pnl = 0.0
+                total_unrealized_pnl = 0.0
                 parsed: list[dict] = []
-                for p in raw_positions:
-                    qty_fp = float(p.get("position_fp", "0") or 0)
-                    if qty_fp == 0:
-                        continue
+                for raw_position in held_raws:
+                    qty_fp = float(raw_position.get("position_fp", "0") or 0)
                     side = "YES" if qty_fp > 0 else "NO"
-                    qty = abs(int(qty_fp))
-                    exposure = float(p.get("market_exposure_dollars", "0") or 0)
-                    pnl = float(p.get("realized_pnl_dollars", "0") or 0)
+                    qty = abs(qty_fp)
+                    exposure = float(raw_position.get("market_exposure_dollars", "0") or 0)
+                    fees = float(raw_position.get("fees_paid_dollars", "0") or 0)
+                    realized = float(raw_position.get("realized_pnl_dollars", "0") or 0)
+                    ticker = raw_position.get("ticker", "")
+
+                    avg_price_cents = (exposure / qty * 100.0) if qty else 0.0
+
+                    yes_price = yes_price_map.get(ticker)
+                    current_price_cents: float | None = None
+                    unrealized_pnl: float | None = None
+                    if yes_price is not None and qty > 0:
+                        current_price_cents = yes_price if side == "YES" else (100.0 - yes_price)
+                        current_market_value = qty * current_price_cents / 100.0
+                        unrealized_pnl = current_market_value - exposure - fees
+
                     total_exposure += exposure
-                    total_pnl += pnl
-                    ticker = p.get("ticker", "")
+                    if unrealized_pnl is not None:
+                        total_unrealized_pnl += unrealized_pnl
+
                     parsed.append({
                         "ticker": ticker,
                         "side": side,
-                        "quantity": qty,
-                        "avg_price_dollars": round(exposure / qty, 4) if qty else 0,
-                        "current_price_dollars": None,
-                        "unrealized_pnl_dollars": pnl,
+                        "quantity": int(qty),
+                        "avg_price_dollars": round(avg_price_cents / 100.0, 4),
+                        "current_price_dollars": round(current_price_cents / 100.0, 4) if current_price_cents is not None else None,
+                        "total_cost_dollars": round(exposure, 2),
+                        "total_cost_with_fees_dollars": round(exposure + fees, 2),
+                        "unrealized_pnl_dollars": round(unrealized_pnl, 2) if unrealized_pnl is not None else None,
+                        "fees_paid_dollars": round(fees, 2),
+                        "realized_pnl_dollars": round(realized, 2),
                     })
 
                 trading_state.positions = parsed
                 trading_state.total_exposure_dollars = total_exposure
-                trading_state.daily_pnl_dollars = total_pnl
+                trading_state.daily_pnl_dollars = total_unrealized_pnl
 
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:
-                logger.warning("Account poll failed: %s", exc)
+            except Exception as caught_exception:
+                logger.warning("Account poll failed: %s", caught_exception)
 
-            await asyncio.sleep(30)
+            await asyncio.sleep(10)
 
 
 # ---------------------------------------------------------------------------
@@ -202,13 +247,20 @@ def create_app(
         resolved, elapsed_seconds) snapshots so the UI can plot how each idea
         moved over the intervals after it was presented. Never executes anything.
         """
-        from kalshi_trader import paper
+        from kalshi_trader import db, paper
 
         try:
-            ideas = paper.recommendations_with_marks()
-        except Exception as exc:  # never let a malformed store break the page
-            logger.warning("ideas history read failed: %s", exc)
-            ideas = []
+            # Primary source: Supabase, so any machine sees the shared data.
+            ideas = await db.recommendations_with_marks()
+        except Exception as supabase_exception:
+            # Fall back to the local JSONL store when Supabase is unreachable.
+            logger.warning("ideas history Supabase read failed, using local store: %s",
+                           supabase_exception)
+            try:
+                ideas = paper.recommendations_with_marks()
+            except Exception as local_exception:  # never let a bad store break the page
+                logger.warning("ideas history local read failed: %s", local_exception)
+                ideas = []
         return JSONResponse({"ideas": ideas})
 
     @app.post("/api/ideas")
@@ -256,6 +308,38 @@ def create_app(
         except Exception as exc:
             logger.error("DB save failed for rejected idea %s: %s", idea_id, exc)
         return JSONResponse({"ok": True})
+
+    @app.get("/api/markets/prices")
+    async def get_market_prices(tickers: str = "") -> JSONResponse:
+        """Return the current YES price in cents for each requested ticker.
+
+        Accepts a comma-separated ``tickers`` query parameter (e.g.
+        ``?tickers=FOO-1,BAR-2``).  Up to 40 tickers are fetched in parallel
+        with a concurrency limit of 5.  Returns ``{ticker: price_or_null}``.
+        """
+        from kalshi_trader.client import KalshiClient
+        from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+
+        if not tickers:
+            return JSONResponse({})
+
+        raw_tickers = [ticker.strip() for ticker in tickers.split(",") if ticker.strip()]
+        unique_tickers = list(dict.fromkeys(raw_tickers))[:40]
+        if not unique_tickers:
+            return JSONResponse({})
+
+        try:
+            concurrency_semaphore = asyncio.Semaphore(5)
+            async with KalshiClient() as raw_client:
+                client = ReadOnlyKalshiClient(raw_client)
+                price_results = await asyncio.gather(
+                    *[_fetch_yes_price_cents(client, ticker, concurrency_semaphore)
+                      for ticker in unique_tickers]
+                )
+            return JSONResponse(dict(zip(unique_tickers, price_results)))
+        except Exception as caught_exception:
+            logger.warning("get_market_prices failed: %s", caught_exception)
+            return JSONResponse({}, status_code=500)
 
     return app
 

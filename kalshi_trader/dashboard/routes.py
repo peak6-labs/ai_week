@@ -47,19 +47,47 @@ def _slate_status(state: DashboardState) -> str:
     return "degraded" if state.last_scan_error else "ready"
 
 
-async def _resolve_markets(state: DashboardState, tickers: list[str]) -> dict[str, Market]:
+def _scan_metadata_payload(state: DashboardState) -> dict | None:
+    metadata = state.scored_slate_metadata
+    if metadata is None:
+        return None
+    return {
+        "live_prices_refreshed_at": (
+            metadata.live_prices_refreshed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            if metadata.live_prices_refreshed_at else None
+        ),
+        "shortlist_refreshed_at": (
+            metadata.shortlist_refreshed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            if metadata.shortlist_refreshed_at else None
+        ),
+        "filtered_ticker_count": metadata.filtered_ticker_count,
+        "live_priced_ticker_count": metadata.live_priced_ticker_count,
+        "dropped_unquoted_ticker_count": metadata.dropped_unquoted_ticker_count,
+        "degraded": metadata.degraded,
+        "degraded_reason": metadata.degraded_reason,
+    }
+
+
+async def _resolve_markets(
+    state: DashboardState, tickers: list[str], skip_cache: bool = False
+) -> dict[str, Market]:
     """Build a ticker -> Market lookup, preferring the cached slate and fetching
-    only the tickers it doesn't already cover (held positions / order markets)."""
+    only the tickers it doesn't already cover (held positions / order markets).
+
+    Pass skip_cache=True for positions so prices are always fetched live rather
+    than served from the up-to-5-minute-old scan cache.
+    """
     lookup: dict[str, Market] = {}
     missing: list[str] = []
     for ticker in set(tickers):
         if not ticker:
             continue
-        cached_market = state.scored_slate_markets.get(ticker)
-        if cached_market is not None:
-            lookup[ticker] = cached_market
-        else:
-            missing.append(ticker)
+        if not skip_cache:
+            cached_market = state.scored_slate_markets.get(ticker)
+            if cached_market is not None:
+                lookup[ticker] = cached_market
+                continue
+        missing.append(ticker)
 
     async def _fetch(ticker: str) -> tuple[str, Market | None]:
         try:
@@ -91,6 +119,7 @@ async def health(request: Request) -> dict:
             "in_progress": state.scan_in_progress,
             "last_error": state.last_scan_error,
             "age_seconds": _age_seconds(state.scored_slate_generated_at),
+            "metadata": _scan_metadata_payload(state),
         },
     }
 
@@ -108,6 +137,7 @@ async def ideas(request: Request, top: int = 10) -> dict:
             if state.scored_slate_generated_at else None
         ),
         "age_seconds": _age_seconds(state.scored_slate_generated_at),
+        "metadata": _scan_metadata_payload(state),
         "ideas": [
             serialize_event_group(average_score, market_count, best_market)
             for average_score, market_count, best_market in grouped[:max(top, 0)]
@@ -129,7 +159,7 @@ async def portfolio(request: Request) -> dict:
 
     market_positions_raw = positions_response.get("market_positions") or []
     market_lookup = await _resolve_markets(
-        state, [position.get("ticker", "") for position in market_positions_raw]
+        state, [position.get("ticker", "") for position in market_positions_raw], skip_cache=True
     )
     mapped_positions = portfolio_mapping.map_positions(market_positions_raw, market_lookup)
 

@@ -15,7 +15,7 @@ from datetime import datetime
 from kalshi_trader.actionability import MarketScorer, SnapshotStore
 from kalshi_trader.client import KalshiClient
 from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
-from kalshi_trader.models import Market
+from kalshi_trader.models import Market, ScanMetadata
 from kalshi_trader.scanner import MarketScanner
 
 # A small dedicated pool for the latency-sensitive live polls (balance/positions/
@@ -27,6 +27,7 @@ LIVE_POLL_POOL_SIZE: int = 8
 # enriched snapshot (produced by scripts/fetch_markets.py); only the signals
 # (candles/trades/orderbooks) refresh live each cycle.
 DEFAULT_MARKETS_FILE: str = "live_markets.json"
+DEFAULT_SCANNER_CATEGORIES: tuple[str, ...] = ()
 
 
 @dataclass
@@ -45,11 +46,13 @@ class DashboardState:
     markets_file: str | None = None
     cached_universe_markets: list[Market] | None = None
     cached_universe_mtime: float | None = None
+    scanner_categories: tuple[str, ...] = DEFAULT_SCANNER_CATEGORIES
 
     # In-memory scored-slate cache (written by the scoring loop).
     scored_slate_grouped: list | None = None      # output of group_by_event
     scored_slate_markets: dict = field(default_factory=dict)  # ticker -> Market (for joins)
     scored_slate_generated_at: datetime | None = None
+    scored_slate_metadata: ScanMetadata | None = None
     last_scan_error: str | None = None
     scan_in_progress: bool = False
     scan_cycle_number: int = 0
@@ -74,6 +77,11 @@ def create_dashboard_state() -> DashboardState:
     markets_file = os.environ.get("DASHBOARD_MARKETS_FILE", DEFAULT_MARKETS_FILE)
     if not markets_file or not os.path.exists(markets_file):
         markets_file = None
+    scanner_categories = tuple(
+        category.strip().lower()
+        for category in os.environ.get("DASHBOARD_SCANNER_CATEGORIES", "").split(",")
+        if category.strip()
+    )
 
     scan_client = ReadOnlyKalshiClient(KalshiClient())
 
@@ -95,4 +103,5 @@ def create_dashboard_state() -> DashboardState:
         scorer=scorer,
         kalshi_env=kalshi_env,
         markets_file=markets_file,
+        scanner_categories=scanner_categories,
     )

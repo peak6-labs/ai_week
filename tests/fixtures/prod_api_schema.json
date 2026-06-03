@@ -1,0 +1,418 @@
+{
+  "get_market": {
+    "market": {
+      "can_close_early": true,
+      "close_time": "2026-06-18T00:30:00Z",
+      "created_time": "2026-06-01T23:31:36.481842Z",
+      "custom_strike": {
+        "basketball_team": "67468ecc-b868-43a4-b9dc-751a52894bb0"
+      },
+      "early_close_condition": "This market will close and expire after a winner is declared.",
+      "event_ticker": "KXNBASPREAD-26JUN03NYKSAS",
+      "expected_expiration_time": "2026-06-04T03:30:00Z",
+      "expiration_time": "2026-06-18T00:30:00Z",
+      "expiration_value": "",
+      "floor_strike": 12.5,
+      "fractional_trading_enabled": true,
+      "last_price_dollars": "0.1100",
+      "latest_expiration_time": "2026-06-18T00:30:00Z",
+      "liquidity_dollars": "0.0000",
+      "market_type": "binary",
+      "no_ask_dollars": "0.9000",
+      "no_bid_dollars": "0.8900",
+      "no_sub_title": "New York wins by over 12.5 points",
+      "notional_value_dollars": "1.0000",
+      "occurrence_datetime": "2026-06-04T03:30:00Z",
+      "open_interest_fp": "767.79",
+      "open_time": "2026-06-01T23:33:00Z",
+      "previous_price_dollars": "0.1100",
+      "previous_yes_ask_dollars": "0.1100",
+      "previous_yes_bid_dollars": "0.1000",
+      "price_level_structure": "linear_cent",
+      "price_ranges": [
+        {
+          "end": "1.0000",
+          "start": "0.0000",
+          "step": "0.0100"
+        }
+      ],
+      "response_price_units": "usd_cent",
+      "result": "",
+      "rules_primary": "If New York wins the New York at San Antonio professional basketball game originally scheduled for Jun 3, 2026 by more than 12.5 points, then the market resolves to Yes.",
+      "rules_secondary": "",
+      "settlement_timer_seconds": 30,
+      "status": "active",
+      "strike_type": "greater",
+      "ticker": "KXNBASPREAD-26JUN03NYKSAS-NYK12",
+      "title": "New York wins by over 12.5 points?",
+      "updated_time": "2026-06-01T23:33:00.400094Z",
+      "volume_24h_fp": "559.03",
+      "volume_fp": "767.79",
+      "yes_ask_dollars": "0.1100",
+      "yes_ask_size_fp": "213.00",
+      "yes_bid_dollars": "0.1000",
+      "yes_bid_size_fp": "422.00",
+      "yes_sub_title": "New York wins by over 12.5 points"
+    }
+  },
+  "get_orderbook": {
+    "orderbook_fp": {
+      "no_dollars": [
+        [
+          "0.0100",
+          "9513301.00"
+        ],
+        [
+          "0.0300",
+          "100.00"
+        ],
+        [
+          "0.0600",
+          "581450.00"
+        ],
+        [
+          "0.0700",
+          "100.00"
+        ],
+        [
+          "0.1000",
+          "5.00"
+        ],
+        [
+          "0.1100",
+          "105.00"
+        ],
+        [
+          "0.1200",
+          "5.00"
+        ],
+        [
+          "0.1300",
+          "3.00"
+        ],
+        [
+          "0.1400",
+          "3.00"
+        ],
+        [
+          "0.1500",
+          "2.00"
+        ],
+        [
+          "0.1700",
+          "149224.00"
+        ],
+        [
+          "0.2800",
+          "73614.00"
+        ],
+        [
+          "0.3900",
+          "32523.00"
+        ],
+        [
+          "0.4100",
+          "12.00"
+        ],
+        [
+          "0.4200",
+          "2190.00"
+        ],
+        [
+          "0.5300",
+          "5000.00"
+        ],
+        [
+          "0.5700",
+          "3740.00"
+        ],
+        [
+          "0.5800",
+          "3740.00"
+        ],
+        [
+          "0.5900",
+          "740.00"
+        ],
+        [
+          "0.6000",
+          "650.00"
+        ],
+        [
+          "0.6100",
+          "606.00"
+        ],
+        [
+          "0.6900",
+          "502.00"
+        ],
+        [
+          "0.7400",
+          "432.00"
+        ],
+        [
+          "0.7500",
+          "2000.00"
+        ],
+        [
+          "0.7600",
+          "3000.00"
+        ],
+        [
+          "0.7700",
+          "116.00"
+        ],
+        [
+          "0.7900",
+          "95.00"
+        ],
+        [
+          "0.8100",
+          "627.00"
+        ],
+        [
+          "0.8300",
+          "14.00"
+        ],
+        [
+          "0.8500",
+          "521.00"
+        ],
+        [
+          "0.8600",
+          "4594.00"
+        ],
+        [
+          "0.8700",
+          "8257.00"
+        ],
+        [
+          "0.8800",
+          "4369.23"
+        ],
+        [
+          "0.8900",
+          "213.00"
+        ]
+      ],
+      "yes_dollars": [
+        [
+          "0.0100",
+          "1396.00"
+        ],
+        [
+          "0.0200",
+          "2034.00"
+        ],
+        [
+          "0.0300",
+          "152.00"
+        ],
+        [
+          "0.0400",
+          "5000.00"
+        ],
+        [
+          "0.0500",
+          "2530.00"
+        ],
+        [
+          "0.0600",
+          "10451.00"
+        ],
+        [
+          "0.0700",
+          "2822.67"
+        ],
+        [
+          "0.0800",
+          "2239.24"
+        ],
+        [
+          "0.0900",
+          "1619.25"
+        ],
+        [
+          "0.1000",
+          "422.00"
+        ]
+      ]
+    }
+  },
+  "get_markets_sample": {
+    "cursor": "CgwI-u-A0QYQoL3N1wMSL0tYTVZFQ1JPU1NDQVRFR09SWS1TMjAyNjQ1M0UyNTgwQzM1LTNEQjAyMzczRjI0",
+    "markets": [
+      {
+        "can_close_early": true,
+        "close_time": "2026-06-18T00:30:00Z",
+        "created_time": "2026-06-03T14:19:39.157082Z",
+        "custom_strike": {
+          "Associated Events": "KXNBA3PT-26JUN03NYKSAS,KXNBAAST-26JUN03NYKSAS,KXNBAPTS-26JUN03NYKSAS,KXNBAPTS-26JUN03NYKSAS,KXNBAPTS-26JUN03NYKSAS,KXNBAPTS-26JUN03NYKSAS",
+          "Associated Market Sides": "yes,yes,yes,yes,yes,yes",
+          "Associated Markets": "KXNBA3PT-26JUN03NYKSAS-NYKKTOWNS32-1,KXNBAAST-26JUN03NYKSAS-NYKJBRUNSON11-6,KXNBAPTS-26JUN03NYKSAS-NYKKTOWNS32-15,KXNBAPTS-26JUN03NYKSAS-NYKMBRIDGES25-15,KXNBAPTS-26JUN03NYKSAS-SASDHARPER2-10,KXNBAPTS-26JUN03NYKSAS-SASDVASSELL24-10",
+          "Multivariate Event Ticker": "KXMVESPORTSMULTIGAMEEXTENDED-S2026F5819B26DDB"
+        },
+        "event_ticker": "KXMVESPORTSMULTIGAMEEXTENDED-S2026F5819B26DDB",
+        "expected_expiration_time": "2026-06-04T03:30:00Z",
+        "expiration_time": "2026-06-18T00:30:00Z",
+        "expiration_value": "",
+        "fractional_trading_enabled": true,
+        "is_provisional": true,
+        "last_price_dollars": "0.0000",
+        "latest_expiration_time": "2026-06-18T00:30:00Z",
+        "liquidity_dollars": "0.0000",
+        "market_type": "binary",
+        "mve_collection_ticker": "KXMVESPORTSMULTIGAMEEXTENDED-R",
+        "mve_selected_legs": [
+          {
+            "event_ticker": "KXNBA3PT-26JUN03NYKSAS",
+            "market_ticker": "KXNBA3PT-26JUN03NYKSAS-NYKKTOWNS32-1",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAAST-26JUN03NYKSAS",
+            "market_ticker": "KXNBAAST-26JUN03NYKSAS-NYKJBRUNSON11-6",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAPTS-26JUN03NYKSAS",
+            "market_ticker": "KXNBAPTS-26JUN03NYKSAS-NYKKTOWNS32-15",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAPTS-26JUN03NYKSAS",
+            "market_ticker": "KXNBAPTS-26JUN03NYKSAS-NYKMBRIDGES25-15",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAPTS-26JUN03NYKSAS",
+            "market_ticker": "KXNBAPTS-26JUN03NYKSAS-SASDHARPER2-10",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAPTS-26JUN03NYKSAS",
+            "market_ticker": "KXNBAPTS-26JUN03NYKSAS-SASDVASSELL24-10",
+            "side": "yes"
+          }
+        ],
+        "no_ask_dollars": "1.0000",
+        "no_bid_dollars": "1.0000",
+        "no_sub_title": "yes Karl-Anthony Towns: 1+,yes Jalen Brunson: 6+,yes Karl-Anthony Towns: 15+,yes Mikal Bridges: 15+,yes Dylan Harper: 10+,yes Devin Vassell: 10+",
+        "notional_value_dollars": "1.0000",
+        "open_interest_fp": "0.00",
+        "open_time": "2026-06-03T14:19:39Z",
+        "previous_price_dollars": "0.0000",
+        "previous_yes_ask_dollars": "0.0000",
+        "previous_yes_bid_dollars": "0.0000",
+        "price_level_structure": "deci_cent",
+        "price_ranges": [
+          {
+            "end": "1.0000",
+            "start": "0.0000",
+            "step": "0.0010"
+          }
+        ],
+        "response_price_units": "usd_cent",
+        "result": "",
+        "rules_primary": "",
+        "rules_secondary": "",
+        "settlement_timer_seconds": 5,
+        "status": "active",
+        "strike_type": "custom",
+        "ticker": "KXMVESPORTSMULTIGAMEEXTENDED-S2026F5819B26DDB-29F4E5A266C",
+        "title": "yes Karl-Anthony Towns: 1+,yes Jalen Brunson: 6+,yes Karl-Anthony Towns: 15+,yes Mikal Bridges: 15+,yes Dylan Harper: 10+,yes Devin Vassell: 10+",
+        "updated_time": "2026-06-03T14:19:39.620909Z",
+        "volume_24h_fp": "0.00",
+        "volume_fp": "0.00",
+        "yes_ask_dollars": "0.0000",
+        "yes_ask_size_fp": "0.00",
+        "yes_bid_dollars": "0.0000",
+        "yes_bid_size_fp": "0.00",
+        "yes_sub_title": "yes Karl-Anthony Towns: 1+,yes Jalen Brunson: 6+,yes Karl-Anthony Towns: 15+,yes Mikal Bridges: 15+,yes Dylan Harper: 10+,yes Devin Vassell: 10+"
+      },
+      {
+        "can_close_early": true,
+        "close_time": "2026-06-18T00:30:00Z",
+        "created_time": "2026-06-03T14:19:38.989028Z",
+        "custom_strike": {
+          "Associated Events": "KXNBAPTS-26JUN03NYKSAS,KXNBAPTS-26JUN03NYKSAS,KXNBAREB-26JUN03NYKSAS,KXNBAREB-26JUN03NYKSAS,KXNBASPREAD-26JUN03NYKSAS",
+          "Associated Market Sides": "yes,yes,yes,yes,no",
+          "Associated Markets": "KXNBAPTS-26JUN03NYKSAS-NYKKTOWNS32-10,KXNBAPTS-26JUN03NYKSAS-SASDFOX4-10,KXNBAREB-26JUN03NYKSAS-NYKOANUNOBY8-2,KXNBAREB-26JUN03NYKSAS-SASSCASTLE5-2,KXNBASPREAD-26JUN03NYKSAS-SAS7",
+          "Multivariate Event Ticker": "KXMVECROSSCATEGORY-S2026453E2580C35"
+        },
+        "event_ticker": "KXMVECROSSCATEGORY-S2026453E2580C35",
+        "expected_expiration_time": "2026-06-04T03:30:00Z",
+        "expiration_time": "2026-06-18T00:30:00Z",
+        "expiration_value": "",
+        "fractional_trading_enabled": true,
+        "is_provisional": true,
+        "last_price_dollars": "0.0000",
+        "latest_expiration_time": "2026-06-18T00:30:00Z",
+        "liquidity_dollars": "0.0000",
+        "market_type": "binary",
+        "mve_collection_ticker": "KXMVECROSSCATEGORY-R",
+        "mve_selected_legs": [
+          {
+            "event_ticker": "KXNBAPTS-26JUN03NYKSAS",
+            "market_ticker": "KXNBAPTS-26JUN03NYKSAS-NYKKTOWNS32-10",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAPTS-26JUN03NYKSAS",
+            "market_ticker": "KXNBAPTS-26JUN03NYKSAS-SASDFOX4-10",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAREB-26JUN03NYKSAS",
+            "market_ticker": "KXNBAREB-26JUN03NYKSAS-NYKOANUNOBY8-2",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBAREB-26JUN03NYKSAS",
+            "market_ticker": "KXNBAREB-26JUN03NYKSAS-SASSCASTLE5-2",
+            "side": "yes"
+          },
+          {
+            "event_ticker": "KXNBASPREAD-26JUN03NYKSAS",
+            "market_ticker": "KXNBASPREAD-26JUN03NYKSAS-SAS7",
+            "side": "no"
+          }
+        ],
+        "no_ask_dollars": "1.0000",
+        "no_bid_dollars": "1.0000",
+        "no_sub_title": "yes Karl-Anthony Towns: 10+,yes De'Aaron Fox: 10+,yes OG Anunoby: 2+,yes Stephon Castle: 2+,no San Antonio wins by over 7.5 points",
+        "notional_value_dollars": "1.0000",
+        "open_interest_fp": "0.00",
+        "open_time": "2026-06-03T14:19:38Z",
+        "previous_price_dollars": "0.0000",
+        "previous_yes_ask_dollars": "0.0000",
+        "previous_yes_bid_dollars": "0.0000",
+        "price_level_structure": "deci_cent",
+        "price_ranges": [
+          {
+            "end": "1.0000",
+            "start": "0.0000",
+            "step": "0.0010"
+          }
+        ],
+        "response_price_units": "usd_cent",
+        "result": "",
+        "rules_primary": "",
+        "rules_secondary": "",
+        "settlement_timer_seconds": 5,
+        "status": "active",
+        "strike_type": "custom",
+        "ticker": "KXMVECROSSCATEGORY-S2026453E2580C35-3DB02373F24",
+        "title": "yes Karl-Anthony Towns: 10+,yes De'Aaron Fox: 10+,yes OG Anunoby: 2+,yes Stephon Castle: 2+,no San Antonio wins by over 7.5 points",
+        "updated_time": "2026-06-03T14:19:39.620909Z",
+        "volume_24h_fp": "0.00",
+        "volume_fp": "0.00",
+        "yes_ask_dollars": "0.0000",
+        "yes_ask_size_fp": "0.00",
+        "yes_bid_dollars": "0.0000",
+        "yes_bid_size_fp": "0.00",
+        "yes_sub_title": "yes Karl-Anthony Towns: 10+,yes De'Aaron Fox: 10+,yes OG Anunoby: 2+,yes Stephon Castle: 2+,no San Antonio wins by over 7.5 points"
+      }
+    ]
+  }
+}

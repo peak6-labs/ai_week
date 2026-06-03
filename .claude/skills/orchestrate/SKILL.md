@@ -65,12 +65,8 @@ BALANCE=${BALANCE:-${KALSHI_BALANCE:-1000}}
 echo "BALANCE=$BALANCE"
 ```
 
-**Mark prior paper recommendations to market** (updates would-be P&L on past
-recommendations; read-only, never executes):
-
-```bash
-KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/paper_track.py mark || true
-```
+(Marking prior recommendations to market happens **last**, as a trailing
+low-priority step — see Step 10 — so it never delays analysis.)
 
 ---
 
@@ -80,10 +76,12 @@ Dispatch the **`market-scout`** agent with the `Agent` tool. Tell it explicitly
 to write its scored JSON to a path you control so you can read it back
 deterministically. Pass this prompt (substituting the real `TS`):
 
-> Scan and score the live Kalshi board. Write the full scored JSON (the
-> `score_markets.py --json` output) to `/tmp/market_scout_<TS>.json` and also
-> save your markdown report. In your final message, return the JSON path you
-> wrote and a one-line summary of the hottest themes.
+> Scan and score the live Kalshi board. You are in **pipeline mode**: write the
+> full scored JSON (the `score_markets.py --json` output) to
+> `/tmp/market_scout_<TS>.json` and do **NOT** write the markdown report or
+> enumerate events — generating it is slow and bloats the round-trip. In your
+> final message, return only the JSON path you wrote plus a one-line summary of
+> the hottest themes.
 
 When the agent returns, read `/tmp/market_scout_<TS>.json`. It is a list of event
 rows sorted by `average_score` descending. Each row has: `event_ticker`,
@@ -101,10 +99,15 @@ x), so we only spend those on a prioritized **deep-signal subset**.
 
 - **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
   scoring and, if it reaches 2+ sources, gets recorded for the backtest.
-- **Deep-signal subset (≤ ~15)** = the rows most worth an external lookup:
-  weather/climate markets (NOAA), sports (sportsbook), high-volume markets
-  (`volume_24h > 5000`, for polymarket/whale/order-flow), and the top rows by
-  `average_score`. Only these get Step 2's agent dispatch.
+- **Deep-signal subset (≤ ~20)** = the highest-priority rows for external agent
+  dispatch. Select by this priority order until you hit 20:
+  1. All weather/climate markets (NOAA is independent and cheap)
+  2. All sports markets (sportsbook odds are independent and sharp)
+  3. All mentions markets (GDELT base-rate)
+  4. Top rows by `average_score` to fill remaining slots
+  Keep the cap at 20 — market_maker now runs on every market in the subset, so
+  each batch of 3 already spawns 6+ parallel agents. Wider subsets slow the cycle
+  without proportionally more signal. Only this subset gets Step 2's agent dispatch.
 
 For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
 as the tradeable `ticker`.
@@ -135,6 +138,24 @@ on* (e.g. NYC temp settles on AccuWeather, not NOAA). Carry each market's
 the settlement-sensitive agents, and Step 5 reads `contract_terms_url` for the
 full mechanics.
 
+**Live-price the deep-signal subset.** The snapshot is the market *universe* only;
+its prices may be stale. Every market we evaluate deeply (and might recommend)
+must be priced from the live API, not the snapshot. Fetch live top-of-book for
+the **same subset tickers** now:
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/live_prices.py \
+  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/live_prices_${TS}.json
+```
+
+Read `/tmp/live_prices_${TS}.json` ({ticker: {yes_bid, yes_ask, last_price}}).
+**Immediately override each subset market's `yes_bid`/`yes_ask` with these live
+values right now** — before dispatching any signal agents in Step 2. A ticker
+mapping to nulls is illiquid/unquoted — drop it from the subset rather than run
+agents on a stale price. Carry the updated prices forward into Step 2 (agent
+dispatch) and Step 3 (signals file). This guarantees signal agents see the live
+market price, not the potentially-stale scout snapshot.
+
 If the file is empty or missing, log and stop:
 
 ```bash
@@ -145,11 +166,13 @@ If the file is empty or missing, log and stop:
 
 ## Step 2 — Dispatch signal agents in parallel
 
-Process the **deep-signal subset** (≤ ~15) in **batches of 5**. For each batch,
-spawn all applicable signal agents **in a single message** (multiple `Agent`
-tool calls) so they run concurrently. Wait for the whole batch before starting
-the next. This keeps concurrent API load bounded — never fan out the whole board
-at once. The rest of the coverage set rides on its deterministic scout signals.
+Process the **deep-signal subset** (≤ ~20) in **batches of 3 markets**. For each
+batch, spawn all applicable signal agents **in a single message** (multiple
+`Agent` tool calls) so they run concurrently. Wait for the whole batch before
+starting the next. Batching is what keeps concurrent API load bounded — now that
+`market-maker-signal` runs on every market, each batch already spawns 6+ parallel
+agents. Keep batches small so each one completes quickly. The rest of the coverage
+set rides on its deterministic scout signals.
 
 Log before each batch:
 
@@ -166,7 +189,7 @@ scout signals, which are correlated with each other):
 
 | Agent | Args to pass in the prompt |
 |-------|----------------------------|
-| `polymarket-price-signal` | ticker, title, midpoint=`yes_ask` (int), hours_to_close |
+| `polymarket-price-signal` | ticker, title, midpoint = live `yes_ask` from `/tmp/live_prices_${TS}.json` (fallback: scout row `yes_ask`), hours_to_close |
 
 **Conditional (only when it applies — keeps dispatch load bounded):**
 
@@ -180,13 +203,16 @@ scout signals, which are correlated with each other):
   briefing, floor speech, or press conference); args: ticker, title. Independent
   base-rate signal (GDELT TV captions) for a family that otherwise has no
   independent source.
-- `polls-signal` — for **elections** markets (president, senate, house, governor,
-  generic ballot — category `elections` or those keywords in the title); args:
-  ticker, title. Independent FiveThirtyEight polling signal — prioritize it on
-  elections (which dominate the board) the way sportsbook is prioritized on sports.
-- `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
-- `order-flow-signal` / `market-maker-signal` — only if `volume_24h > 5000`
-  (sparse trade history makes them empty on thin markets); args: ticker, title
+- `polls-signal` — **disabled** (`agent_polls_enabled: false` in `runtime_config.json`).
+  Returns no data outside a U.S. general-election cycle. Re-enable in fall 2026
+  when 538 has live polling for federal races.
+- `x-signal` — **disabled** (`agent_x_enabled: false` in `runtime_config.json`). Do not dispatch.
+- `market-maker-signal` — **every market in the deep-signal subset**; args:
+  ticker, title. This is an orderbook-snapshot signal — it does not require
+  trade history and is the highest-value signal we have. Dispatch it for every
+  market in every batch, no volume gate.
+- `order-flow-signal` — only if `volume_24h > 500` (reads live trade tape;
+  returns empty on thin markets); args: ticker, title
 
 **Pass the settlement block to the settlement-sensitive agents.** A market's edge
 dies quietly when an agent measures the *wrong thing* — forecasting NYC temp off
@@ -238,6 +264,13 @@ deep-signal subset additionally append the agent estimates you collected. Market
 outside the subset simply carry their two deterministic scout signals — that's
 fine; they still get scored and (if 2+ sources) recorded for the backtest.
 
+**Confirm live prices.** Subset markets already have their `yes_bid`/`yes_ask`
+updated from `/tmp/live_prices_${TS}.json` (done at the end of Step 1, before
+agent dispatch). Write these same live values into the signals file — do not
+fall back to the scout row prices for subset markets. Coverage-set markets
+outside the subset keep snapshot prices (recorded for calibration only, never
+recommended).
+
 Use the **Write** tool to create `/tmp/signals_<TS>.json` as an array of market
 objects:
 
@@ -252,6 +285,7 @@ objects:
     "hours_to_close": 24.0,
     "actionability_score": 0.72,
     "coverage_pct": 80.0,
+    "volume_24h": 12708,
     "signal_estimates": [
       {"source": "kalshi_bias", "probability": 0.62, "uncertainty": 0.05, "weight": 0.65, "data_issued_at": "...", "metadata": {}},
       {"source": "polymarket_price", "probability": 0.58, "uncertainty": 0.03, "weight": 0.75, "data_issued_at": "...", "metadata": {}}
@@ -466,6 +500,29 @@ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) | N markets | K approved | top: TICKER EDGE
 
 Return a short summary to the user: markets evaluated, candidates after scoring,
 ideas after the adversarial challenge, ideas approved by risk, and the top idea.
+
+---
+
+## Step 10 — Mark prior recommendations (trailing, lowest priority)
+
+**Only after** publishing, mark prior recommendations to current market prices.
+This is the **lowest-priority** step and must never delay analysis: it runs
+last, and **if the cycle is already running long, skip it** — the next cycle
+catches up (marks being a little late is fine).
+
+Source open recommendations from **Supabase** with `--from-supabase` so ideas
+recorded on *any* machine get marked (the dashboard reads Supabase; local-only
+marking misses ideas recorded elsewhere). Bound the work with
+`--max-age-minutes` so it re-prices only recently-recorded ideas (toward the
+5/15/30/60/120-minute checkpoints) rather than the whole open book:
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python \
+  scripts/paper_track.py mark --from-supabase --max-age-minutes 130 || true
+```
+
+Read-only; never executes trades. This is what keeps the Ideas History P&L
+timeline populated.
 
 ---
 

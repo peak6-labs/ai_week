@@ -28,6 +28,7 @@ except Exception:  # pragma: no cover - truststore optional
 from supabase import AsyncClient, acreate_client
 
 from kalshi_trader import config
+from kalshi_trader.ideas_history import join_recommendations_and_marks, parse_iso_timestamp
 from kalshi_trader.models import OrderResult, RiskDecision, SignalEstimate, TradeIdea
 
 logger = logging.getLogger(__name__)
@@ -246,19 +247,27 @@ async def insert_recommendation(rec: dict) -> None:
         "disposition": rec.get("disposition", "candidate"),
         "paper_only": True,
     }
+    # Mirror the true record time when known; otherwise let the DB default
+    # (now()) stand — never send null into the NOT NULL created_at column.
+    if rec.get("recorded_at"):
+        row["created_at"] = rec["recorded_at"]
     await client.table("recommendations").upsert(row, on_conflict="id").execute()
 
 
 async def insert_recommendation_mark(recommendation_id: str, mark: dict) -> None:
     """Insert one mark-to-market check for a recommendation."""
     client = await _get_client()
-    await client.table("recommendation_marks").insert({
+    mark_row = {
         "recommendation_id": recommendation_id,
         "current_value_cents": mark.get("current_value_cents"),
         "pnl_cents": mark.get("pnl_cents"),
         "would_profit": mark.get("would_profit"),
         "resolved": bool(mark.get("resolved")),
-    }).execute()
+    }
+    # Mirror the true check time when known; otherwise let the DB default stand.
+    if mark.get("checked_at"):
+        mark_row["checked_at"] = mark["checked_at"]
+    await client.table("recommendation_marks").insert(mark_row).execute()
 
 
 async def resolve_recommendation(recommendation_id: str) -> None:
@@ -655,3 +664,79 @@ async def get_signals_for_trade(trade_id: str) -> list[dict]:
         .execute()
     )
     return resp.data or []
+
+
+def _normalize_recommendation_row(row: dict) -> dict:
+    """Map a Supabase ``recommendations`` row to the shape the UI consumes.
+
+    ``id`` becomes ``rec_id`` and ``created_at`` becomes ``recorded_at`` (the two
+    keys the shared transform keys off). Every other column — including
+    ``paper_only`` — passes through unchanged, so the same path serves paper and
+    real ideas (real-trading switch invariant).
+    """
+    normalized = dict(row)
+    normalized["rec_id"] = normalized.pop("id", None)
+    normalized["recorded_at"] = normalized.pop("created_at", None)
+    return normalized
+
+
+def _normalize_mark_row(row: dict) -> dict:
+    """Map a Supabase ``recommendation_marks`` row to the UI mark shape.
+
+    ``recommendation_id`` becomes ``rec_id`` (the join key); ``checked_at`` and
+    the value fields pass through unchanged.
+    """
+    normalized = dict(row)
+    normalized["rec_id"] = normalized.pop("recommendation_id", None)
+    return normalized
+
+
+async def recommendations_with_marks() -> list[dict]:
+    """Return every recommendation joined with its marks timeline, from Supabase.
+
+    Mirror of ``paper.recommendations_with_marks`` but sourced from the shared
+    Supabase tables so any machine sees the same data. Uses the same pure
+    transform (``ideas_history.join_recommendations_and_marks``) so the local and
+    remote readers cannot drift. Returns all recommendations regardless of
+    ``paper_only`` — that flag is data, never a filter.
+    """
+    client = await _get_client()
+    recommendation_response = await client.table("recommendations").select("*").execute()
+    mark_response = await client.table("recommendation_marks").select("*").execute()
+
+    recommendations = [
+        _normalize_recommendation_row(row) for row in (recommendation_response.data or [])
+    ]
+    marks = [_normalize_mark_row(row) for row in (mark_response.data or [])]
+    return join_recommendations_and_marks(recommendations, marks)
+
+
+async def fetch_open_recommendations(
+    max_age_minutes: float | None = None, now: datetime | None = None
+) -> list[dict]:
+    """Open recommendations from Supabase, normalized to the local rec shape.
+
+    The dashboard reads ideas from Supabase, and ideas may be recorded by any
+    machine, so marking must source open recommendations from Supabase (not just
+    the local JSONL store) to keep every shared idea marked. ``max_age_minutes``
+    bounds a low-priority pass to recently-recorded ideas; a recommendation whose
+    ``recorded_at`` cannot be parsed is kept (age unknown).
+    """
+    client = await _get_client()
+    response = await (
+        client.table("recommendations").select("*").eq("status", "open").execute()
+    )
+    recommendations = [_normalize_recommendation_row(row) for row in (response.data or [])]
+    if max_age_minutes is None:
+        return recommendations
+
+    reference_time = now or datetime.now(tz=timezone.utc)
+    recent: list[dict] = []
+    for recommendation in recommendations:
+        recorded_at = parse_iso_timestamp(recommendation.get("recorded_at"))
+        if recorded_at is None:
+            recent.append(recommendation)
+            continue
+        if (reference_time - recorded_at).total_seconds() / 60.0 <= max_age_minutes:
+            recent.append(recommendation)
+    return recent

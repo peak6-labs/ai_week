@@ -277,20 +277,26 @@ def combine_signals(signals: list[dict], cfg: dict) -> dict:
     }
 
 
-def compute_edge_and_kelly(combined_probability: float, yes_ask_cents: float, cfg: dict) -> dict:
+def compute_edge_and_kelly(
+    combined_probability: float,
+    yes_ask_cents: float,
+    cfg: dict,
+    yes_bid_cents: float | None = None,
+) -> dict:
     """Compute fee-adjusted edge and half-Kelly fraction on the side we would take.
 
-    Pure math. ``combined_probability`` is the fair YES probability and
-    ``yes_ask_cents`` is the YES entry price in cents. If YES looks cheap we buy
-    YES; if YES looks rich we buy NO. Edge and Kelly are always measured on the
-    chosen side, so a NO-side mispricing (YES overpriced) surfaces symmetrically
-    with a YES-side one rather than being silently dropped.
+    Pure math. ``combined_probability`` is the fair YES probability.
+    ``yes_ask_cents`` is the YES taker entry in cents. ``yes_bid_cents``, when
+    available, is used to derive the real NO taker entry as ``100 - yes_bid``.
+    If YES looks cheap we buy YES; if YES looks rich we buy NO. Edge and Kelly
+    are always measured on the chosen side, so a NO-side mispricing (YES
+    overpriced) surfaces symmetrically with a YES-side one rather than being
+    silently dropped.
     """
     yes_price = yes_ask_cents / 100.0
 
-    # Take the side with positive raw edge, then express the probability and entry
-    # price on that side. The NO entry price is the complement of the YES price;
-    # the bid/ask spread is handled upstream when the caller prices the real NO ask.
+    # Take the side with positive raw edge, then express the probability and
+    # taker entry price on that side: YES buys at the ask, NO buys at 100-bid.
     if combined_probability >= yes_price:
         side = "yes"
         side_probability = combined_probability
@@ -298,7 +304,11 @@ def compute_edge_and_kelly(combined_probability: float, yes_ask_cents: float, cf
     else:
         side = "no"
         side_probability = 1.0 - combined_probability
-        side_price = 1.0 - yes_price
+        side_price = (
+            (100.0 - float(yes_bid_cents)) / 100.0
+            if yes_bid_cents is not None
+            else 1.0 - yes_price
+        )
 
     edge_cents = side_probability * 100 - side_price * 100
 
@@ -479,7 +489,12 @@ def score_market(market_data: dict, cfg: dict) -> dict:
     scored = collapse_source_families(scored)
 
     combined = combine_signals(scored, cfg)
-    edge = compute_edge_and_kelly(combined["combined_probability"], yes_ask, cfg)
+    edge = compute_edge_and_kelly(
+        combined["combined_probability"],
+        yes_ask,
+        cfg,
+        yes_bid_cents=market_data.get("yes_bid"),
+    )
 
     # With no usable signals the combined probability defaults to 0.5, which
     # against an extreme price (e.g. a 3¢ longshot) would fabricate a huge

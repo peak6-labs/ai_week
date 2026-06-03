@@ -135,6 +135,18 @@ class TestRecommendationsWithMarks:
 # ---------------------------------------------------------------------------
 
 class TestIdeasHistoryEndpoint:
+    """These verify local-store shaping through the endpoint, so they force the
+    Supabase source unavailable and exercise the local fallback. Source-selection
+    itself is covered by ``TestIdeasHistorySourcing``."""
+
+    @pytest.fixture(autouse=True)
+    def _force_local_source(self, monkeypatch):
+        from kalshi_trader import db
+
+        async def _unavailable():
+            raise RuntimeError("Supabase disabled in this test")
+        monkeypatch.setattr(db, "recommendations_with_marks", _unavailable)
+
     def test_returns_200(self, monkeypatch, tmp_path):
         write_paper_store(monkeypatch, tmp_path, SAMPLE_RECS, SAMPLE_MARKS)
         client = make_client(tmp_path)
@@ -161,3 +173,36 @@ class TestIdeasHistoryEndpoint:
         write_paper_store(monkeypatch, tmp_path, [], [])
         client = make_client(tmp_path)
         assert client.get("/api/ideas/history").json() == {"ideas": []}
+
+
+# ---------------------------------------------------------------------------
+# Endpoint sourcing: Supabase first, local JSONL fallback
+# ---------------------------------------------------------------------------
+
+class TestIdeasHistorySourcing:
+    SUPABASE_IDEAS = [{"rec_id": "sb-1", "recorded_at": "2026-06-03T06:00:00+00:00",
+                       "ticker": "KXSUPA-1", "marks": []}]
+
+    def test_uses_supabase_when_available(self, monkeypatch, tmp_path):
+        from kalshi_trader import db
+        # Local store has the SAMPLE recs; Supabase returns something distinct.
+        write_paper_store(monkeypatch, tmp_path, SAMPLE_RECS, SAMPLE_MARKS)
+
+        async def fake_supabase():
+            return self.SUPABASE_IDEAS
+        monkeypatch.setattr(db, "recommendations_with_marks", fake_supabase)
+
+        ideas = make_client(tmp_path).get("/api/ideas/history").json()["ideas"]
+        assert [idea["rec_id"] for idea in ideas] == ["sb-1"]
+
+    def test_falls_back_to_local_when_supabase_raises(self, monkeypatch, tmp_path):
+        from kalshi_trader import db
+        write_paper_store(monkeypatch, tmp_path, SAMPLE_RECS, SAMPLE_MARKS)
+
+        async def boom():
+            raise RuntimeError("supabase unreachable")
+        monkeypatch.setattr(db, "recommendations_with_marks", boom)
+
+        ideas = make_client(tmp_path).get("/api/ideas/history").json()["ideas"]
+        # local data served instead — the SAMPLE recs
+        assert {idea["rec_id"] for idea in ideas} == {"rec-a", "rec-b"}

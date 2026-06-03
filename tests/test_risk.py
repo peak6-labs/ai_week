@@ -238,16 +238,30 @@ def test_check_trade_fee_estimate_uses_corrected_fee(risk, sample_idea, empty_po
     assert decision.fees_estimate_cents == pytest.approx(recomputed_fee_cents, abs=1.0)
 
 
-def test_adaptive_sizing_reduces_after_three_losses(risk, sample_idea, empty_portfolio):
+def test_adaptive_sizing_reduces_after_three_losses(risk, empty_portfolio):
+    # A modest-edge idea whose half-Kelly size lands below MAX_SINGLE_POSITION,
+    # so the post-loss reduction is observable rather than masked by the cap.
+    modest_idea = TradeIdea(
+        agent_id="conditional_event",
+        ticker="NBA-CELTICS-WIN",
+        side=Side.YES,
+        action=OrderAction.BUY,
+        confidence=0.26,
+        market_price=20.0,
+        reasoning="Slight edge",
+        signal_sources=["A1"],
+        category="sports",
+    )
     risk.record_loss("sports")
     risk.record_loss("sports")
     risk.record_loss("sports")
-    reduced = risk.check_trade(sample_idea, empty_portfolio)
+    reduced = risk.check_trade(modest_idea, empty_portfolio)
 
     risk2 = RiskManager()
-    full = risk2.check_trade(sample_idea, empty_portfolio)
+    full = risk2.check_trade(modest_idea, empty_portfolio)
 
     assert reduced.approved
+    assert full.approved
     assert reduced.approved_size_dollars < full.approved_size_dollars
 
 

@@ -53,9 +53,12 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the array is empty (`[]`): log and report.
+   - If the array is empty (`[]`): log and report. An empty array is normal and
+     expected for races 538 does not poll (mayoral/local offices, primaries,
+     runoffs, ballot measures, and vote-share-threshold markets) — it is **not**
+     an error, so log it at info level.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polls-signal: TICKER → no signal (unparseable title or no 538 data for race)" warning
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polls-signal: TICKER → no 538 signal (race type not covered by FiveThirtyEight)"
      ```
    - If non-empty: log the result and print the raw JSON.
      ```bash

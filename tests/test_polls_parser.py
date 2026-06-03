@@ -48,6 +48,43 @@ def test_parse_two_word_state_new_hampshire():
     assert result["state"] == "new hampshire"
 
 
+# --- unsupported race families (538 polls general-election head-to-heads only) -
+
+def test_parse_mayoral_race_returns_none():
+    # FiveThirtyEight does not poll municipal/mayoral races.
+    result = parse_election_title(
+        "KXVOTEPRIMARY-MAYORLA26SPRA-65",
+        "Will Spencer Pratt receive at least 30% of the popular vote in the "
+        "first round of the 2026 Los Angeles mayoral election?",
+    )
+    assert result is None
+
+
+def test_parse_primary_with_chamber_keyword_returns_none():
+    # A Senate *primary* contains "Senate" but 538 has no primary polling, so the
+    # general-election senate file would produce a bogus signal — reject it.
+    result = parse_election_title(
+        "TICKER", "Will Colin Allred win the Democratic primary for the Texas Senate race?"
+    )
+    assert result is None
+
+
+def test_parse_vote_share_threshold_returns_none():
+    # A vote-share *threshold* market ("at least 55%") asks a different question
+    # than 538's head-to-head win margin — reject it even though it says "Senate".
+    result = parse_election_title(
+        "TICKER", "Will the Republican get at least 55% of the vote in the Ohio Senate race?"
+    )
+    assert result is None
+
+
+def test_parse_runoff_returns_none():
+    result = parse_election_title(
+        "TICKER", "Will Raphael Warnock win the Georgia Senate runoff?"
+    )
+    assert result is None
+
+
 # --- csv parsing -----------------------------------------------------------
 
 _SAMPLE_CSV = (

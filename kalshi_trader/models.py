@@ -141,3 +141,20 @@ class RankedSlate:
     ideas: list[tuple[TradeIdea, RiskDecision]]
     generated_at: datetime
     cycle_number: int
+
+
+@dataclass
+class ScanMetadata:
+    live_prices_refreshed_at: datetime | None = None
+    shortlist_refreshed_at: datetime | None = None
+    filtered_ticker_count: int = 0
+    live_priced_ticker_count: int = 0
+    dropped_unquoted_ticker_count: int = 0
+    degraded: bool = False
+    degraded_reason: str | None = None
+
+
+@dataclass
+class ScanResult:
+    ranked_markets: list[ScoredMarket]
+    metadata: ScanMetadata

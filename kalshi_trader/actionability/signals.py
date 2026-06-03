@@ -173,6 +173,28 @@ def ofi_score(trades: list[dict]) -> float | None:
     return abs(yes_volume - no_volume) / total_volume
 
 
+def live_top_of_book(orderbook: dict) -> tuple[float | None, float | None]:
+    """Derive (yes_bid, yes_ask) in cents from a live orderbook.
+
+    The book holds resting bids per side. Best YES bid = highest YES level. Best
+    YES ask = 100 - highest NO bid (buying YES is selling NO). Returns None for a
+    side with no resting levels.
+    """
+    def best_price(levels: list) -> float | None:
+        prices = []
+        for level in levels or []:
+            try:
+                prices.append(float(level[0]))
+            except (IndexError, TypeError, ValueError):
+                continue
+        return max(prices) if prices else None
+
+    yes_bid = best_price(orderbook.get("yes", []) if isinstance(orderbook, dict) else [])
+    best_no_bid = best_price(orderbook.get("no", []) if isinstance(orderbook, dict) else [])
+    yes_ask = (100.0 - best_no_bid) if best_no_bid is not None else None
+    return yes_bid, yes_ask
+
+
 def orderbook_skew_score(orderbook: dict) -> float:
     """Is the order book lopsided within 5 cents of mid?
 
