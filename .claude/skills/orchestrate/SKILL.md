@@ -102,6 +102,34 @@ Continue to Step 1 unconditionally — portfolio evaluation never blocks idea ge
 
 ---
 
+## Step 0.75 — AI position review
+
+Only runs if `clean_positions` from `/tmp/portfolio_eval_${TS}.json` contains
+positions with `market_exposure_dollars >= 2.0`.
+
+If none qualify:
+```bash
+.venv/bin/python scripts/ui_log.py "Portfolio review: no positions to review" 2>/dev/null || true
+```
+Then continue to Step 1 immediately.
+
+If there are qualifying positions, follow the `/portfolio` skill's Steps 3–7
+verbatim (fetch rules → collect signals → dispatch position-reviewer → present
+recommendations → prompt y/n → place approved exits). Use the `clean_positions`
+from `/tmp/portfolio_eval_${TS}.json` as the starting data.
+
+Signal dispatch is batched at 3 positions (same discipline as Step 2 of this
+pipeline).
+
+**This step pauses for user input.** Do not proceed to Step 1 until the user
+has responded to all position prompts (or there are no positions to review).
+
+```bash
+.venv/bin/python scripts/ui_log.py "Portfolio review: starting AI position analysis" 2>/dev/null || true
+```
+
+---
+
 ## Step 1 — Find markets with the market-scout agent
 
 Dispatch the **`market-scout`** agent with the `Agent` tool. Tell it explicitly
@@ -132,14 +160,15 @@ x), so we only spend those on a prioritized **deep-signal subset**.
 - **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
   scoring and, if it reaches 2+ sources, gets recorded for the backtest.
 - **Deep-signal subset (≤ ~20)** = the highest-priority rows for external agent
-  dispatch. Select by this priority order until you hit 20:
+  dispatch. **First, pre-filter the full board to rows with `average_score ≥ 0.4`**
+  — at that threshold the worth_trading hit rate is 3× the baseline (12.9% vs 4.4%),
+  so agent time is spent where it matters. Then select from that filtered pool by
+  this priority order until you hit 20:
   1. All weather/climate markets (NOAA is independent and cheap)
   2. All sports markets (sportsbook odds are independent and sharp)
   3. All mentions markets (GDELT base-rate)
   4. Top rows by `average_score` to fill remaining slots
-  Keep the cap at 20 — market_maker now runs on every market in the subset, so
-  each batch of 3 already spawns 6+ parallel agents. Wider subsets slow the cycle
-  without proportionally more signal. Only this subset gets Step 2's agent dispatch.
+  Keep the cap at 20. Only this subset gets Step 2's agent dispatch.
 
 For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
 as the tradeable `ticker`.
@@ -198,18 +227,17 @@ If the file is empty or missing, log and stop:
 
 ## Step 2 — Dispatch signal agents in parallel
 
-Process the **deep-signal subset** (≤ ~20) in **batches of 3 markets**. For each
-batch, spawn all applicable signal agents **in a single message** (multiple
-`Agent` tool calls) so they run concurrently. Wait for the whole batch before
-starting the next. Batching is what keeps concurrent API load bounded — now that
-`market-maker-signal` runs on every market, each batch already spawns 6+ parallel
-agents. Keep batches small so each one completes quickly. The rest of the coverage
-set rides on its deterministic scout signals.
+**Dispatch all subset markets in one single parallel message** — one `Agent` tool
+call per applicable agent, all firing concurrently. Do NOT batch sequentially; the
+rate-limit concern that motivated batches of 3 was x-signal and polymarket-price,
+both of which are now disabled. Weather/MM/OFI/mentions hitting their respective
+APIs concurrently is safe and reduces total wall time from O(batches × latency)
+to a single round-trip.
 
-Log before each batch:
+Log before dispatch:
 
 ```bash
-.venv/bin/python scripts/ui_log.py "Orchestrator: collecting signals for TICKER1, TICKER2, ..."
+.venv/bin/python scripts/ui_log.py "Orchestrator: collecting signals for TICKER1, TICKER2, ... (N markets)"
 ```
 
 `microstructure` and `kalshi_bias` already come from the scout row — **do not
@@ -257,8 +285,11 @@ NOAA; prepared remarks only, not Q&A).
   contains a league like WTA/ATP/NBA/NHL/MLB/NFL/UFC); args: ticker, title,
   plus `rules_primary` and `settlement_sources` from the rules file in the prompt
   so the agent only signals when the external contract resolves on the same criterion.
-- `order-flow-signal` — only if `volume_24h > 500`; args: ticker, title
-- `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
+- `order-flow-signal` — only if `volume_24h > 5000`; args: ticker, title.
+  Below 5k vol the trade tape is too sparse for reliable OFI direction — VPIN
+  elevates but stays neutral, adding noise without edge.
+- `polymarket-whale-signal` — **disabled**. Returned 0 real signals across all
+  test cycles; the markets we score don't have Polymarket whale coverage.
 - `polymarket-price-signal` — **disabled**. Do not dispatch.
 - `x-signal` — **disabled** (`agent_x_enabled: false`). Do not dispatch.
 
@@ -268,7 +299,7 @@ Settlement context routing summary (for reference):
 |-------|-------------------|
 | `weather-signal`, `mentions-signal`, `polls-signal` | pass as `SETTLEMENT_JSON` |
 | `sportsbook-odds-signal` | include `rules_primary` + `settlement_sources` in prompt |
-| `order-flow`, `market-maker`, `polymarket-whale`, scout signals | none needed — price/flow-derived |
+| `order-flow`, `market-maker`, scout signals | none needed — price/flow-derived |
 
 Each agent returns a JSON array of `SignalEstimate` objects. An empty array `[]`
 means **no signal** — record it as absent. Never fabricate a signal value to
@@ -404,16 +435,26 @@ candidate slate:
    source the signals measured? Check the signal metadata's `data_quality` field:
    a signal with `data_quality: unavailable` or `data_quality: stale` (>120 min
    for weather) contributed a floor/fallback value, not a real forecast — treat it
-   as absent and do not count it toward source independence. Does any
-   cross-venue signal (sportsbook) reference the *same* criterion? If the rule or
-   PDF has a twist the signals didn't account for (specific date, strict threshold,
-   source of truth, determination delay), drop the market. **Microstructure +
-   kalshi_bias are price-derived and correlated** — a slate resting only on those
-   two is weak; prefer markets where an independent signal (sportsbook/weather/
-   mentions) agrees.
+   as absent and do not count it toward source independence. If the rule or PDF
+   has a twist the signals didn't account for (specific date, strict threshold,
+   source of truth, determination delay), drop the market.
 2. **Bear case** — what specific mechanism makes the signal wrong?
-3. **Source independence** — are the agreeing signals from orthogonal data
-   sources, or do they share a common input?
+3. **Source independence** — two paths to pass:
+   - **External path** (lower bar, 5¢): an independent external signal
+     (weather/sportsbook/mentions) agrees with the direction. Microstructure +
+     kalshi_bias alone are price-derived and correlated — they do not satisfy
+     this path. fee_adjusted_edge ≥ 5¢.
+   - **Internal path** (higher bar, 8¢): `market_maker.direction` ∈ {YES, NO}
+     (not neutral) **and** `order_flow.ofi_direction` ∈ {YES, NO} (not neutral)
+     **and** both point the same direction. These two sources are orthogonal —
+     the order book snapshot and the trade tape are different data streams. If
+     `ofi_score = 0.0` while `buying_fraction` is extreme (normalization bug in
+     thin markets), treat OFI direction as absent. Compute:
+     ```
+     effective_edge = fee_adjusted_edge + actionability_score × 5
+     ```
+     Pass if effective_edge ≥ 8¢.
+   If neither path is satisfied, fail on source independence.
 4. **Base rate** — does the historical base rate support this direction?
 5. **Fresh-eyes test** — would you act on this with no prior conviction?
 
