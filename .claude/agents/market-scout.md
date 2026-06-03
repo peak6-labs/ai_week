@@ -39,17 +39,17 @@ report plus an inline summary. You generate ideas; a human decides.
    repo root (`/Users/scorley/code`). The slow part of a full-board scan is
    pulling the entire ~480-page market list from the API (minutes). The actual
    signal data — candles, trades, orderbooks — is always fetched live and is
-   cheap. So score from a **same-day market-list snapshot**: the signals stay
+   cheap, and the top markets get live orderbook bid/ask enrichment at score
+   time. So score from the existing market-list snapshot: the signals stay
    current even when the market list is a few hours old, and a run takes seconds
    instead of minutes.
 
-   a. Check the snapshot's age: `stat -f '%Sm' live_markets.json`. If it exists
-      and is from **today**, use it. If it is missing or stale, refresh it ONCE
-      first — this is the slow ~480-page pull:
-
-      ```bash
-      KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/fetch_markets.py
-      ```
+   a. **Do NOT refresh the snapshot.** Always score from the existing
+      `live_markets.json` as-is — never run `scripts/fetch_markets.py`. The
+      ~480-page refresh is slow and heavy on the API; the snapshot being a few
+      hours (or a day) old is fine because live signals and top-market orderbook
+      prices are re-fetched at score time. If `live_markets.json` is missing
+      entirely, stop and report that — do not trigger a refresh yourself.
 
    b. Score from the snapshot and emit JSON (seconds when the candle cache is
       warm). If the **caller gave you an explicit output JSON path** (e.g. the
