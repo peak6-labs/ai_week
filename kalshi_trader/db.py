@@ -514,6 +514,109 @@ async def upsert_polymarket_markets(markets: list[dict]) -> int:
 
 
 # ---------------------------------------------------------------------------
+# markets (Kalshi catalog — live_markets.json snapshot ingest)
+# ---------------------------------------------------------------------------
+
+_MARKETS_BATCH_SIZE = 500
+
+
+def _to_timestamp(raw_value) -> str | None:
+    """Normalise a Kalshi close_time string to an ISO UTC timestamp, or None."""
+    if not raw_value:
+        return None
+    if isinstance(raw_value, str):
+        return raw_value.replace("Z", "+00:00")
+    return None
+
+
+def _to_number(raw_value) -> float | None:
+    """Coerce a value to float, returning None when missing or unparseable."""
+    if raw_value is None or raw_value == "":
+        return None
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_integer(raw_value) -> int | None:
+    """Coerce a value to int, returning None when missing or unparseable."""
+    if raw_value is None or raw_value == "":
+        return None
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def prepare_market_row(market: dict, snapshot_at: str | None = None) -> dict:
+    """Map a live_markets.json market dict to a public.markets row.
+
+    Only fields the table has are kept; the full source dict is preserved in
+    ``raw`` for fidelity. ``snapshot_at`` is the snapshot's saved_at timestamp.
+    """
+    return {
+        "ticker": market["ticker"],
+        "event_ticker": market.get("event_ticker") or None,
+        "series_ticker": market.get("series_ticker") or None,
+        "title": market.get("title") or None,
+        "category": market.get("category") or None,
+        "status": market.get("status") or None,
+        "yes_bid": _to_number(market.get("yes_bid")),
+        "yes_ask": _to_number(market.get("yes_ask")),
+        "last_price": _to_number(market.get("last_price")),
+        "volume_24h": _to_integer(market.get("volume_24h")),
+        "open_interest": _to_integer(market.get("open_interest")),
+        "close_time": _to_timestamp(market.get("close_time")),
+        "raw": market,
+        "snapshot_at": snapshot_at,
+        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+
+async def upsert_markets(rows: list[dict]) -> int:
+    """Upsert prepared public.markets rows in batches of 500.
+
+    ``rows`` must already be prepared via ``prepare_market_row`` (each carries a
+    ticker primary key). Dedupes on ticker. Best-effort per batch — a failed
+    batch is logged and skipped. Returns the number of rows successfully written.
+    """
+    if not rows:
+        return 0
+
+    client = await _get_client()
+    written = 0
+    for start_index in range(0, len(rows), _MARKETS_BATCH_SIZE):
+        batch = rows[start_index : start_index + _MARKETS_BATCH_SIZE]
+        try:
+            await (
+                client.table("markets")
+                .upsert(batch, on_conflict="ticker")
+                .execute()
+            )
+            written += len(batch)
+        except Exception as caught_exception:
+            logger.warning(
+                "markets upsert failed for batch %d-%d: %s",
+                start_index, start_index + len(batch) - 1, caught_exception,
+            )
+
+    return written
+
+
+async def count_markets() -> int:
+    """Return the total row count of the public.markets table."""
+    client = await _get_client()
+    response = await (
+        client.table("markets")
+        .select("ticker", count="exact")
+        .limit(1)
+        .execute()
+    )
+    return response.count or 0
+
+
+# ---------------------------------------------------------------------------
 # reads
 # ---------------------------------------------------------------------------
 
