@@ -116,3 +116,30 @@ def test_performance_by_edge_bucket_brackets_at_the_threshold(isolated_store) ->
     assert by_bucket["[2.5,5)"]["wins"] == 0
     assert by_bucket["[10,inf)"]["marked"] == 1
     assert by_bucket["[10,inf)"]["wins"] == 1
+
+
+def test_append_mark_stamps_checked_at_into_the_mark_dict(isolated_store) -> None:
+    """append_mark must stamp checked_at into the passed dict so the same value
+    can be mirrored to Supabase, and return it."""
+    rec_id = paper.record_recommendation(
+        cycle_ts="c1", ticker="KX-STAMP", side="yes", entry_cents=40.0,
+        predicted_prob=0.6, edge_cents=8, n_sources=2, sources=["kalshi_bias", "x_grok"])
+    mark = {"current_value_cents": 45.0, "pnl_cents": 5.0, "would_profit": True, "resolved": False}
+    returned = paper.append_mark(rec_id, "KX-STAMP", mark)
+    # stamped into the caller's dict + returned
+    assert "checked_at" in mark
+    assert returned["checked_at"] == mark["checked_at"]
+    # and persisted with the same value
+    stored = next(m for m in paper.recommendations_with_marks() if m["rec_id"] == rec_id)["marks"][0]
+    assert stored["checked_at"] == mark["checked_at"]
+
+
+def test_append_mark_preserves_explicit_checked_at(isolated_store) -> None:
+    """If the caller already set checked_at, append_mark keeps it."""
+    rec_id = paper.record_recommendation(
+        cycle_ts="c1", ticker="KX-EXPL", side="no", entry_cents=60.0,
+        predicted_prob=0.4, edge_cents=8, n_sources=2, sources=["kalshi_bias", "x_grok"])
+    mark = {"checked_at": "2026-06-03T12:00:00+00:00", "pnl_cents": 1.0,
+            "would_profit": True, "resolved": False}
+    paper.append_mark(rec_id, "KX-EXPL", mark)
+    assert mark["checked_at"] == "2026-06-03T12:00:00+00:00"

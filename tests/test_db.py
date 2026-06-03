@@ -257,3 +257,123 @@ async def test_resolve_market_brier_score():
     scores = {call[0][0]["brier_score"] for call in update_calls}
     expected = {round((0.73 - 1.0) ** 2, 6), round((0.40 - 1.0) ** 2, 6)}
     assert scores == expected
+
+
+# ---------------------------------------------------------------------------
+# Ideas History reader — row normalizers + recommendations_with_marks
+# ---------------------------------------------------------------------------
+
+def test_normalize_recommendation_row_remaps_id_and_created_at():
+    from kalshi_trader.db import _normalize_recommendation_row
+    row = {
+        "id": "uuid-1", "created_at": "2026-06-03T04:00:00+00:00",
+        "ticker": "KXTEST-A", "side": "no", "entry_price_cents": 54.0,
+        "disposition": "worth_trading", "paper_only": True, "sources": ["microstructure"],
+    }
+    normalized = _normalize_recommendation_row(row)
+    assert normalized["rec_id"] == "uuid-1"
+    assert normalized["recorded_at"] == "2026-06-03T04:00:00+00:00"
+    assert "id" not in normalized and "created_at" not in normalized
+    # mode flag and other fields pass through unchanged (real-trading invariant)
+    assert normalized["paper_only"] is True
+    assert normalized["disposition"] == "worth_trading"
+    assert normalized["ticker"] == "KXTEST-A"
+
+
+def test_normalize_mark_row_remaps_recommendation_id():
+    from kalshi_trader.db import _normalize_mark_row
+    row = {
+        "recommendation_id": "uuid-1", "checked_at": "2026-06-03T05:00:00+00:00",
+        "current_value_cents": 60.0, "pnl_cents": 6.0, "would_profit": True, "resolved": False,
+    }
+    normalized = _normalize_mark_row(row)
+    assert normalized["rec_id"] == "uuid-1"
+    assert "recommendation_id" not in normalized
+    assert normalized["checked_at"] == "2026-06-03T05:00:00+00:00"
+    assert normalized["pnl_cents"] == 6.0
+
+
+@pytest.mark.asyncio
+async def test_recommendations_with_marks_joins_and_remaps():
+    import kalshi_trader.db as db_module
+    db_module._client = None
+
+    rec_rows = [
+        {"id": "uuid-a", "created_at": "2026-06-03T04:00:00+00:00", "ticker": "KXTEST-A",
+         "side": "no", "entry_price_cents": 54.0, "disposition": "worth_trading", "paper_only": True},
+        {"id": "uuid-b", "created_at": "2026-06-03T05:00:00+00:00", "ticker": "KXTEST-B",
+         "side": "yes", "entry_price_cents": 30.0, "disposition": "approved", "paper_only": True},
+    ]
+    mark_rows = [
+        {"recommendation_id": "uuid-a", "checked_at": "2026-06-03T11:00:00+00:00",
+         "current_value_cents": 60.0, "pnl_cents": 6.0, "would_profit": True, "resolved": False},
+        {"recommendation_id": "uuid-a", "checked_at": "2026-06-03T04:00:00+00:00",
+         "current_value_cents": 54.0, "pnl_cents": 0.0, "would_profit": False, "resolved": False},
+    ]
+
+    def table(name):
+        builder = MagicMock()
+        data = rec_rows if name == "recommendations" else mark_rows
+        builder.select.return_value.execute = AsyncMock(return_value=MagicMock(data=data))
+        return builder
+
+    mock_client = MagicMock()
+    mock_client.table.side_effect = table
+
+    with patch.object(db_module, "_get_client", AsyncMock(return_value=mock_client)):
+        ideas = await db_module.recommendations_with_marks()
+
+    # newest first by recorded_at
+    assert [idea["rec_id"] for idea in ideas] == ["uuid-b", "uuid-a"]
+    rec_a = next(idea for idea in ideas if idea["rec_id"] == "uuid-a")
+    assert rec_a["recorded_at"] == "2026-06-03T04:00:00+00:00"
+    assert rec_a["paper_only"] is True
+    # marks joined, oldest first, elapsed computed
+    assert len(rec_a["marks"]) == 2
+    assert rec_a["marks"][0]["elapsed_seconds"] == pytest.approx(0.0)
+    assert rec_a["marks"][1]["elapsed_seconds"] == pytest.approx(7 * 3600)
+
+
+@pytest.mark.asyncio
+async def test_insert_recommendation_writes_recorded_at_as_created_at():
+    import kalshi_trader.db as db_module
+    db_module._client = None
+    mock_client = MagicMock()
+    mock_client.table.return_value.upsert.return_value.execute = AsyncMock(
+        return_value=MagicMock(data=[{"id": "rec-1"}]))
+    rec = {"rec_id": "rec-1", "recorded_at": "2026-06-03T04:00:00+00:00", "cycle_ts": "c1",
+           "ticker": "KXTEST-A", "side": "no", "entry_price_cents": 54.0}
+    with patch.object(db_module, "_get_client", AsyncMock(return_value=mock_client)):
+        await db_module.insert_recommendation(rec)
+    upserted = mock_client.table.return_value.upsert.call_args[0][0]
+    assert upserted["created_at"] == "2026-06-03T04:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_insert_recommendation_omits_created_at_when_absent():
+    import kalshi_trader.db as db_module
+    db_module._client = None
+    mock_client = MagicMock()
+    mock_client.table.return_value.upsert.return_value.execute = AsyncMock(
+        return_value=MagicMock(data=[{"id": "rec-1"}]))
+    rec = {"rec_id": "rec-1", "ticker": "KXTEST-A", "side": "no", "entry_price_cents": 54.0}
+    with patch.object(db_module, "_get_client", AsyncMock(return_value=mock_client)):
+        await db_module.insert_recommendation(rec)
+    upserted = mock_client.table.return_value.upsert.call_args[0][0]
+    # no created_at sent → DB default now() stands (never send null into NOT NULL)
+    assert "created_at" not in upserted
+
+
+@pytest.mark.asyncio
+async def test_insert_recommendation_mark_writes_checked_at():
+    import kalshi_trader.db as db_module
+    db_module._client = None
+    mock_client = MagicMock()
+    mock_client.table.return_value.insert.return_value.execute = AsyncMock(
+        return_value=MagicMock(data=[{"id": "mark-1"}]))
+    mark = {"checked_at": "2026-06-03T05:00:00+00:00", "current_value_cents": 60.0,
+            "pnl_cents": 6.0, "would_profit": True, "resolved": False}
+    with patch.object(db_module, "_get_client", AsyncMock(return_value=mock_client)):
+        await db_module.insert_recommendation_mark("rec-1", mark)
+    inserted = mock_client.table.return_value.insert.call_args[0][0]
+    assert inserted["checked_at"] == "2026-06-03T05:00:00+00:00"

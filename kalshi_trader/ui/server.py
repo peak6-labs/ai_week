@@ -207,13 +207,20 @@ def create_app(
         resolved, elapsed_seconds) snapshots so the UI can plot how each idea
         moved over the intervals after it was presented. Never executes anything.
         """
-        from kalshi_trader import paper
+        from kalshi_trader import db, paper
 
         try:
-            ideas = paper.recommendations_with_marks()
-        except Exception as exc:  # never let a malformed store break the page
-            logger.warning("ideas history read failed: %s", exc)
-            ideas = []
+            # Primary source: Supabase, so any machine sees the shared data.
+            ideas = await db.recommendations_with_marks()
+        except Exception as supabase_exception:
+            # Fall back to the local JSONL store when Supabase is unreachable.
+            logger.warning("ideas history Supabase read failed, using local store: %s",
+                           supabase_exception)
+            try:
+                ideas = paper.recommendations_with_marks()
+            except Exception as local_exception:  # never let a bad store break the page
+                logger.warning("ideas history local read failed: %s", local_exception)
+                ideas = []
         return JSONResponse({"ideas": ideas})
 
     @app.post("/api/ideas")
