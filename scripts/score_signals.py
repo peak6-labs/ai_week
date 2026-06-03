@@ -326,6 +326,13 @@ def usable_estimates(estimates: list[dict]) -> list[dict]:
             continue
         if uncertainty >= 0.99:
             continue  # non-informative — agent found nothing usable
+        # Empty-data guard: an estimate flagged as having no underlying data
+        # (e.g. an X search that found zero posts) is absence-inferred, not
+        # evidence. Drop it regardless of the uncertainty the agent stamped on
+        # it — some agents emit a confident-looking value off no data.
+        metadata = estimate.get("metadata") or {}
+        if metadata.get("data_quality") == "empty" or metadata.get("post_count") == 0:
+            continue
         issued = estimate.get("data_issued_at")
         age_minutes = 0.0
         if issued:
@@ -342,6 +349,54 @@ def usable_estimates(estimates: list[dict]) -> list[dict]:
             "data_age_minutes": age_minutes,
         })
     return usable
+
+
+# Source families where one upstream call emits several "slice" estimates that
+# must NOT be counted as independent sources (they share a common input).
+_SOURCE_FAMILY_PREFIXES: list[str] = ["x_grok"]
+
+
+def _source_family(source: str) -> str:
+    """Map a possibly-sliced source name to its family (e.g. x_grok_news → x_grok)."""
+    for prefix in _SOURCE_FAMILY_PREFIXES:
+        if source.startswith(prefix):
+            return prefix
+    return source
+
+
+def collapse_source_families(estimates: list[dict]) -> list[dict]:
+    """Collapse slices of one upstream call into a single source estimate.
+
+    Several X (Grok) strategy slices — buzz/sentiment/experts/news — come from
+    one Grok query, so counting them as 4 sources both inflates ``n_sources``
+    (the actionability gate) and gives that one query 4x the weight in the
+    combine. Average each family's slices into one estimate carrying a single
+    representative weight, keyed by the family name.
+    """
+    by_family: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for estimate in estimates:
+        family = _source_family(estimate.get("source", "unknown"))
+        if family not in by_family:
+            by_family[family] = []
+            order.append(family)
+        by_family[family].append(estimate)
+
+    collapsed: list[dict] = []
+    for family in order:
+        members = by_family[family]
+        if len(members) == 1:
+            collapsed.append({**members[0], "source": family})
+            continue
+        count = len(members)
+        collapsed.append({
+            "source": family,
+            "probability": sum(float(m["probability"]) for m in members) / count,
+            "uncertainty": sum(float(m["uncertainty"]) for m in members) / count,
+            "weight": sum(float(m["weight"]) for m in members) / count,
+            "data_age_minutes": min(float(m.get("data_age_minutes", 0)) for m in members),
+        })
+    return collapsed
 
 
 def score_market(market_data: dict, cfg: dict) -> dict:
@@ -375,6 +430,10 @@ def score_market(market_data: dict, cfg: dict) -> dict:
                 result = fn(raw)
                 if result:
                     scored.append(result)
+
+    # Collapse multi-slice families (e.g. the four x_grok_* slices) into one
+    # source so they neither inflate n_sources nor over-weight the combine.
+    scored = collapse_source_families(scored)
 
     combined = combine_signals(scored, cfg)
     edge = compute_edge_and_kelly(combined["combined_probability"], yes_ask, cfg)

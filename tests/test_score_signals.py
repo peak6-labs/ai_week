@@ -95,3 +95,61 @@ def test_no_signals_against_extreme_price_is_not_actionable() -> None:
     assert result["worth_trading"] is False
     assert result["edge_cents"] == 0.0
     assert result["kelly_fraction"] == 0.0
+
+
+# --- empty-data guard (#12) + same-origin source collapse (#13) ---
+
+def test_empty_data_x_estimate_is_dropped() -> None:
+    # An X estimate with metadata.data_quality == "empty" (zero posts) is
+    # absence-inferred, not evidence. It must be dropped regardless of the low
+    # uncertainty the agent stamped on it.
+    estimates = [
+        {"source": "x_grok_buzz", "probability": 0.08, "uncertainty": 0.07,
+         "weight": 0.25, "metadata": {"data_quality": "empty", "post_count": 0}},
+    ]
+    assert score_signals.usable_estimates(estimates) == []
+
+
+def test_post_count_zero_estimate_is_dropped() -> None:
+    estimates = [
+        {"source": "x_grok_news", "probability": 0.1, "uncertainty": 0.1,
+         "weight": 0.25, "metadata": {"post_count": 0}},
+    ]
+    assert score_signals.usable_estimates(estimates) == []
+
+
+def test_x_grok_slices_collapse_to_one_source() -> None:
+    # Four x_grok strategy slices come from ONE Grok call — they must count as a
+    # single source (not inflate n_sources to 4 or get 4x the weight).
+    estimates = [
+        {"source": "x_grok_buzz", "probability": 0.20, "uncertainty": 0.10, "weight": 0.25,
+         "data_age_minutes": 0.0},
+        {"source": "x_grok_sentiment", "probability": 0.30, "uncertainty": 0.10, "weight": 0.25,
+         "data_age_minutes": 0.0},
+        {"source": "x_grok_experts", "probability": 0.20, "uncertainty": 0.10, "weight": 0.25,
+         "data_age_minutes": 0.0},
+        {"source": "x_grok_news", "probability": 0.30, "uncertainty": 0.10, "weight": 0.25,
+         "data_age_minutes": 0.0},
+    ]
+    collapsed = score_signals.collapse_source_families(estimates)
+    assert len(collapsed) == 1
+    assert collapsed[0]["source"] == "x_grok"
+    assert collapsed[0]["probability"] == 0.25  # mean of 0.20/0.30/0.20/0.30
+
+
+def test_x_grok_slices_count_as_single_source_in_score_market() -> None:
+    # micro + kalshi_bias + 4 x_grok slices must yield n_sources == 3, not 6.
+    market = {
+        "ticker": "KX-LA", "yes_ask": 48.0, "yes_bid": 46.0,
+        "signal_estimates": [
+            {"source": "microstructure", "probability": 0.45, "uncertainty": 0.2, "weight": 0.4},
+            {"source": "kalshi_bias", "probability": 0.50, "uncertainty": 0.05, "weight": 0.7},
+            {"source": "x_grok_buzz", "probability": 0.20, "uncertainty": 0.10, "weight": 0.25},
+            {"source": "x_grok_sentiment", "probability": 0.20, "uncertainty": 0.10, "weight": 0.25},
+            {"source": "x_grok_experts", "probability": 0.20, "uncertainty": 0.10, "weight": 0.25},
+            {"source": "x_grok_news", "probability": 0.20, "uncertainty": 0.10, "weight": 0.25},
+        ],
+    }
+    result = score_signals.score_market(market, DEFAULT_CONFIG)
+    assert result["n_sources"] == 3
+    assert sorted(result["sources"]) == ["kalshi_bias", "microstructure", "x_grok"]
