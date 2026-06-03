@@ -100,7 +100,14 @@ def _cmd_record_scored(args) -> None:
         for idea in json.loads(Path(args.exclude_file).read_text()):
             excluded.add(idea.get("ticker", ""))
 
+    # Dedup: with whole-board coverage the same market recurs every cycle. Record
+    # a (ticker, side) once while it is still open, then just keep marking it —
+    # re-recording would flood the store with duplicates and skew the backtest.
+    already_open = {(rec["ticker"], rec.get("side"))
+                    for rec in paper.open_recommendations()}
+
     recorded = 0
+    skipped_open = 0
     by_disposition: dict[str, int] = {}
     recorded_rows: list[dict] = []
     for market in scored:
@@ -111,6 +118,9 @@ def _cmd_record_scored(args) -> None:
         if n_sources < args.min_sources:
             continue
         side = market.get("side", "yes")
+        if (ticker, side) in already_open:
+            skipped_open += 1
+            continue
         yes_ask = float(market.get("yes_ask", 0) or 0)
         yes_bid = float(market.get("yes_bid", yes_ask) or yes_ask)
         # Taker entry cost on the chosen side, mirroring paper.entry_price_cents.
@@ -146,7 +156,8 @@ def _cmd_record_scored(args) -> None:
 
     _mirror_recommendations(recorded_rows)
     print(f"recorded {recorded} scored markets for backtest "
-          f"(cycle {args.cycle_ts}, min_sources={args.min_sources}, by_disposition={by_disposition})")
+          f"(cycle {args.cycle_ts}, min_sources={args.min_sources}, "
+          f"by_disposition={by_disposition}, skipped {skipped_open} already-open)")
 
 
 async def _cmd_mark(args) -> None:

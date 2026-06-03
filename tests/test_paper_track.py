@@ -82,3 +82,20 @@ def test_record_scored_excludes_approved_slate(isolated_store, tmp_path) -> None
 
     tickers = {r["ticker"] for r in paper.load_recommendations()}
     assert tickers == {"KX-OTHER"}  # approved slate recorded separately, not here
+
+
+def test_record_scored_skips_already_open_ticker_side(isolated_store, tmp_path) -> None:
+    # Whole-board coverage re-scores the same markets every cycle; an open
+    # (ticker, side) must not be recorded twice — just marked over time.
+    scored = [{"ticker": "KX-DUP", "side": "no", "yes_ask": 60, "yes_bid": 58,
+               "combined_probability": 0.3, "fee_adjusted_edge": 3.0, "worth_trading": False,
+               "n_sources": 2, "sources": ["microstructure", "kalshi_bias"], "category": "elections"}]
+    args = Namespace(scored_file=_write_scored(tmp_path, scored), cycle_ts="T1",
+                     exclude_file="", min_sources=2)
+    paper_track._cmd_record_scored(args)
+    # Second cycle, same market still open → should be skipped.
+    args2 = Namespace(scored_file=_write_scored(tmp_path, scored), cycle_ts="T2",
+                      exclude_file="", min_sources=2)
+    paper_track._cmd_record_scored(args2)
+    rows = [r for r in paper.load_recommendations() if r["ticker"] == "KX-DUP"]
+    assert len(rows) == 1
