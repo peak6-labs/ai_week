@@ -117,6 +117,30 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                         "total": int(float(raw_order.get("initial_count_fp", "0") or 0)),
                         "created_time": raw_order.get("created_time"),
                     })
+
+                # Enrich orders with live bid/ask and latest pipeline fair value.
+                if mapped_orders:
+                    order_tickers = list({o["ticker"] for o in mapped_orders if o["ticker"]})
+                    order_price_results = await asyncio.gather(
+                        *[_fetch_yes_price_data(client, ticker, concurrency_semaphore)
+                          for ticker in order_tickers]
+                    )
+                    order_price_map: dict[str, dict | None] = dict(zip(order_tickers, order_price_results))
+
+                    from kalshi_trader import db as _db
+                    try:
+                        fair_value_map = await _db.get_latest_fair_values(order_tickers)
+                    except Exception as fair_value_exception:
+                        logger.debug("Fair value lookup failed: %s", fair_value_exception)
+                        fair_value_map = {}
+
+                    for order in mapped_orders:
+                        price_data = order_price_map.get(order["ticker"])
+                        order["yes_bid"] = price_data["bid"] if price_data else None
+                        order["yes_ask"] = price_data["ask"] if price_data else None
+                        raw_prob = fair_value_map.get(order["ticker"])
+                        order["fair_value_cents"] = round(raw_prob * 100, 1) if raw_prob is not None else None
+
                 trading_state.orders = mapped_orders
 
                 raw_positions = positions_resp.get("market_positions") or []

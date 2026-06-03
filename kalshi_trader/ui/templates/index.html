@@ -858,14 +858,17 @@
             <tr>
               <th>Ticker</th>
               <th>Side</th>
-              <th>Price ¢</th>
+              <th>Order ¢</th>
+              <th>Bid ¢</th>
+              <th>Ask ¢</th>
+              <th>Fair Val ¢</th>
               <th>Remaining</th>
               <th>Filled</th>
               <th>Age</th>
             </tr>
           </thead>
           <tbody id="orders-tbody">
-            <tr class="empty-row"><td colspan="6">No resting orders</td></tr>
+            <tr class="empty-row"><td colspan="9">No resting orders</td></tr>
           </tbody>
         </table>
       </div>
@@ -1121,7 +1124,7 @@ function renderPositions(positions) {
 function renderOrders(orders) {
   const tbody = document.getElementById('orders-tbody');
   if (!orders || orders.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No resting orders</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No resting orders</td></tr>';
     return;
   }
   tbody.innerHTML = orders.map(o => {
@@ -1132,10 +1135,20 @@ function renderOrders(orders) {
     const tickerEl = url
       ? `<a class="text-mono kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(o.ticker ?? '')}</a>`
       : `<span class="text-mono">${escHtml(o.ticker ?? '')}</span>`;
+    const bidDisplay = o.yes_bid != null ? o.yes_bid + '¢' : '—';
+    const askDisplay = o.yes_ask != null ? o.yes_ask + '¢' : '—';
+    const fairVal = o.fair_value_cents;
+    const fairDisplay = fairVal != null ? fairVal + '¢' : '—';
+    const fairCls = fairVal != null && o.price_cents != null
+      ? (fairVal > o.price_cents ? 'pnl-pos' : fairVal < o.price_cents ? 'pnl-neg' : '')
+      : '';
     return `<tr>
       <td>${tickerEl}</td>
       <td>${sideBadge}</td>
       <td>${o.price_cents ?? '—'}¢</td>
+      <td style="color:var(--text-secondary)">${escHtml(bidDisplay)}</td>
+      <td style="color:var(--text-secondary)">${escHtml(askDisplay)}</td>
+      <td class="${fairCls}">${escHtml(fairDisplay)}</td>
       <td>${o.remaining ?? ''}</td>
       <td style="color:var(--text-tertiary)">${o.filled ?? 0}/${o.total ?? 0}</td>
       <td style="color:var(--text-tertiary)">${timeSince(o.created_time)}</td>

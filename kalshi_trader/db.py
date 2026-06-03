@@ -301,6 +301,24 @@ async def upsert_scored_markets(rows: list[dict]) -> int:
     return written
 
 
+async def get_latest_fair_values(tickers: list[str]) -> dict[str, float | None]:
+    """Return the most recent combined_probability (0-1) per ticker from scored_markets."""
+    if not tickers:
+        return {}
+    client = await _get_client()
+    resp = await client.table("scored_markets") \
+        .select("ticker,combined_probability") \
+        .in_("ticker", tickers) \
+        .order("created_at", desc=True) \
+        .execute()
+    result: dict[str, float | None] = {}
+    for row in resp.data:
+        ticker = row["ticker"]
+        if ticker not in result:
+            result[ticker] = row.get("combined_probability")
+    return result
+
+
 async def close_trade(
     trade_id: str,
     exit_reason: str,
