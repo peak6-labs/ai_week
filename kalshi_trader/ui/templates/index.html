@@ -583,6 +583,32 @@
       color: var(--text-tertiary);
       margin-bottom: 10px;
     }
+    .idea-price-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .idea-price-row label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .idea-price-input {
+      width: 72px;
+      padding: 4px 7px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+    .idea-price-input:focus {
+      outline: none;
+      border-color: var(--success);
+      box-shadow: 0 0 0 2px rgba(52,199,89,0.18);
+    }
     .idea-card-actions {
       display: flex;
       gap: 8px;
@@ -1249,6 +1275,12 @@ function renderPendingIdeas(ideas) {
         <div class="idea-reasoning">${escHtml(idea.reasoning ?? '')}</div>
         ${sources ? `<div class="idea-signals">${sources}</div>` : ''}
         ${marketPrice ? `<div class="idea-market-price">${escHtml(marketPrice)}</div>` : ''}
+        <div class="idea-price-row">
+          <label>Exec. price ¢</label>
+          <input type="number" class="idea-price-input" data-id="${escHtml(idea.id)}"
+            value="${idea.market_price != null ? Math.round(idea.market_price) : ''}"
+            min="1" max="99" step="1" placeholder="—" />
+        </div>
         <div class="idea-card-actions">
           <button class="btn-approve" data-id="${escHtml(idea.id)}">Approve</button>
           <button class="btn-reject" data-id="${escHtml(idea.id)}">Reject</button>
@@ -1259,14 +1291,18 @@ function renderPendingIdeas(ideas) {
 
   // Attach approve/reject handlers
   grid.querySelectorAll('.btn-approve').forEach(btn => {
-    btn.addEventListener('click', () => reviewIdea(btn.dataset.id, 'approve'));
+    btn.addEventListener('click', () => {
+      const priceInput = grid.querySelector(`.idea-price-input[data-id="${btn.dataset.id}"]`);
+      const priceCents = priceInput && priceInput.value !== '' ? parseFloat(priceInput.value) : null;
+      reviewIdea(btn.dataset.id, 'approve', isNaN(priceCents) ? null : priceCents);
+    });
   });
   grid.querySelectorAll('.btn-reject').forEach(btn => {
-    btn.addEventListener('click', () => reviewIdea(btn.dataset.id, 'reject'));
+    btn.addEventListener('click', () => reviewIdea(btn.dataset.id, 'reject', null));
   });
 }
 
-async function reviewIdea(ideaId, action) {
+async function reviewIdea(ideaId, action, priceCents) {
   // Optimistic: remove card immediately
   const card = document.getElementById('idea-card-' + ideaId);
   if (card) card.remove();
@@ -1278,7 +1314,12 @@ async function reviewIdea(ideaId, action) {
   }
 
   try {
-    const resp = await fetch(`/api/ideas/${encodeURIComponent(ideaId)}/${action}`, { method: 'POST' });
+    const fetchOpts = { method: 'POST' };
+    if (action === 'approve' && priceCents !== null && priceCents !== undefined) {
+      fetchOpts.headers = { 'Content-Type': 'application/json' };
+      fetchOpts.body = JSON.stringify({ price_cents: priceCents });
+    }
+    const resp = await fetch(`/api/ideas/${encodeURIComponent(ideaId)}/${action}`, fetchOpts);
     if (!resp.ok) {
       console.warn('reviewIdea failed, HTTP', resp.status);
     }

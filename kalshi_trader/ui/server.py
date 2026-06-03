@@ -328,12 +328,23 @@ def create_app(
 
     @app.post("/api/ideas/{idea_id}/approve")
     async def approve_idea(idea_id: str, request: Request) -> JSONResponse:
-        """Approve a pending idea by id."""
+        """Approve a pending idea by id.
+
+        Accepts an optional JSON body ``{"price_cents": float}`` to override
+        the execution price.  Stored on the idea as ``override_price_cents``
+        for the executor to use when execution is re-enabled.
+        """
         state: TradingState = request.app.state.trading_state
         idx = next((i for i, idea in enumerate(state.pending_ideas) if idea.get("id") == idea_id), None)
         if idx is None:
             return JSONResponse({"error": "idea not found"}, status_code=404)
         idea = state.pending_ideas.pop(idx)
+        try:
+            body = await request.json()
+            if isinstance(body, dict) and body.get("price_cents") is not None:
+                idea["override_price_cents"] = float(body["price_cents"])
+        except Exception:
+            pass
         idea["decision"] = "approved"
         idea["reviewed_at"] = datetime.now(tz=timezone.utc).isoformat()
         state.reviewed_ideas.insert(0, idea)
