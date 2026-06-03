@@ -89,6 +89,11 @@ def test_profit_target_skips_zero_cost_basis():
     assert check_profit_target(position) is None
 
 
+def test_profit_target_skips_zero_quantity():
+    position = _position(cost_basis=5.0, quantity=0.0, current_price_cents=90.0)
+    assert check_profit_target(position) is None
+
+
 # ---------------------------------------------------------------------------
 # EXIT_CHECKS list
 # ---------------------------------------------------------------------------
