@@ -16,6 +16,12 @@ from kalshi_trader.actionability.signals import (
     volume_oi_ratio_score,
     volume_spike_short_term_score,
 )
+from kalshi_trader.signals.microstructure import (
+    range_position,
+    signed_momentum_cents,
+    signed_ofi,
+    signed_orderbook_skew,
+)
 
 if TYPE_CHECKING:
     from kalshi_trader.actionability.store import SnapshotStore
@@ -82,6 +88,9 @@ class MarketScorer:
             weekly_hl_score=scores["weekly_hl"],
             ofi_score=None,
             orderbook_skew_score=None,
+            # Signed components for the directional microstructure signal.
+            signed_momentum_cents=signed_momentum_cents(hourly_candles),
+            range_position=range_position(hourly_candles, midpoint_price),
         )
 
     def enrich_with_live(
@@ -97,9 +106,11 @@ class MarketScorer:
             ticker = scored_market.market.ticker
             if ticker in trade_data:
                 scored_market.ofi_score = ofi_score(trade_data[ticker])
+                scored_market.signed_ofi = signed_ofi(trade_data[ticker])
                 trade_hits += 1
             if ticker in orderbook_data:
                 scored_market.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
+                scored_market.signed_orderbook_skew = signed_orderbook_skew(orderbook_data[ticker])
                 orderbook_hits += 1
             scored_market.composite_score = self._composite(self._scores_dict(scored_market))
         _log.debug(
