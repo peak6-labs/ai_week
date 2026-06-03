@@ -153,16 +153,38 @@ def close_recommendation(rec_id: str) -> None:
     _RECS_FILE.write_text("\n".join(json.dumps(r, default=str) for r in rows) + ("\n" if rows else ""))
 
 
-def performance_summary() -> dict:
-    """Aggregate the latest mark per recommendation into a quick scorecard."""
-    marks = _read_jsonl(_MARKS_FILE)
+def _latest_marks() -> dict[str, dict]:
     latest: dict[str, dict] = {}
-    for mark in marks:
+    for mark in _read_jsonl(_MARKS_FILE):
         latest[mark["rec_id"]] = mark  # later marks overwrite — file is append-ordered
-    scored = [m for m in latest.values() if m.get("pnl_cents") is not None]
+    return latest
+
+
+def _scorecard(marks: list[dict]) -> dict:
+    scored = [m for m in marks if m.get("pnl_cents") is not None]
     if not scored:
         return {"marked": 0, "wins": 0, "win_rate": None, "avg_pnl_cents": None}
     wins = sum(1 for m in scored if m.get("would_profit"))
     avg = sum(m["pnl_cents"] for m in scored) / len(scored)
     return {"marked": len(scored), "wins": wins,
             "win_rate": round(wins / len(scored), 3), "avg_pnl_cents": round(avg, 2)}
+
+
+def performance_summary() -> dict:
+    """Aggregate the latest mark per recommendation into a quick scorecard."""
+    return _scorecard(list(_latest_marks().values()))
+
+
+def performance_by_source() -> dict[str, dict]:
+    """Scorecard sliced by each recommendation's signal sources.
+
+    Lets us compare which signal — or which whale scorer (recorded as
+    ``whale:<scorer>``) — actually predicts outcomes best.
+    """
+    latest = _latest_marks()
+    recs = {r["rec_id"]: r for r in load_recommendations()}
+    by_source: dict[str, list[dict]] = {}
+    for rec_id, mark in latest.items():
+        for source in (recs.get(rec_id, {}).get("sources") or ["unknown"]):
+            by_source.setdefault(source, []).append(mark)
+    return {source: _scorecard(marks) for source, marks in by_source.items()}

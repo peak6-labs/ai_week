@@ -134,9 +134,11 @@ async def _cmd_mark(args) -> None:
 
 
 def _cmd_report(args) -> None:
-    summary = paper.performance_summary()
     open_n = len(paper.open_recommendations())
-    print(json.dumps({"open_recommendations": open_n, **summary}, indent=2))
+    out = {"open_recommendations": open_n, "overall": paper.performance_summary()}
+    if args.by_source:
+        out["by_source"] = paper.performance_by_source()
+    print(json.dumps(out, indent=2))
 
 
 def main() -> None:
@@ -148,7 +150,8 @@ def main() -> None:
     rec.add_argument("--cycle-ts", required=True)
 
     sub.add_parser("mark", help="Mark all open recommendations to current market")
-    sub.add_parser("report", help="Print the running scorecard")
+    report = sub.add_parser("report", help="Print the running scorecard")
+    report.add_argument("--by-source", action="store_true", help="Break the scorecard down by signal source")
 
     args = parser.parse_args()
     if args.command == "record":
