@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from kalshi_trader.agents.weather_agent import _parse_weather_market, WeatherAgent
 from kalshi_trader.models import SignalEstimate
@@ -148,3 +148,70 @@ async def test_build_authority_signal_handler_reads_independence_from_dict():
     )
     assert result["source"] == "x_weather_authority"
     assert result["metadata"]["independent_of_noaa"] is False
+
+
+# ---------------------------------------------------------------------------
+# ensemble handlers (GEFS ensemble — primary quantitative signal)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_ensemble_forecast_delegates_to_open_meteo():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    agent._open_meteo = MagicMock()
+    agent._open_meteo.get_ensemble_members = AsyncMock(return_value={
+        "members": [80.0] * 31, "member_count": 31, "field": "temperature_2m_max",
+        "units": "°F", "model": "gfs_seamless",
+    })
+
+    result = await agent._get_ensemble_forecast(41.8781, -87.6298, "2026-06-05", "temp_high")
+
+    # The handler parses the YYYY-MM-DD string into a date before delegating.
+    agent._open_meteo.get_ensemble_members.assert_awaited_once_with(
+        41.8781, -87.6298, date(2026, 6, 5), "temp_high"
+    )
+    assert result["member_count"] == 31
+
+
+@pytest.mark.asyncio
+async def test_build_ensemble_signal_handler_returns_gfs_ensemble():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    ensemble = {"members": [70.0 + index for index in range(31)], "member_count": 31}
+    result = await agent._build_ensemble_signal(
+        ticker="KXHIGHTCHI-26JUN05-T85", metric="temp_high", threshold=85.0,
+        operator="above", ensemble=ensemble,
+    )
+    assert result["source"] == "gfs_ensemble"
+    assert result["metadata"]["member_count"] == 31
+    # estimate_to_dict must emit data_issued_at as an ISO string.
+    assert isinstance(result["data_issued_at"], str)
+
+
+@pytest.mark.asyncio
+async def test_build_ensemble_signal_handler_tolerates_roundtripped_string_timestamp():
+    # When the ensemble dict round-trips through the agent, data_issued_at arrives
+    # as a string (BaseAgent json-encodes tool results with default=str). The
+    # builder must ignore it and still produce an ISO-serializable estimate.
+    agent = WeatherAgent.__new__(WeatherAgent)
+    ensemble = {
+        "members": [70.0 + index for index in range(31)], "member_count": 31,
+        "data_issued_at": "2026-06-05 12:00:00+00:00",  # str(datetime), not a datetime
+    }
+    result = await agent._build_ensemble_signal(
+        ticker="T", metric="temp_high", threshold=85.0, operator="above", ensemble=ensemble,
+    )
+    assert result["source"] == "gfs_ensemble"
+    assert isinstance(result["data_issued_at"], str)
+
+
+@pytest.mark.asyncio
+async def test_close_closes_all_clients():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    agent._noaa = MagicMock(); agent._noaa.close = AsyncMock()
+    agent._open_meteo = MagicMock(); agent._open_meteo.close = AsyncMock()
+    agent._x = MagicMock(); agent._x.close = AsyncMock()
+
+    await agent.close()
+
+    agent._noaa.close.assert_awaited_once()
+    agent._open_meteo.close.assert_awaited_once()
+    agent._x.close.assert_awaited_once()

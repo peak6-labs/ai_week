@@ -59,6 +59,18 @@ def test_usable_estimates_drops_noninformative() -> None:
     assert [u["source"] for u in usable] == ["kalshi_bias"]
 
 
+def test_usable_estimates_drops_empty_ensemble() -> None:
+    # An ensemble estimate flagged empty (Open-Meteo down / too few members) must
+    # be dropped so the parametric NOAA fallback carries the market instead.
+    estimates = [
+        {"source": "noaa_gfs", "probability": 0.7, "uncertainty": 0.08, "weight": 0.85},
+        {"source": "gfs_ensemble", "probability": 0.5, "uncertainty": 1.0, "weight": 0.85,
+         "metadata": {"data_quality": "empty", "member_count": 3}},
+    ]
+    usable = score_signals.usable_estimates(estimates)
+    assert [u["source"] for u in usable] == ["noaa_gfs"]
+
+
 def test_score_market_uses_signal_estimates_directly() -> None:
     market = {
         "ticker": "KXFOO", "title": "t", "category": "politics", "yes_ask": 40.0,

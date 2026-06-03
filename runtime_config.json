@@ -1,6 +1,7 @@
 {
   "min_agents": 2,
   "weight_noaa": 0.85,
+  "weight_ensemble": 0.85,
   "weight_polymarket_price": 0.75,
   "weight_polymarket_whale": 0.6,
   "weight_x_grok": 0.6,
@@ -8,6 +9,9 @@
   "weight_market_maker": 0.65,
   "uncertainty_noaa_temp": 0.08,
   "uncertainty_noaa_precip": 0.05,
+  "uncertainty_ensemble_temp": 0.07,
+  "uncertainty_ensemble_precip": 0.05,
+  "ensemble_min_members": 10,
   "uncertainty_poly_price": 0.03,
   "uncertainty_whale_single": 0.15,
   "uncertainty_whale_multi": 0.1,

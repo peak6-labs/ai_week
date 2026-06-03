@@ -126,6 +126,127 @@ def build_weather_signal(
     )
 
 
+# Standard NWS "measurable precipitation" threshold (inches) — used for rain
+# markets that ask "will it rain" with no explicit amount in the threshold.
+_MEASURABLE_PRECIP_INCHES = 0.01
+
+
+def build_ensemble_signal(
+    ticker: str,
+    metric: str,
+    threshold: float,
+    operator: str,
+    ensemble: dict,
+) -> SignalEstimate:
+    """Build a ``gfs_ensemble`` SignalEstimate from GEFS member values.
+
+    The model-implied probability is the *empirical CDF* — the fraction of
+    ensemble members that satisfy the threshold — which replaces the parametric
+    normal-CDF proxy (``build_weather_signal``) as the primary quantitative
+    weather signal::
+
+        above → members strictly greater than threshold
+        below → members strictly less than threshold
+
+    For precipitation with ``threshold <= 0`` (a "will it rain" market), a member
+    "satisfies" when its forecast accumulation exceeds 0.01" (measurable precip).
+
+    When fewer than ``ensemble_min_members`` are present the estimate is flagged
+    ``data_quality == "empty"`` with ``uncertainty = 1.0`` so the scorer drops it
+    and the agent's parametric NOAA fallback stands instead.
+
+    Args:
+        ticker: Kalshi market ticker.
+        metric: "temp_high", "temp_low", or "precipitation".
+        threshold: Numeric threshold for the condition.
+        operator: "above" or "below".
+        ensemble: Dict from ``OpenMeteoClient.get_ensemble_members`` (members,
+            member_count, field, units, model, data_issued_at).
+
+    Returns:
+        SignalEstimate with source="gfs_ensemble".
+    """
+    members: list[float] = [float(value) for value in ensemble.get("members", [])]
+    member_count = len(members)
+    minimum_members = int(cfg.get("ensemble_min_members"))
+
+    if member_count < minimum_members:
+        # Not enough ensemble members — flag empty so the scorer drops it and the
+        # caller's parametric NOAA estimate carries the market instead.
+        return SignalEstimate(
+            source="gfs_ensemble",
+            probability=0.5,
+            uncertainty=1.0,
+            weight=cfg.get("weight_ensemble"),
+            data_issued_at=datetime.now(tz=timezone.utc),
+            metadata={
+                "ticker": ticker,
+                "narrative": (
+                    f"GEFS ensemble unavailable for {ticker} "
+                    f"({member_count} members); falling back to NOAA parametric."
+                ),
+                "data_quality": "empty",
+                "forecast_model": "gfs_ensemble",
+                "member_count": member_count,
+            },
+        )
+
+    if metric == "precipitation":
+        effective_threshold = threshold if threshold and threshold > 0 else _MEASURABLE_PRECIP_INCHES
+        members_satisfying = sum(1 for value in members if value > effective_threshold)
+    elif operator == "above":
+        members_satisfying = sum(1 for value in members if value > threshold)
+    else:  # below
+        members_satisfying = sum(1 for value in members if value < threshold)
+
+    raw_probability = members_satisfying / member_count
+    probability = min(max(raw_probability, 0.01), 0.99)
+
+    sorted_members = sorted(members)
+    ensemble_mean = sum(members) / member_count
+    ensemble_median = sorted_members[member_count // 2]
+    percentile_10 = sorted_members[max(0, int(0.10 * (member_count - 1)))]
+    percentile_90 = sorted_members[min(member_count - 1, int(0.90 * (member_count - 1)))]
+
+    uncertainty = (
+        cfg.get("uncertainty_ensemble_precip")
+        if metric == "precipitation"
+        else cfg.get("uncertainty_ensemble_temp")
+    )
+
+    narrative = (
+        f"GEFS {member_count}-member ensemble: {members_satisfying}/{member_count} members "
+        f"{operator} {threshold} for {ticker}. P = {probability:.2%}. "
+        f"Ensemble median {ensemble_median:.1f}, p10–p90 "
+        f"[{percentile_10:.1f}, {percentile_90:.1f}]."
+    )
+
+    return SignalEstimate(
+        source="gfs_ensemble",
+        probability=probability,
+        uncertainty=uncertainty,
+        weight=cfg.get("weight_ensemble"),
+        # Stamp the build time (≈ fetch time, same cycle). We deliberately do NOT
+        # read back ensemble["data_issued_at"]: the GEFS forecast is fresh each
+        # cycle (see plan — data_issued_at = now), and when this dict round-trips
+        # through the agent it is JSON-encoded with default=str, so that field
+        # arrives as a string, not a datetime.
+        data_issued_at=datetime.now(tz=timezone.utc),
+        metadata={
+            "ticker": ticker,
+            "narrative": narrative,
+            "data_quality": "fresh",
+            "forecast_model": "gfs_ensemble",
+            "member_count": member_count,
+            "members_satisfying": members_satisfying,
+            "ensemble_mean": round(ensemble_mean, 2),
+            "ensemble_median": round(ensemble_median, 2),
+            "percentile_10": round(percentile_10, 2),
+            "percentile_90": round(percentile_90, 2),
+        },
+    )
+
+
 # Uncertainty bump applied when an authority's post is low-confidence / a lone
 # post, and again when the authority is an NWS office (not independent of NOAA).
 _AUTHORITY_UNCERTAINTY_BUMP = 0.05
