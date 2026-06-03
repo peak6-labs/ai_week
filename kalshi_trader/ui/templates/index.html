@@ -1098,8 +1098,13 @@ function renderPositions(positions) {
     const posTickerEl = posUrl
       ? `<a class="text-mono kalshi-link" href="${posUrl}" target="_blank" rel="noopener">${escHtml(p.ticker ?? '')}</a>`
       : `<span class="text-mono">${escHtml(p.ticker ?? '')}</span>`;
-    const bidDisplay = p.yes_bid != null ? p.yes_bid + '¢' : '—';
-    const askDisplay = p.yes_ask != null ? p.yes_ask + '¢' : '—';
+    const isYesSide = String(p.side || '').toUpperCase() === 'YES';
+    const sideBid = (p.yes_bid != null && p.yes_ask != null)
+      ? (isYesSide ? p.yes_bid : 100 - p.yes_ask) : null;
+    const sideAsk = (p.yes_bid != null && p.yes_ask != null)
+      ? (isYesSide ? p.yes_ask : 100 - p.yes_bid) : null;
+    const bidDisplay = sideBid != null ? Math.round(sideBid) + '¢' : '—';
+    const askDisplay = sideAsk != null ? Math.round(sideAsk) + '¢' : '—';
     const currentDisplay = p.current_price_dollars !== null && p.current_price_dollars !== undefined
       ? fmt$(p.current_price_dollars) : '—';
     const upnlDisplay = upnl !== null && upnl !== undefined
