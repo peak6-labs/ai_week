@@ -162,11 +162,27 @@ def _cmd_record_scored(args) -> None:
 
 async def _cmd_mark(args) -> None:
     from kalshi_trader.client import KalshiClient
+    from kalshi_trader import db
 
-    open_recs = paper.open_recommendations()
+    max_age_minutes = getattr(args, "max_age_minutes", None)
+    from_supabase = getattr(args, "from_supabase", False)
+
+    # The dashboard reads ideas from Supabase, and ideas may be recorded by any
+    # machine. --from-supabase sources open recommendations from Supabase and
+    # writes marks back to Supabase, so every shared idea gets marked regardless
+    # of which machine recorded it. Without it, marking covers only the local
+    # JSONL store (this machine's own recordings).
+    if from_supabase:
+        open_recs = await db.fetch_open_recommendations(max_age_minutes=max_age_minutes)
+    else:
+        open_recs = paper.open_recommendations(max_age_minutes=max_age_minutes)
+
     if not open_recs:
-        print("no open recommendations to mark")
+        scope = (f" within {max_age_minutes:g} min" if max_age_minutes is not None else "")
+        source = "supabase" if from_supabase else "local"
+        print(f"no open {source} recommendations to mark{scope}")
         return
+
     client = KalshiClient()
     marked = 0
     resolved = 0
@@ -176,9 +192,11 @@ async def _cmd_mark(args) -> None:
             try:
                 market_data = await client.get_market(ticker)
                 market = market_data.get("market", market_data)
-            except Exception as exc:
-                paper.append_mark(rec["rec_id"], ticker, {"error": str(exc)[:120],
-                                                           "pnl_cents": None, "would_profit": None})
+            except Exception as caught_exception:
+                error_mark = {"error": str(caught_exception)[:120],
+                              "pnl_cents": None, "would_profit": None}
+                if not from_supabase:
+                    paper.append_mark(rec["rec_id"], ticker, error_mark)
                 continue
             status = (market.get("status") or "").lower()
             result = (market.get("result") or "").lower()  # "yes"/"no" when settled
@@ -192,19 +210,23 @@ async def _cmd_mark(args) -> None:
                 yes_ask=market.get("yes_ask"),
                 resolved_yes=resolved_yes,
             )
-            paper.append_mark(rec["rec_id"], ticker, mark)
-            marked += 1
-            # Mirror the mark to Supabase (best-effort).
-            try:
-                from kalshi_trader import db
+            if from_supabase:
+                # No local row to append to; stamp the check time and write to Supabase.
+                mark.setdefault("checked_at", paper._now_iso())
                 await db.insert_recommendation_mark(rec["rec_id"], mark)
-            except Exception:
-                pass
+            else:
+                paper.append_mark(rec["rec_id"], ticker, mark)
+                try:  # mirror local mark to Supabase (best-effort)
+                    await db.insert_recommendation_mark(rec["rec_id"], mark)
+                except Exception:
+                    pass
+            marked += 1
+
             if mark.get("resolved"):
-                paper.close_recommendation(rec["rec_id"])
                 resolved += 1
+                if not from_supabase:
+                    paper.close_recommendation(rec["rec_id"])
                 try:
-                    from kalshi_trader import db
                     await db.resolve_recommendation(rec["rec_id"])
                     await db.resolve_market(ticker, bool(resolved_yes))
                 except Exception:
@@ -213,7 +235,8 @@ async def _cmd_mark(args) -> None:
         if hasattr(client, "close"):
             await client.close()
     summary = paper.performance_summary()
-    print(f"marked {marked} ({resolved} resolved). scorecard: {summary}")
+    print(f"marked {marked} ({resolved} resolved), source="
+          f"{'supabase' if from_supabase else 'local'}. scorecard: {summary}")
 
 
 def _cmd_report(args) -> None:
@@ -248,7 +271,15 @@ def main() -> None:
     rec_scored.add_argument("--min-sources", type=int, default=2,
                             help="Only record markets with at least this many signal sources")
 
-    sub.add_parser("mark", help="Mark all open recommendations to current market")
+    mark_parser = sub.add_parser("mark", help="Mark open recommendations to current market")
+    mark_parser.add_argument(
+        "--max-age-minutes", type=float, default=None, dest="max_age_minutes",
+        help="Only mark recommendations recorded within this many minutes "
+             "(for a low-priority pass that re-prices just young ideas).")
+    mark_parser.add_argument(
+        "--from-supabase", action="store_true", dest="from_supabase",
+        help="Source open recommendations from Supabase (shared across machines) "
+             "and write marks back to Supabase, instead of the local JSONL store.")
     report = sub.add_parser("report", help="Print the running scorecard")
     report.add_argument("--by-source", action="store_true", help="Break the scorecard down by signal source")
     report.add_argument("--by-disposition", action="store_true",

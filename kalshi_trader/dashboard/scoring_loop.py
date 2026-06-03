@@ -25,19 +25,15 @@ from kalshi_trader.dashboard.state import DashboardState
 from kalshi_trader.grouping import group_by_event
 from kalshi_trader.market_snapshot import load_snapshot
 from kalshi_trader.models import Market
-from kalshi_trader.scanner import filter_markets
 
 _log = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS: int = 300  # re-score every 5 minutes
 
 
-def _load_filtered_universe(markets_file: str) -> list[Market]:
-    """Parse the snapshot and apply the standard filters. Runs off-thread —
-    the prod snapshot is ~270MB / ~half a million markets."""
-    now_dt = datetime.now(timezone.utc)
-    snapshot_markets = load_snapshot(markets_file, now_dt)
-    return filter_markets(snapshot_markets, None, now_dt)
+def _load_snapshot_universe(markets_file: str) -> list[Market]:
+    """Parse the snapshot catalog off-thread; filtering happens in the scanner."""
+    return load_snapshot(markets_file, datetime.now(timezone.utc))
 
 
 async def _resolve_universe(state: DashboardState) -> list[Market] | None:
@@ -49,9 +45,9 @@ async def _resolve_universe(state: DashboardState) -> list[Market] | None:
     mtime = os.path.getmtime(markets_file)
     if state.cached_universe_markets is None or state.cached_universe_mtime != mtime:
         _log.info("Loading market universe from snapshot %s (parsing off-thread)...", markets_file)
-        state.cached_universe_markets = await asyncio.to_thread(_load_filtered_universe, markets_file)
+        state.cached_universe_markets = await asyncio.to_thread(_load_snapshot_universe, markets_file)
         state.cached_universe_mtime = mtime
-        _log.info("Universe loaded: %d markets pass filters", len(state.cached_universe_markets))
+        _log.info("Universe loaded: %d snapshot markets", len(state.cached_universe_markets))
     return state.cached_universe_markets
 
 
@@ -66,16 +62,23 @@ async def run_one_scan_cycle(state: DashboardState) -> None:
     try:
         universe = await _resolve_universe(state)
         if universe is not None:
-            ranked = await state.scanner.get_scored_markets(
-                state.scorer, state.snapshot_store, markets=universe
+            scan_result = await state.scanner.run_scan(
+                state.scorer,
+                state.snapshot_store,
+                markets=universe,
+                categories=state.scanner_categories,
             )
         else:
             # No snapshot available — fall back to a live universe scan with category
             # enrichment. This is slow on prod (~500k markets); prefer a snapshot.
             _log.warning("No markets snapshot configured — falling back to live scan (slow on prod)")
-            ranked = await state.scanner.get_scored_markets(
-                state.scorer, state.snapshot_store, should_enrich_categories=True
+            scan_result = await state.scanner.run_scan(
+                state.scorer,
+                state.snapshot_store,
+                should_enrich_categories=True,
+                categories=state.scanner_categories,
             )
+        ranked = scan_result.ranked_markets
         grouped = group_by_event(ranked)
 
         state.scored_slate_grouped = grouped
@@ -83,7 +86,8 @@ async def run_one_scan_cycle(state: DashboardState) -> None:
             scored_market.market.ticker: scored_market.market for scored_market in ranked
         }
         state.scored_slate_generated_at = datetime.now(timezone.utc)
-        state.last_scan_error = None
+        state.scored_slate_metadata = scan_result.metadata
+        state.last_scan_error = scan_result.metadata.degraded_reason
         state.scan_cycle_number += 1
         _log.info(
             "Scan cycle %d complete in %.1fs — %d markets, %d events",

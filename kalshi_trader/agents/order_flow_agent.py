@@ -26,6 +26,27 @@ def _parse_trade_time(t: dict) -> datetime:
     return dt
 
 
+def _trade_dollar_volume(t: dict) -> float:
+    """Extract dollar volume from a trade dict.
+
+    Kalshi v2 API uses count_fp (string) and yes_price_dollars (string, 0–1).
+    Legacy/test dicts may use count (int) and yes_price (int, 0–100).
+    """
+    count_fp = t.get("count_fp")
+    if count_fp is not None:
+        count = float(count_fp)
+    else:
+        count = float(t.get("count", t.get("size", 0)))
+
+    yes_price_dollars = t.get("yes_price_dollars")
+    if yes_price_dollars is not None:
+        price = float(yes_price_dollars)
+    else:
+        price = float(t.get("yes_price", t.get("price", 50))) / 100.0
+
+    return count * price
+
+
 def compute_ofi(trades: list[dict], window_minutes: int = 30) -> float:
     """Order Flow Imbalance: (buy_vol - sell_vol) / total_vol in [-1, 1].
 
@@ -41,9 +62,7 @@ def compute_ofi(trades: list[dict], window_minutes: int = 30) -> float:
     for t in trades:
         if _parse_trade_time(t).timestamp() < cutoff:
             continue
-        count = float(t.get("count", t.get("size", 0)))
-        price = float(t.get("yes_price", t.get("price", 50))) / 100.0
-        dollar_vol = count * price
+        dollar_vol = _trade_dollar_volume(t)
         side = t.get("taker_side", t.get("side", "yes"))
         if side == "yes":
             buy_vol += dollar_vol
@@ -73,9 +92,7 @@ def compute_vpin(trades: list[dict], bucket_size_usd: float = 5000.0) -> float:
     bucket_total = 0.0
 
     for t in trades:
-        count = float(t.get("count", t.get("size", 0)))
-        price = float(t.get("yes_price", t.get("price", 50))) / 100.0
-        dollar_vol = count * price
+        dollar_vol = _trade_dollar_volume(t)
         side = t.get("taker_side", t.get("side", "yes"))
 
         if side == "yes":
@@ -200,10 +217,7 @@ class OrderFlowAgent:
 
     async def _compute_vpin(self, trades: list[dict], n_buckets: int = 10) -> dict:
         # Derive bucket_size_usd from total volume / n_buckets so we get ~n_buckets buckets
-        total_vol = sum(
-            float(t.get("count", t.get("size", 0))) * float(t.get("yes_price", t.get("price", 50))) / 100.0
-            for t in trades
-        )
+        total_vol = sum(_trade_dollar_volume(t) for t in trades)
         bucket_size_usd = max(total_vol / n_buckets, 1.0) if trades else 1.0
         vpin_score = compute_vpin(trades, bucket_size_usd=bucket_size_usd)
         return {
@@ -220,14 +234,10 @@ class OrderFlowAgent:
         else:
             direction = "neutral"
         total_buy = sum(
-            float(t.get("count", t.get("size", 0))) * float(t.get("yes_price", t.get("price", 50))) / 100.0
-            for t in trades
+            _trade_dollar_volume(t) for t in trades
             if t.get("taker_side", t.get("side", "yes")) == "yes"
         )
-        total_all = sum(
-            float(t.get("count", t.get("size", 0))) * float(t.get("yes_price", t.get("price", 50))) / 100.0
-            for t in trades
-        )
+        total_all = sum(_trade_dollar_volume(t) for t in trades)
         buying_fraction = round(total_buy / total_all, 4) if total_all > 0 else 0.5
         return {
             "ofi_score": round(ofi_score, 4),

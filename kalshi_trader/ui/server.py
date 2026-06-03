@@ -32,11 +32,16 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 async def _poll_kalshi_account(trading_state: TradingState) -> None:
     """Poll Kalshi every 30 s for balance and positions, update TradingState."""
     from kalshi_trader.client import KalshiClient
+    from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
 
     await asyncio.sleep(2)  # brief delay so server is fully up first
     trading_state.log("Account poller started")
 
-    async with KalshiClient() as client:
+    # The dashboard runs against the prod (real-money) account, so wrap the raw
+    # client in the read-only facade: the poller can only read balance/positions
+    # and is structurally incapable of placing or cancelling an order.
+    async with KalshiClient() as raw_client:
+        client = ReadOnlyKalshiClient(raw_client)
         while True:
             try:
                 balance_resp = await client.get_balance()
@@ -202,13 +207,20 @@ def create_app(
         resolved, elapsed_seconds) snapshots so the UI can plot how each idea
         moved over the intervals after it was presented. Never executes anything.
         """
-        from kalshi_trader import paper
+        from kalshi_trader import db, paper
 
         try:
-            ideas = paper.recommendations_with_marks()
-        except Exception as exc:  # never let a malformed store break the page
-            logger.warning("ideas history read failed: %s", exc)
-            ideas = []
+            # Primary source: Supabase, so any machine sees the shared data.
+            ideas = await db.recommendations_with_marks()
+        except Exception as supabase_exception:
+            # Fall back to the local JSONL store when Supabase is unreachable.
+            logger.warning("ideas history Supabase read failed, using local store: %s",
+                           supabase_exception)
+            try:
+                ideas = paper.recommendations_with_marks()
+            except Exception as local_exception:  # never let a bad store break the page
+                logger.warning("ideas history local read failed: %s", local_exception)
+                ideas = []
         return JSONResponse({"ideas": ideas})
 
     @app.post("/api/ideas")

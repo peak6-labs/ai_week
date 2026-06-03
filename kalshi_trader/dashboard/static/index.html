@@ -79,6 +79,7 @@
   .spacer { flex: 1; }
   .stat-inline { color: var(--text-dim); font-size: 11.5px; letter-spacing: .08em; white-space: nowrap; }
   .stat-inline b { color: var(--text); font-weight: 600; }
+  .stat-inline.dimline { max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
   .live { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; letter-spacing: .1em; }
   .live .pulse {
     width: 8px; height: 8px; border-radius: 50%; background: var(--green);
@@ -188,6 +189,7 @@
     <span class="badge" id="env-badge" title="Real-money account. This dashboard is read-only and cannot place or cancel orders."><span class="dot">●</span> PROD · READ-ONLY</span>
     <div class="spacer"></div>
     <span class="stat-inline">SCAN <b id="scan-cycle">—</b> · <b id="scan-age">—</b></span>
+    <span class="stat-inline dimline"><b id="scan-live-meta">—</b></span>
     <span class="live" id="live"><span class="pulse"></span><span id="live-label">CONNECTING</span></span>
     <span class="stat-inline"><b id="clock">--:--:--</b> UTC</span>
   </header>
@@ -412,8 +414,16 @@ function fmtCov(pct) {
 
 function renderIdeas(d) {
   const body = document.getElementById("ideas-body");
-  document.getElementById("ideas-meta").textContent =
-    d.status === "warming_up" ? "warming up" : ("updated " + ageStr(d.generated_at) + " ago");
+  const meta = d.metadata || {};
+  const refreshed = meta.shortlist_refreshed_at || meta.live_prices_refreshed_at || d.generated_at;
+  let ideasMeta = d.status === "warming_up" ? "warming up" : ("updated " + ageStr(refreshed) + " ago");
+  if (meta.live_priced_ticker_count !== undefined && meta.filtered_ticker_count !== undefined) {
+    ideasMeta += ` · live ${meta.live_priced_ticker_count}/${meta.filtered_ticker_count}`;
+  }
+  if ((meta.dropped_unquoted_ticker_count || 0) > 0) {
+    ideasMeta += ` · dropped ${meta.dropped_unquoted_ticker_count}`;
+  }
+  document.getElementById("ideas-meta").textContent = ideasMeta;
   if (d.status === "warming_up") {
     body.innerHTML = `<tr><td colspan="10"><div class="msg">warming up — first scan in progress…</div></td></tr>`;
     return;
@@ -443,6 +453,18 @@ function renderHealth(d) {
   document.getElementById("scan-cycle").textContent = "#" + (d.scan?.cycle_number ?? 0);
   document.getElementById("scan-age").textContent =
     d.scan?.last_generated_at ? (ageStr(d.scan.last_generated_at) + " old") : "warming up";
+  const meta = d.scan?.metadata || {};
+  let liveMeta = "waiting for live scan";
+  if (meta.live_priced_ticker_count !== undefined && meta.filtered_ticker_count !== undefined) {
+    liveMeta = `${meta.live_priced_ticker_count}/${meta.filtered_ticker_count} live-priced`;
+    if ((meta.dropped_unquoted_ticker_count || 0) > 0) {
+      liveMeta += ` · ${meta.dropped_unquoted_ticker_count} dropped`;
+    }
+    const freshAt = meta.shortlist_refreshed_at || meta.live_prices_refreshed_at;
+    if (freshAt) liveMeta += ` · refreshed ${ageStr(freshAt)} ago`;
+  }
+  if (meta.degraded_reason) liveMeta += ` · ${meta.degraded_reason}`;
+  document.getElementById("scan-live-meta").textContent = liveMeta;
   const live = document.getElementById("live"), label = document.getElementById("live-label");
   live.classList.remove("stale", "down");
   if (d.status === "degraded") { live.classList.add("stale"); label.textContent = "DEGRADED"; }

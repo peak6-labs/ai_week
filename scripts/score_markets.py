@@ -3,7 +3,7 @@
 Usage:
     python scripts/score_markets.py              # top 10 markets
     python scripts/score_markets.py --top 25
-    python scripts/score_markets.py --category sports
+    python scripts/score_markets.py --category sports --category politics
     python scripts/score_markets.py --verbose    # show DEBUG-level cache detail
     python scripts/score_markets.py --json        # emit all events as JSON (for agents)
 """
@@ -49,16 +49,20 @@ def _print_debug_block(scored_market: ScoredMarket, rank: int) -> None:
     )
 
 
-async def run(top: int, category: str | None, markets_file: str | None,
+async def run(top: int, categories: list[str] | None, markets_file: str | None,
               debug: bool, as_json: bool) -> None:
     client  = KalshiClient()
     scanner = MarketScanner(client)
     scorer  = MarketScorer()
     store   = SnapshotStore()
 
-    ranked = await scanner.get_scored_markets(
-        scorer, store, category=category, markets_file=markets_file
+    scan_result = await scanner.run_scan(
+        scorer,
+        store,
+        categories=categories,
+        markets_file=markets_file,
     )
+    ranked = scan_result.ranked_markets
 
     grouped = group_by_event(ranked)
 
@@ -90,6 +94,14 @@ async def run(top: int, category: str | None, markets_file: str | None,
 
     unique_events = len(grouped)
     print(f"\n{len(ranked)} markets → {unique_events} events. Top {min(top, unique_events)} shown.")
+    metadata = scan_result.metadata
+    print(
+        "Live pricing: "
+        f"{metadata.live_priced_ticker_count}/{metadata.filtered_ticker_count} quoted, "
+        f"{metadata.dropped_unquoted_ticker_count} dropped"
+    )
+    if metadata.degraded_reason:
+        print(f"Scan status: degraded ({metadata.degraded_reason})")
 
     if debug:
         print("\n\n=== DEBUG: full signal breakdown (best market per event) ===")
@@ -100,7 +112,8 @@ async def run(top: int, category: str | None, markets_file: str | None,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Score Kalshi markets by actionability.")
     parser.add_argument("--top", type=int, default=10, help="Number of markets to display")
-    parser.add_argument("--category", type=str, default=None, help="Filter by category")
+    parser.add_argument("--category", action="append", dest="categories",
+                        help="Filter by category; repeat to include multiple categories")
     parser.add_argument("--markets-file", type=str, default=None, dest="markets_file",
                         help="Use pre-fetched market snapshot instead of querying the API")
     parser.add_argument("--verbose", action="store_true", help="Show DEBUG-level cache detail")
@@ -116,4 +129,4 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
-    asyncio.run(run(args.top, args.category, args.markets_file, args.debug, args.as_json))
+    asyncio.run(run(args.top, args.categories, args.markets_file, args.debug, args.as_json))

@@ -5,6 +5,7 @@ import functools
 from typing import Any
 import requests
 from kalshi_auth import KalshiClient as _SyncKalshiClient
+from kalshi_trader.schema import normalize_market, normalize_orderbook
 
 # Dedicated pool so candle batch requests aren't capped at the process default
 # (~22 threads on this machine). Tune against Kalshi rate limits if needed.
@@ -101,13 +102,18 @@ class KalshiClient:
         if cursor:
             params["cursor"] = cursor
         params.update(kwargs)
-        return await self.get("/markets", params=params)
+        response = await self.get("/markets", params=params)
+        for market in response.get("markets") or []:
+            normalize_market(market)
+        return response
 
     async def get_market(self, ticker: str) -> dict:
-        return await self.get(f"/markets/{ticker}")
+        response = await self.get(f"/markets/{ticker}")
+        normalize_market(response.get("market", response))
+        return response
 
     async def get_orderbook(self, ticker: str) -> dict:
-        return await self.get(f"/markets/{ticker}/orderbook")
+        return normalize_orderbook(await self.get(f"/markets/{ticker}/orderbook"))
 
     async def get_balance(self) -> dict:
         return await self.get("/portfolio/balance")

@@ -35,7 +35,8 @@ class RiskManager:
 
         # Hard: total exposure
         if portfolio.total_exposure_dollars >= config.MAX_TOTAL_EXPOSURE_DOLLARS:
-            return RiskDecision(False, 0, "max total exposure reached ($400)")
+            return RiskDecision(False, 0,
+                                f"max total exposure reached (${config.MAX_TOTAL_EXPOSURE_DOLLARS})")
 
         # Hard: category exposure
         cat_exposure = portfolio.exposure_by_category.get(idea.category, 0.0)

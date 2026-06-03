@@ -17,6 +17,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from kalshi_trader.ideas_history import join_recommendations_and_marks, parse_iso_timestamp
+
 _PAPER_DIR = Path(__file__).resolve().parent.parent / "data" / "paper"
 _RECS_FILE = _PAPER_DIR / "recommendations.jsonl"
 _MARKS_FILE = _PAPER_DIR / "marks.jsonl"
@@ -145,13 +147,43 @@ def load_recommendations() -> list[dict]:
     return _read_jsonl(_RECS_FILE)
 
 
-def open_recommendations() -> list[dict]:
-    return [r for r in load_recommendations() if r.get("status") == "open"]
+def open_recommendations(
+    max_age_minutes: float | None = None, now: datetime | None = None
+) -> list[dict]:
+    """Open recommendations, optionally limited to those recorded recently.
+
+    ``max_age_minutes`` lets a low-priority marking pass re-price only young
+    ideas (toward the 5/15/30/60/120-minute checkpoints) without re-fetching
+    every open recommendation each cycle. A recommendation whose ``recorded_at``
+    cannot be parsed is kept — age is unknown, so it is never silently dropped.
+    """
+    open_recs = [r for r in load_recommendations() if r.get("status") == "open"]
+    if max_age_minutes is None:
+        return open_recs
+
+    reference_time = now or datetime.now(tz=timezone.utc)
+    recent: list[dict] = []
+    for recommendation in open_recs:
+        recorded_at = parse_iso_timestamp(recommendation.get("recorded_at"))
+        if recorded_at is None:
+            recent.append(recommendation)  # unknown age — never silently drop
+            continue
+        age_minutes = (reference_time - recorded_at).total_seconds() / 60.0
+        if age_minutes <= max_age_minutes:
+            recent.append(recommendation)
+    return recent
 
 
-def append_mark(rec_id: str, ticker: str, mark: dict) -> None:
-    _append_jsonl(_MARKS_FILE, {"rec_id": rec_id, "ticker": ticker,
-                                "checked_at": _now_iso(), **mark})
+def append_mark(rec_id: str, ticker: str, mark: dict) -> dict:
+    """Append a mark to the local store and return it.
+
+    Stamps ``checked_at`` into the passed mark dict (unless the caller already
+    set one) so the identical timestamp can be mirrored to Supabase rather than
+    re-derived at insert time.
+    """
+    mark.setdefault("checked_at", _now_iso())
+    _append_jsonl(_MARKS_FILE, {"rec_id": rec_id, "ticker": ticker, **mark})
+    return mark
 
 
 def close_recommendation(rec_id: str) -> None:
@@ -180,48 +212,11 @@ def recommendations_with_marks() -> list[dict]:
     ``elapsed_seconds`` field giving the time between the recommendation's
     ``recorded_at`` and the mark's ``checked_at`` so the UI can show intervals
     (e.g. +0h / +7h / +resolved). Read-only; never executes anything.
+
+    The local JSONL store and the Supabase reader share the same pure transform
+    (``ideas_history.join_recommendations_and_marks``) so the two cannot drift.
     """
-    recommendations = load_recommendations()
-
-    marks_by_rec_id: dict[str, list[dict]] = {}
-    for mark in _read_jsonl(_MARKS_FILE):
-        marks_by_rec_id.setdefault(mark.get("rec_id"), []).append(mark)
-
-    joined: list[dict] = []
-    for recommendation in recommendations:
-        rec_id = recommendation.get("rec_id")
-        recorded_at = _parse_iso(recommendation.get("recorded_at"))
-
-        timeline: list[dict] = []
-        for mark in marks_by_rec_id.get(rec_id, []):
-            checked_at = _parse_iso(mark.get("checked_at"))
-            elapsed_seconds: float | None = None
-            if recorded_at is not None and checked_at is not None:
-                elapsed_seconds = (checked_at - recorded_at).total_seconds()
-            timeline.append({
-                "checked_at": mark.get("checked_at"),
-                "current_value_cents": mark.get("current_value_cents"),
-                "pnl_cents": mark.get("pnl_cents"),
-                "would_profit": mark.get("would_profit"),
-                "resolved": mark.get("resolved"),
-                "elapsed_seconds": elapsed_seconds,
-            })
-        timeline.sort(key=lambda mark: mark["checked_at"] or "")
-
-        joined.append({**recommendation, "marks": timeline})
-
-    joined.sort(key=lambda recommendation: recommendation.get("recorded_at") or "", reverse=True)
-    return joined
-
-
-def _parse_iso(value) -> datetime | None:
-    """Parse an ISO timestamp string into an aware datetime; None on failure."""
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        return None
+    return join_recommendations_and_marks(load_recommendations(), _read_jsonl(_MARKS_FILE))
 
 
 def _scorecard(marks: list[dict]) -> dict:
