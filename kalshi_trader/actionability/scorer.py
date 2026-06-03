@@ -12,6 +12,7 @@ from kalshi_trader.actionability.signals import (
     ofi_score,
     oi_change_score,
     orderbook_skew_score,
+    live_top_of_book,
     relative_historical_volume_score,
     spread_penalty_multiplier,
     volume_oi_ratio_score,
@@ -116,6 +117,13 @@ class MarketScorer:
             if ticker in orderbook_data:
                 scored_market.orderbook_skew_score = orderbook_skew_score(orderbook_data[ticker])
                 scored_market.signed_orderbook_skew = signed_orderbook_skew(orderbook_data[ticker])
+                # Replace stale snapshot prices with the live top-of-book so the
+                # entry price we score/record matches the live market.
+                live_yes_bid, live_yes_ask = live_top_of_book(orderbook_data[ticker])
+                if live_yes_bid is not None:
+                    scored_market.market.yes_bid = live_yes_bid
+                if live_yes_ask is not None:
+                    scored_market.market.yes_ask = live_yes_ask
                 orderbook_hits += 1
             raw_composite_score = self._composite(self._scores_dict(scored_market))
             spread_multiplier = spread_penalty_multiplier(scored_market.market)

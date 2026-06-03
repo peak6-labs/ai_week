@@ -134,7 +134,7 @@ class MarketScanner:
         scorer: MarketScorer,
         store: SnapshotStore,
         trade_top_n: int = 50,
-        orderbook_top_n: int = 20,
+        orderbook_top_n: int = 40,
         category: str | None = None,
         markets_file: Path | str | None = None,
         should_enrich_categories: bool = False,
