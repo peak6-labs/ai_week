@@ -295,10 +295,26 @@ def compute_edge_and_kelly(combined_probability: float, yes_ask_cents: float, cf
         full_kelly_fraction = (side_probability * yes_net_odds - complement_probability) / yes_net_odds
         kelly = max(0.0, full_kelly_fraction * 0.5)  # half-Kelly
 
+    # Configurable edge bar (default 5¢) so it can be tuned from the paper loop
+    # without a code change (#25).
+    min_edge_cents = float(cfg.get("min_edge_cents", 5.0))
+
+    # High-entry-price guardrail (#14): a leg entered at ≥ the cap has a brutal
+    # payoff asymmetry — e.g. buying NO at 93¢ risks 93¢ to make 7¢, so one loss
+    # erases ~13 wins. The only resolved paper loss so far was exactly this (a 93¢
+    # NO, −93¢). Block these regardless of nominal edge; the cap is configurable.
+    entry_price_cents = side_price * 100.0
+    max_entry_price_cents = float(cfg.get("max_entry_price_cents", 90.0))
+    entry_price_blocked = entry_price_cents > max_entry_price_cents
+
+    worth_trading = (fee_adjusted_edge > min_edge_cents) and not entry_price_blocked
+
     return {
         "edge_cents": round(edge_cents, 2),
         "fee_adjusted_edge": round(fee_adjusted_edge, 2),
-        "worth_trading": fee_adjusted_edge > 5.0,
+        "worth_trading": worth_trading,
+        "entry_price_cents": round(entry_price_cents, 2),
+        "entry_price_blocked": entry_price_blocked,
         "kelly_fraction": round(kelly, 4),
         "side": side,
     }

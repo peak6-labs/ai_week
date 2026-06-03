@@ -92,22 +92,36 @@ rows sorted by `average_score` descending. Each row has: `event_ticker`,
 `open_interest`, `volume_24h`, `signals`, `close_time`, `series_url`.
 **Prices are in cents (0–99).**
 
-Take the **top 20** rows by `average_score`. For each, compute
-`hours_to_close` from `close_time` relative to now. Use `best_market_ticker` as
-the tradeable `ticker`.
+**Coverage: score the WHOLE board, dispatch external agents to a subset.** The
+deterministic scout signals (`microstructure` + `kalshi_bias`) are already
+attached to every one of the ~200 rows at no cost, so we **score and record all
+of them** (Steps 3–4) — this is the calibration dataset and it's nearly free.
+What is expensive is the external signal *agents* (weather/sportsbook/polymarket/
+x), so we only spend those on a prioritized **deep-signal subset**.
+
+- **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
+  scoring and, if it reaches 2+ sources, gets recorded for the backtest.
+- **Deep-signal subset (≤ ~15)** = the rows most worth an external lookup:
+  weather/climate markets (NOAA), sports (sportsbook), high-volume markets
+  (`volume_24h > 5000`, for polymarket/whale/order-flow), and the top rows by
+  `average_score`. Only these get Step 2's agent dispatch.
+
+For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
+as the tradeable `ticker`.
 
 **Each scout row already carries a `signal_estimates` list** — the deterministic
 `microstructure` (directional price/volume/orderbook) and `kalshi_bias`
 (calibration) signals, computed during the scan with no extra calls. Keep these;
 Step 2 only needs to add the signals that require live lookups or judgment.
 
-**Fetch settlement rules for the selected markets** (the snapshot omits them).
-The rule can differ from what the title implies — this matters for cross-venue
-matching and for trusting a signal:
+**Fetch settlement rules — only for the deep-signal subset (and later any
+candidates).** `market_rules.py` makes one API call per ticker, so do NOT fetch
+rules for all ~200; fetch them for the deep-signal subset now, and (in Step 5)
+for any market that becomes a candidate:
 
 ```bash
 KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
-  --tickers TICKER1 TICKER2 ... > /tmp/rules_${TS}.json
+  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/rules_${TS}.json
 ```
 
 Read `/tmp/rules_${TS}.json` ({ticker: {rules_primary, subtitle, ...}}). Carry
@@ -124,10 +138,11 @@ If the file is empty or missing, log and stop:
 
 ## Step 2 — Dispatch signal agents in parallel
 
-Process the selected markets in **batches of 5**. For each batch, spawn all
-applicable signal agents **in a single message** (multiple `Agent` tool calls)
-so they run concurrently. Wait for the whole batch before starting the next.
-This keeps concurrent API load bounded — never fan out all 20 markets at once.
+Process the **deep-signal subset** (≤ ~15) in **batches of 5**. For each batch,
+spawn all applicable signal agents **in a single message** (multiple `Agent`
+tool calls) so they run concurrently. Wait for the whole batch before starting
+the next. This keeps concurrent API load bounded — never fan out the whole board
+at once. The rest of the coverage set rides on its deterministic scout signals.
 
 Log before each batch:
 
@@ -191,6 +206,12 @@ with the scout row's `signal_estimates`** (microstructure + kalshi_bias) and
 unwrap to the `metadata` field — the scorer combines the estimates' own
 `probability`/`uncertainty`/`weight` directly.
 
+Build the signals file for the **entire coverage set (~200 markets)**, not just
+the subset: start each market from its scout `signal_estimates`, and for the
+deep-signal subset additionally append the agent estimates you collected. Markets
+outside the subset simply carry their two deterministic scout signals — that's
+fine; they still get scored and (if 2+ sources) recorded for the backtest.
+
 Use the **Write** tool to create `/tmp/signals_<TS>.json` as an array of market
 objects:
 
@@ -250,6 +271,14 @@ PYTHONPATH=. .venv/bin/python scripts/persist_cycle.py \
 ---
 
 ## Step 5 — Adversarial challenge
+
+First, **fetch settlement rules for any surviving candidate not already in the
+deep-signal subset** (so every candidate has `rules_primary` for question 1):
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
+  --tickers CANDIDATE_TICKER... >> /tmp/rules_${TS}.json   # merge/extend
+```
 
 For each surviving market, answer these five questions before letting it onto the
 candidate slate:
