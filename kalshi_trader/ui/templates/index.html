@@ -793,14 +793,6 @@
           </div>
           <span class="field-error" id="err-weight_x_grok"></span>
         </div>
-        <div class="field-row" data-key="weight_x_claude">
-          <label class="field-label">X / Claude <span class="field-key-tag">weight_x_claude</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_x_claude" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_x_claude">0.75</span>
-          </div>
-          <span class="field-error" id="err-weight_x_claude"></span>
-        </div>
         <div class="field-row" data-key="weight_market_maker">
           <label class="field-label">Market maker (orderbook) <span class="field-key-tag">weight_market_maker</span></label>
           <div class="slider-row">
@@ -808,6 +800,38 @@
             <span class="slider-val" id="val-weight_market_maker">0.65</span>
           </div>
           <span class="field-error" id="err-weight_market_maker"></span>
+        </div>
+        <div class="field-row" data-key="weight_sportsbook">
+          <label class="field-label">Sportsbook odds <span class="field-key-tag">weight_sportsbook</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_sportsbook" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_sportsbook">0.85</span>
+          </div>
+          <span class="field-error" id="err-weight_sportsbook"></span>
+        </div>
+        <div class="field-row" data-key="weight_kalshi_bias">
+          <label class="field-label">Kalshi bias <span class="field-key-tag">weight_kalshi_bias</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_kalshi_bias" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_kalshi_bias">0.50</span>
+          </div>
+          <span class="field-error" id="err-weight_kalshi_bias"></span>
+        </div>
+        <div class="field-row" data-key="weight_microstructure">
+          <label class="field-label">Microstructure <span class="field-key-tag">weight_microstructure</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_microstructure" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_microstructure">0.35</span>
+          </div>
+          <span class="field-error" id="err-weight_microstructure"></span>
+        </div>
+        <div class="field-row" data-key="weight_order_flow">
+          <label class="field-label">Order flow <span class="field-key-tag">weight_order_flow</span></label>
+          <div class="slider-row">
+            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_order_flow" min="0" max="1" step="0.01" />
+            <span class="slider-val" id="val-weight_order_flow">0.55</span>
+          </div>
+          <span class="field-error" id="err-weight_order_flow"></span>
         </div>
         <!-- Uncertainty inputs -->
         <div class="field-row" data-key="uncertainty_noaa_temp">
@@ -1035,55 +1059,6 @@
       </div>
     </div>
 
-    <!-- Section 9: System & Models -->
-    <div class="panel config-section">
-      <div class="config-section-title">System &amp; Models</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="specialist_model">
-          <label class="field-label">Specialist model <span class="field-key-tag">specialist_model</span></label>
-          <select class="field-input cfg-input" id="cfg-specialist_model">
-            <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-            <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
-            <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-            <option value="claude-opus-4-5">claude-opus-4-5</option>
-            <option value="claude-opus-4-8">claude-opus-4-8</option>
-          </select>
-          <span class="field-error" id="err-specialist_model"></span>
-        </div>
-        <div class="field-row" data-key="coordinator_model">
-          <label class="field-label">Coordinator model <span class="field-key-tag">coordinator_model</span></label>
-          <select class="field-input cfg-input" id="cfg-coordinator_model">
-            <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-            <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
-            <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-            <option value="claude-opus-4-5">claude-opus-4-5</option>
-            <option value="claude-opus-4-8">claude-opus-4-8</option>
-          </select>
-          <span class="field-error" id="err-coordinator_model"></span>
-        </div>
-        <div class="field-row" data-key="agent_max_iterations">
-          <label class="field-label">Agent max iterations <span class="field-key-tag">agent_max_iterations</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-agent_max_iterations" min="5" max="100" step="1" />
-          <span class="field-error" id="err-agent_max_iterations"></span>
-        </div>
-        <div class="field-row" data-key="x_max_concurrent_searches">
-          <label class="field-label">X max concurrent searches <span class="field-key-tag">x_max_concurrent_searches</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-x_max_concurrent_searches" min="1" max="10" step="1" />
-          <span class="field-error" id="err-x_max_concurrent_searches"></span>
-        </div>
-        <div class="field-row" data-key="ws_reconnect_delay_seconds">
-          <label class="field-label">WS reconnect delay (s) <span class="field-key-tag">ws_reconnect_delay_seconds</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-ws_reconnect_delay_seconds" min="1" max="60" step="1" />
-          <span class="field-error" id="err-ws_reconnect_delay_seconds"></span>
-        </div>
-        <div class="field-row" data-key="ws_watchdog_timeout_seconds">
-          <label class="field-label">WS watchdog timeout (s) <span class="field-key-tag">ws_watchdog_timeout_seconds</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-ws_watchdog_timeout_seconds" min="10" max="300" step="5" />
-          <span class="field-error" id="err-ws_watchdog_timeout_seconds"></span>
-        </div>
-      </div>
-    </div>
-
   </div><!-- /tab-config -->
 
   <!-- -------------------------------------------------------------------- -->
@@ -1154,14 +1129,26 @@
 // ---------------------------------------------------------------------------
 // Agent metadata (static)
 // ---------------------------------------------------------------------------
+// Keyed by the normalized status key the pipeline pushes (hyphens/"-signal"
+// stripped → underscores). Read-only status grid — the pipeline dispatches by
+// market rules, not per-agent toggles.
 const AGENT_META = {
-  weather:      { label: 'WeatherAgent',       sources: 'NOAA NWS, temperature/precipitation forecasts',   enableKey: 'agent_weather_enabled' },
-  polymarket:   { label: 'PolymarketAgent',     sources: 'Polymarket price gap, whale trades',              enableKey: 'agent_polymarket_enabled' },
-  order_flow:   { label: 'OrderFlowAgent',      sources: 'Kalshi order book, OFI, VPIN',                    enableKey: 'agent_order_flow_enabled' },
-  market_maker: { label: 'MarketMakerAgent',    sources: 'Kalshi order book imbalance, spread dynamics',    enableKey: 'agent_market_maker_enabled' },
-  kalshi_bias:  { label: 'KalshiBiasAgent',     sources: 'Political bias, longshot correction, expiry',     enableKey: 'agent_kalshi_bias_enabled' },
-  x:            { label: 'XAgent',              sources: 'X / Grok, X / Claude sentiment search',           enableKey: 'agent_x_enabled' },
+  market_scout:      { label: 'Market Scout',        sources: 'Scores the live board; emits microstructure + bias signals' },
+  microstructure:    { label: 'Microstructure',      sources: 'Signed momentum / OFI / book skew / range-position peaks' },
+  kalshi_bias:       { label: 'Kalshi Bias',         sources: 'Favorite-longshot + political-underconfidence calibration' },
+  sportsbook_odds:   { label: 'Sportsbook Odds',     sources: 'De-vigged DraftKings/FanDuel moneyline (ESPN)' },
+  polymarket_price:  { label: 'Polymarket Price',    sources: 'Polymarket vs Kalshi price gap' },
+  polymarket_whale:  { label: 'Polymarket Whale',    sources: 'Tracked profitable wallets positioned' },
+  order_flow:        { label: 'Order Flow',          sources: 'Kalshi trades: OFI, VPIN' },
+  market_maker:      { label: 'Market Maker',        sources: 'Order-book imbalance, spread dynamics' },
+  x:                 { label: 'X / Grok',            sources: 'X sentiment & news via Grok' },
+  weather:           { label: 'Weather',             sources: 'NOAA NWS temperature / precipitation forecasts' },
 };
+
+// Normalize a pushed status key ("kalshi-bias-signal") to a META key ("kalshi_bias").
+function normAgentKey(k) {
+  return String(k).replace(/-signal$/, '').replace(/-/g, '_');
+}
 
 // ---------------------------------------------------------------------------
 // Tab switching
@@ -1354,51 +1341,38 @@ let agentsGridRendered = false;
 function renderAgentsGrid(agentStatuses, config) {
   const grid = document.getElementById('agents-grid');
 
-  // Build cards for known agents in order
-  const order = ['weather', 'polymarket', 'order_flow', 'market_maker', 'kalshi_bias', 'x'];
+  // Normalize pushed status keys (e.g. "kalshi-bias-signal" → "kalshi_bias").
+  const statuses = {};
+  for (const [k, v] of Object.entries(agentStatuses || {})) statuses[normAgentKey(k)] = v;
+
+  // Show the known signals in order, then any extra ones the pipeline reported.
+  const order = Object.keys(AGENT_META);
+  for (const k of Object.keys(statuses)) if (!order.includes(k)) order.push(k);
+
   grid.innerHTML = order.map(key => {
-    const meta = AGENT_META[key];
-    if (!meta) return '';
-
-    const status = agentStatuses[key] || { enabled: true, status: 'idle', last_run_at: null, last_signal_count: 0, last_output_summary: {} };
-    const enabled = status.enabled;
-    const enableKey = meta.enableKey;
-    const checked = enabled ? 'checked' : '';
-    const dimClass = enabled ? '' : ' disabled';
-
-    const statusPill = renderStatusPill(status.status);
-    const lastRun = timeSince(status.last_run_at);
-
-    const summaryHtml = renderOutputSummary(status.last_output_summary);
-
-    return `<div class="agent-card${dimClass}" id="agent-card-${key}">
+    const meta = AGENT_META[key] || { label: key, sources: '' };
+    const status = statuses[key];
+    if (!status && !AGENT_META[key]) return '';  // unknown + no data → skip
+    const s = status || { status: 'idle', last_run_at: null, last_signal_count: 0, last_output_summary: {} };
+    return `<div class="agent-card">
       <div class="agent-card-header">
         <div>
-          <div class="agent-name">${meta.label}</div>
-          <div class="agent-sources">${meta.sources}</div>
+          <div class="agent-name">${escHtml(meta.label)}</div>
+          <div class="agent-sources">${escHtml(meta.sources)}</div>
         </div>
-        <label class="toggle-switch" title="${enabled ? 'Disable' : 'Enable'} ${meta.label}">
-          <input type="checkbox" class="agent-toggle" data-key="${enableKey}" data-agent="${key}" ${checked} />
-          <span class="toggle-track"></span>
-        </label>
       </div>
       <div class="agent-card-body">
         <div class="agent-meta-row">
-          ${statusPill}
-          <span class="agent-last-run">Last run: ${lastRun}</span>
-          <span class="agent-last-run" style="margin-left:auto;">${status.last_signal_count} signal${status.last_signal_count !== 1 ? 's' : ''}</span>
+          ${renderStatusPill(s.status)}
+          <span class="agent-last-run">Last run: ${timeSince(s.last_run_at)}</span>
+          <span class="agent-last-run" style="margin-left:auto;">${s.last_signal_count} signal${s.last_signal_count !== 1 ? 's' : ''}</span>
         </div>
         <div class="agent-output-summary">
-          ${summaryHtml}
+          ${renderOutputSummary(s.last_output_summary)}
         </div>
       </div>
     </div>`;
   }).join('');
-
-  // Attach toggle event listeners
-  grid.querySelectorAll('.agent-toggle').forEach(toggle => {
-    toggle.addEventListener('change', onAgentToggle);
-  });
 }
 
 function renderStatusPill(status) {
@@ -1413,33 +1387,6 @@ function renderOutputSummary(summary) {
   return Object.entries(summary).map(([k, v]) => {
     return `<div class="kv-row"><span class="kv-key">${escHtml(String(k))}</span><span class="kv-val">${escHtml(String(v))}</span></div>`;
   }).join('');
-}
-
-async function onAgentToggle(e) {
-  const toggle = e.target;
-  const key = toggle.dataset.key;
-  const agentKey = toggle.dataset.agent;
-  const newVal = toggle.checked;
-
-  // Optimistic update of card dim class
-  const card = document.getElementById('agent-card-' + agentKey);
-  if (card) card.classList.toggle('disabled', !newVal);
-
-  try {
-    const resp = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [key]: newVal }),
-    });
-    if (!resp.ok) {
-      throw new Error('HTTP ' + resp.status);
-    }
-  } catch (err) {
-    console.warn('Agent toggle failed, reverting:', err);
-    // Revert
-    toggle.checked = !newVal;
-    if (card) card.classList.toggle('disabled', newVal);
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -353,9 +353,12 @@ PYTHONPATH=. .venv/bin/python scripts/paper_track.py record \
 (backtick-formatted, link via the row's `series_url`), side, edge, size,
 signal sources, adversarial notes, and any risk rejections worth surfacing.
 
-Push the approved slate to the Monitor tab's recent-ideas view. With the **Write**
-tool, create `/tmp/recent_${TS}.json` containing `{"recent_ideas": [ ...the same
-idea array... ]}`, then:
+Surface this cycle's findings to the Monitor tab's recent-ideas view — **all
+risk-checked candidates, approved and rejected**, so a cycle is never blank even
+when nothing passes. With the **Write** tool create `/tmp/recent_${TS}.json` as
+`{"recent_ideas": [...]}` where each entry has: `ticker`, `side` (upper),
+`confidence`, `signal_sources`, `outcome` (`"approved"` else rejected),
+`amount_dollars` (approved size), `rejection_reason` (from the risk agent). Then:
 
 ```bash
 .venv/bin/python scripts/ui_state.py --file /tmp/recent_${TS}.json
