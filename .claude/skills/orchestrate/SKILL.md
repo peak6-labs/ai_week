@@ -135,6 +135,9 @@ scout signals, which are correlated with each other):
 
 **Conditional (only when it applies — keeps dispatch load bounded):**
 
+- `sportsbook-odds-signal` — for **sports** markets (category sports, or ticker
+  contains a league like WTA/ATP/NBA/NHL/MLB/NFL/UFC); args: ticker, title.
+  This is the sharpest *independent* signal for sports — prioritize it there.
 - `polymarket-whale-signal` — only if `volume_24h > 5000`; args: ticker, title
 - `weather-signal` — only if `category` contains "weather" or "climate"; args: ticker, title
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
