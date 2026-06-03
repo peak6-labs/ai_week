@@ -82,17 +82,6 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Trading loop placeholder
-# ---------------------------------------------------------------------------
-
-async def _trading_loop(trading_state: TradingState) -> None:
-    """Placeholder trading loop.  The real loop will replace this later."""
-    trading_state.log("trading loop started")
-    while True:
-        await asyncio.sleep(3600)
-
-
-# ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
@@ -120,7 +109,6 @@ def create_app(
 
     # Attach shared objects to app state so route handlers can reach them.
     app.state.trading_state = trading_state
-    app.state.loop_task: asyncio.Task | None = None
     app.state.config_manager = config_manager
 
     @app.on_event("startup")
@@ -248,43 +236,6 @@ def create_app(
             await insert_reviewed_idea(idea, "rejected")
         except Exception as exc:
             logger.error("DB save failed for rejected idea %s: %s", idea_id, exc)
-        return JSONResponse({"ok": True})
-
-    @app.post("/api/system/start")
-    async def system_start(request: Request) -> JSONResponse:
-        """Start the trading loop asyncio Task."""
-        state: TradingState = request.app.state.trading_state
-
-        if state.system_running:
-            return JSONResponse({"error": "already running"}, status_code=409)
-
-        state.system_running = True
-        task = asyncio.create_task(_trading_loop(state))
-
-        def _on_done(t: asyncio.Task) -> None:
-            exc = t.exception() if not t.cancelled() else None
-            if exc is not None:
-                state.system_running = False
-                state.log(f"ERROR: {exc}")
-
-        task.add_done_callback(_on_done)
-        request.app.state.loop_task = task
-        return JSONResponse({"ok": True})
-
-    @app.post("/api/system/stop")
-    async def system_stop(request: Request) -> JSONResponse:
-        """Cancel the trading loop asyncio Task."""
-        state: TradingState = request.app.state.trading_state
-
-        if not state.system_running:
-            return JSONResponse({"error": "not running"}, status_code=409)
-
-        existing: asyncio.Task | None = request.app.state.loop_task
-        if existing is not None and not existing.done():
-            existing.cancel()
-
-        state.system_running = False
-        request.app.state.loop_task = None
         return JSONResponse({"ok": True})
 
     return app

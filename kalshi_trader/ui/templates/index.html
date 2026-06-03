@@ -139,20 +139,6 @@
     }
     .sys-status-text.running { color: var(--success); }
 
-    /* Start/Stop button */
-    #toggle-btn {
-      margin-left: auto;
-      padding: 6px 16px;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    #toggle-btn:hover { opacity: 0.85; }
-    #toggle-btn.start { background: var(--success); color: #fff; }
-    #toggle-btn.stop  { background: var(--error);   color: #fff; }
 
     /* ------------------------------------------------------------------ */
     /* Main content area                                                    */
@@ -689,7 +675,6 @@
     <span class="stat-label">Positions</span>
     <span class="stat-value" id="stat-positions">0</span>
   </div>
-  <button id="toggle-btn" class="start">Start System</button>
 </div>
 
 <!-- ====================================================================== -->
@@ -1250,13 +1235,19 @@ function timeShort(isoStr) {
 // Status bar update (always runs on every poll)
 // ---------------------------------------------------------------------------
 function updateStatusBar(state) {
-  const running = state.system_running;
+  // The pipeline runs externally (/orchestrate, /loop). "ACTIVE" means a cycle
+  // ran recently; otherwise "IDLE" — no fake in-app system toggle.
+  let active = false;
+  if (state.last_cycle_at) {
+    const ageMin = (Date.now() - new Date(state.last_cycle_at).getTime()) / 60000;
+    active = ageMin >= 0 && ageMin < 30;
+  }
 
   const dot = document.getElementById('status-dot');
   const txt = document.getElementById('status-text');
-  dot.className = 'dot' + (running ? ' running' : '');
-  txt.textContent = running ? 'RUNNING' : 'STOPPED';
-  txt.className = 'sys-status-text' + (running ? ' running' : '');
+  dot.className = 'dot' + (active ? ' running' : '');
+  txt.textContent = active ? 'ACTIVE' : 'IDLE';
+  txt.className = 'sys-status-text' + (active ? ' running' : '');
 
   document.getElementById('stat-balance').textContent = fmt$(state.balance_dollars);
 
@@ -1269,15 +1260,6 @@ function updateStatusBar(state) {
   document.getElementById('stat-cycle').textContent = '#' + state.cycle_number;
   document.getElementById('stat-last-cycle').textContent = timeSince(state.last_cycle_at);
   document.getElementById('stat-positions').textContent = (state.positions || []).length;
-
-  const btn = document.getElementById('toggle-btn');
-  if (running) {
-    btn.textContent = 'Stop System';
-    btn.className = 'stop';
-  } else {
-    btn.textContent = 'Start System';
-    btn.className = 'start';
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1590,20 +1572,6 @@ document.getElementById('save-btn').addEventListener('click', async () => {
 document.getElementById('reset-btn').addEventListener('click', async () => {
   clearFieldErrors();
   await loadConfig();
-});
-
-// ---------------------------------------------------------------------------
-// Start/Stop button
-// ---------------------------------------------------------------------------
-document.getElementById('toggle-btn').addEventListener('click', async () => {
-  const running = document.getElementById('status-dot').classList.contains('running');
-  const endpoint = running ? '/api/system/stop' : '/api/system/start';
-  try {
-    await fetch(endpoint, { method: 'POST' });
-    // State will update on next poll
-  } catch (err) {
-    console.error('System toggle failed:', err);
-  }
 });
 
 // ---------------------------------------------------------------------------
