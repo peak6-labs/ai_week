@@ -28,17 +28,20 @@ You need the caller to supply:
 
 - `TICKER` — the Kalshi market ticker (e.g. `KXBTC-25JUN01-T50000`)
 - `TITLE` — the full market title string (quoted)
+- `YES_BID` *(optional)* — live yes_bid from the orchestrator's live_prices fetch (float, cents). When provided, pass as `--yes-bid` to anchor probability to the same price the scorer will use.
+- `YES_ASK` *(optional)* — live yes_ask from the orchestrator's live_prices fetch (float, cents). When provided, pass as `--yes-ask`.
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Add `--yes-bid` and `--yes-ask` only when the caller supplied them:
 
    ```bash
    cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: analyzing orderbook spread for TICKER"
    PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
      -m kalshi_trader.pipelines.market_maker \
      --ticker TICKER \
-     --title "TITLE"
+     --title "TITLE" \
+     --yes-bid YES_BID --yes-ask YES_ASK
    ```
 
    Set a Bash timeout of at least 60 000 ms. The CLI prints a JSON array of

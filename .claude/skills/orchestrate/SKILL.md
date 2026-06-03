@@ -164,16 +164,16 @@ x), so we only spend those on a prioritized **deep-signal subset**.
 
 - **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
   scoring and, if it reaches 2+ sources, gets recorded for the backtest.
-- **Deep-signal subset (≤ ~20)** = the highest-priority rows for external agent
-  dispatch. **First, pre-filter the full board to rows with `average_score ≥ 0.4`**
-  — at that threshold the worth_trading hit rate is 3× the baseline (12.9% vs 4.4%),
-  so agent time is spent where it matters. Then select from that filtered pool by
-  this priority order until you hit 20:
+- **Deep-signal subset (≤ ~40)** = the highest-priority rows for external agent
+  dispatch. No pre-score filter — include markets across the full range to find
+  fresh signal. Select by this priority order until you hit 40:
   1. All weather/climate markets (NOAA is independent and cheap)
-  2. All sports markets (sportsbook odds are independent and sharp)
+  2. All sports markets with game-outcome resolution (sportsbook odds)
   3. All mentions markets (GDELT base-rate)
-  4. Top rows by `average_score` to fill remaining slots
-  Keep the cap at 20. Only this subset gets Step 2's agent dispatch.
+  4. All markets with `volume_24h > 5000` (OFI eligible)
+  5. Top rows by `average_score` to fill remaining slots
+  Wider subsets mean more OFI coverage and catch markets the score filter misses.
+  Only this subset gets Step 2's agent dispatch.
 
 For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
 as the tradeable `ticker`.
@@ -254,7 +254,7 @@ scout signals, which are correlated with each other):
 
 | Agent | Args to pass in the prompt |
 |-------|----------------------------|
-| `market-maker-signal` | ticker, title. Orderbook-snapshot signal — no volume gate, run on every market. |
+| `market-maker-signal` | ticker, title, **YES_BID** and **YES_ASK** from `/tmp/live_prices_${TS}.json` (extract per ticker). These anchor the probability to the same price the scorer uses, preventing stale-price artifacts. |
 
 **Conditional (only when it applies — keeps dispatch load bounded):**
 
@@ -444,7 +444,7 @@ candidate slate:
    has a twist the signals didn't account for (specific date, strict threshold,
    source of truth, determination delay), drop the market.
 2. **Bear case** — what specific mechanism makes the signal wrong?
-3. **Source independence** — two paths to pass:
+3. **Source independence** — three paths to pass:
    - **External path** (lower bar, 5¢): an independent external signal
      (weather/sportsbook/mentions) agrees with the direction. Microstructure +
      kalshi_bias alone are price-derived and correlated — they do not satisfy
@@ -459,7 +459,16 @@ candidate slate:
      effective_edge = fee_adjusted_edge + actionability_score × 5
      ```
      Pass if effective_edge ≥ 8¢.
-   If neither path is satisfied, fail on source independence.
+   - **Directional-book path** (medium bar, 10¢): `market_maker.direction` ∈
+     {YES, NO} (not neutral) **and** `|depth_imbalance| > 0.4` (a skew this
+     strong is unlikely to be noise). No OFI required. The order book snapshot
+     adds genuine information beyond price history when the imbalance is this
+     lopsided. Compute effective_edge as above. Pass if effective_edge ≥ 10¢.
+     Note: verify the MM probability was anchored to live prices (YES_BID/YES_ASK
+     passed correctly) — if the agent's reported spread is >3× the live spread
+     (ask−bid), the probability may be stale; in that case require effective_edge
+     ≥ 15¢ as a conservatism buffer.
+   If no path is satisfied, fail on source independence.
 4. **Base rate** — does the historical base rate support this direction?
 5. **Fresh-eyes test** — would you act on this with no prior conviction?
 

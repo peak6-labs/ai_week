@@ -177,19 +177,7 @@ def main() -> None:
             midpoint = (bid + ask) / 2.0
             cost_per_contract = midpoint if pos["side"] == "yes" else (100 - midpoint)
             total_li_exposure += pos["quantity"] * cost_per_contract / 100.0
-    remaining_headroom = 100.0 - total_li_exposure
-
-    # Deduct night-mode session spend toward the shared $100 nightly cap
-    _session_date = now_utc.strftime("%Y%m%d")
-    _session_path = Path(f"reports/night-mode-session-{_session_date}.json")
-    night_mode_dollars_spent = 0.0
-    if _session_path.exists():
-        try:
-            _session_data = json.loads(_session_path.read_text())
-            night_mode_dollars_spent = float(_session_data.get("dollars_spent", 0.0))
-        except Exception:
-            pass
-    remaining_headroom = max(0.0, 100.0 - total_li_exposure - night_mode_dollars_spent)
+    remaining_headroom = max(0.0, 100.0 - total_li_exposure)
 
     # Build per-market data
     market_rows = []
@@ -290,7 +278,7 @@ def main() -> None:
     print(f"\n{'='*76}")
     print(f"  LOVE ISLAND USA S8E2 — LIVE ARB MONITOR  {now_utc.strftime('%H:%M:%S UTC')}")
     print(f"  {exit_label}")
-    print(f"  LI Exposure: ${total_li_exposure:.2f}  Night-mode: ${night_mode_dollars_spent:.2f}  Headroom: ${remaining_headroom:.2f} / $100")
+    print(f"  Exposure: ${total_li_exposure:.2f} / $100.00  |  Headroom: ${remaining_headroom:.2f}")
     if alerts:
         print(f"  *** {' | '.join(alerts)}")
     print(f"{'='*76}")
@@ -318,7 +306,6 @@ def main() -> None:
         "markets": market_rows,
         "li_positions": li_positions,
         "total_li_exposure_dollars": round(total_li_exposure, 2),
-        "night_mode_dollars_spent": round(night_mode_dollars_spent, 2),
         "remaining_headroom_dollars": round(remaining_headroom, 2),
         "minutes_to_hard_exit": max(0, int(secs_to_hard / 60)),
         "past_hard_exit": secs_to_hard <= 0,

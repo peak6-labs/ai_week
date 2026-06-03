@@ -3,11 +3,12 @@
 
 Rules applied per candidate (in order):
   1. Session cap:          trades_placed >= 10 or dollars_spent >= $100 → stop all
-  2. Edge gate:            confidence - market_price/100 < 0.05 → skip
-  3. Unquoted guard:       market_price <= 0 or >= 100 → skip
-  4. Weather settlement:   category in {"climate and weather", "weather"}
+  2. Love island filter:   category contains "love island" → skip (always excluded)
+  3. Edge gate:            confidence - market_price/100 < 0.05 → skip
+  4. Unquoted guard:       market_price <= 0 or >= 100 → skip
+  5. Weather settlement:   category in {"climate and weather", "weather"}
                            AND hours_to_close < 2 → skip
-  5. Execute:              buy $10 flat limit order
+  6. Execute:              buy $10 flat limit order
 
 Safety guarantee: Step 0.5 (evaluate_portfolio.py) always runs BEFORE this script
 in the night-mode pipeline. Exit orders from that script are completely independent
@@ -44,6 +45,7 @@ FLAT_TRADE_SIZE_DOLLARS = 10.0
 EDGE_MINIMUM = 0.05
 WEATHER_SETTLEMENT_HOURS = 2.0
 WEATHER_CATEGORIES = {"climate and weather", "weather"}
+LOVE_ISLAND_CATEGORY = "love island"
 
 
 def _load_session(session_file: str) -> dict:
@@ -82,6 +84,10 @@ def apply_rules(candidate: dict, session: dict) -> str | None:
     ):
         return "session_cap_reached"
 
+    category = (candidate.get("category") or "").lower()
+    if LOVE_ISLAND_CATEGORY in category:
+        return "love_island_excluded"
+
     confidence = float(candidate.get("confidence", 0))
     market_price = float(candidate.get("market_price", 0))
 
@@ -92,7 +98,6 @@ def apply_rules(candidate: dict, session: dict) -> str | None:
     if edge < EDGE_MINIMUM:
         return "edge_insufficient"
 
-    category = (candidate.get("category") or "").lower()
     hours_to_close = candidate.get("hours_to_close")
     if (
         category in WEATHER_CATEGORIES

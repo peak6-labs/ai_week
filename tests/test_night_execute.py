@@ -117,10 +117,10 @@ def test_apply_rules_passes_weather_no_hours():
     assert apply_rules(candidate, _session()) is None
 
 
-def test_apply_rules_passes_love_island_under_2h():
-    """Love island (non-weather) trades regardless of time to close."""
+def test_apply_rules_rejects_love_island_under_2h():
+    """Love island is excluded entirely — not just gated on settlement time."""
     candidate = _candidate(category="love island", hours_to_close=0.5)
-    assert apply_rules(candidate, _session()) is None
+    assert apply_rules(candidate, _session()) == "love_island_excluded"
 
 
 def test_apply_rules_passes_politics_under_2h():
@@ -131,6 +131,18 @@ def test_apply_rules_passes_politics_under_2h():
 def test_apply_rules_passes_sports_at_zero_hours():
     candidate = _candidate(category="sports", hours_to_close=0.0)
     assert apply_rules(candidate, _session()) is None
+
+
+def test_apply_rules_rejects_love_island():
+    """Love island markets are always excluded from night-mode execution."""
+    candidate = _candidate(category="love island", hours_to_close=24.0)
+    assert apply_rules(candidate, _session()) == "love_island_excluded"
+
+
+def test_apply_rules_rejects_love_island_regardless_of_edge():
+    """Love island exclusion fires even on a high-edge candidate."""
+    candidate = _candidate(category="love island", confidence=0.95, market_price=10.0)
+    assert apply_rules(candidate, _session()) == "love_island_excluded"
 
 
 # ---------------------------------------------------------------------------

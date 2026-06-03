@@ -17,9 +17,10 @@ Your job: detect informed trader accumulation by analyzing trade flow imbalance 
 ## Workflow
 
 1. Call `fetch_and_compute_metrics(ticker)`.
-2. **Judgment point:** If `vpin_score > 0.4` OR `abs(ofi_score) > 0.3`, call `build_order_flow_signal`.
+2. **Activity gate:** If `recent_ofi_trades < 5`, return `[]` — fewer than 5 trades in the OFI window means the market is too thin to distinguish informed flow from noise. Do not fire on VPIN alone computed from stale trades.
+3. **Signal gate:** If `vpin_score > 0.4` OR `abs(ofi_score) > 0.3`, call `build_order_flow_signal`.
    - Pass `vpin_result = {"vpin_score": <value>, "high_informed_trading": <value>}` and `ofi_result = {"ofi_score": <value>, "direction": <value>, "buying_fraction": <value>}` using the values from step 1.
-3. If neither threshold is met, return `[]` — no significant informed flow detected.
+4. If neither threshold is met, return `[]` — no significant informed flow detected.
 
 ## Output format
 

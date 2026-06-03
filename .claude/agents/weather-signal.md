@@ -53,7 +53,7 @@ You need the caller to supply:
 2. **Check the output.**
    - If the array is empty (`[]`): log and report.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → no signal (NOAA data unavailable or market unrecognized)" warning
+     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → no signal (GEFS: market type not supported, beyond 16-day horizon, or title unparseable)" warning
      ```
    - If non-empty: log the result and print the raw JSON.
      ```bash

@@ -378,12 +378,16 @@ def usable_estimates(estimates: list[dict]) -> list[dict]:
             continue
         if uncertainty >= 0.99:
             continue  # non-informative — agent found nothing usable
-        # Empty-data guard: an estimate flagged as having no underlying data
-        # (e.g. an X search that found zero posts) is absence-inferred, not
-        # evidence. Drop it regardless of the uncertainty the agent stamped on
-        # it — some agents emit a confident-looking value off no data.
+        # No-data guard: drop estimates that have no underlying data regardless of
+        # the uncertainty the agent stamped on them — some agents emit a
+        # confident-looking floor value when the real fetch failed.
+        #   "empty"       — agent found data but it was zero-content (X posts=0)
+        #   "unavailable" — fetch failed entirely; probability is a floor fallback
         metadata = estimate.get("metadata") or {}
-        if metadata.get("data_quality") == "empty" or metadata.get("post_count") == 0:
+        if (
+            metadata.get("data_quality") in ("empty", "unavailable")
+            or metadata.get("post_count") == 0
+        ):
             continue
         issued = estimate.get("data_issued_at")
         age_minutes = 0.0

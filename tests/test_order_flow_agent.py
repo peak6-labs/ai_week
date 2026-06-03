@@ -98,6 +98,7 @@ async def test_fetch_and_compute_metrics_returns_all_keys():
     assert "ofi_score" in result
     assert "direction" in result
     assert "buying_fraction" in result
+    assert "recent_ofi_trades" in result
     assert "recent_trade_count" in result
     assert result["total_trades"] == 15
     # 10 buys vs 5 sells → OFI should be positive
@@ -174,6 +175,7 @@ async def test_compute_ofi_handler_all_buys():
     assert result["ofi_score"] == pytest.approx(1.0)
     assert result["direction"] == "YES"
     assert result["buying_fraction"] == pytest.approx(1.0)
+    assert result["recent_ofi_trades"] == 10
 
 
 @pytest.mark.asyncio
@@ -184,6 +186,7 @@ async def test_compute_ofi_handler_all_sells():
     assert result["ofi_score"] == pytest.approx(-1.0)
     assert result["direction"] == "NO"
     assert result["buying_fraction"] == pytest.approx(0.0)
+    assert result["recent_ofi_trades"] == 10
 
 
 @pytest.mark.asyncio
@@ -193,6 +196,19 @@ async def test_compute_ofi_handler_neutral():
     result = await agent._compute_ofi(trades)
     assert result["ofi_score"] == pytest.approx(0.0)
     assert result["direction"] == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_compute_ofi_stale_trades_give_neutral_buying_fraction():
+    """buying_fraction must use the same window as ofi_score — stale trades excluded from both."""
+    agent = OrderFlowAgent.__new__(OrderFlowAgent)
+    # All trades are 3 hours old — outside the 30-min OFI window
+    stale_buys = [_old_trade("yes") for _ in range(20)]
+    result = await agent._compute_ofi(stale_buys)
+    # OFI window has no trades → both ofi_score and buying_fraction are neutral
+    assert result["ofi_score"] == pytest.approx(0.0)
+    assert result["buying_fraction"] == pytest.approx(0.5)
+    assert result["recent_ofi_trades"] == 0
 
 
 @pytest.mark.asyncio

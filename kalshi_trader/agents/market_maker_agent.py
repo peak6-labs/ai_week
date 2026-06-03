@@ -136,6 +136,8 @@ class MarketMakerAgent:
 
     def __init__(self, client: Any) -> None:
         self._client = client
+        self._yes_bid_override: float | None = None
+        self._yes_ask_override: float | None = None
         system_prompt = (_PROMPTS_DIR / "market_maker.md").read_text()
         self._agent = BaseAgent(
             tools=_SCHEMAS,
@@ -147,7 +149,15 @@ class MarketMakerAgent:
             system_prompt=system_prompt,
         )
 
-    async def run(self, ticker: str, title: str) -> list[SignalEstimate]:
+    async def run(
+        self,
+        ticker: str,
+        title: str,
+        yes_bid_override: float | None = None,
+        yes_ask_override: float | None = None,
+    ) -> list[SignalEstimate]:
+        self._yes_bid_override = yes_bid_override
+        self._yes_ask_override = yes_ask_override
         prompt = f"Analyze market maker dynamics for this Kalshi market:\nticker: {ticker}\ntitle: {title}"
         raw = await self._agent.run(prompt)
         return parse_signal_estimates(raw)
@@ -155,10 +165,14 @@ class MarketMakerAgent:
     async def _get_orderbook(self, ticker: str) -> dict:
         raw = await self._client.get_orderbook(ticker)
         parsed = _parse_orderbook(raw)
+        # Use caller-supplied live prices when provided so probability is anchored to
+        # the same bid/ask we'll score against, not a potentially-stale orderbook read.
+        yes_bid = self._yes_bid_override if self._yes_bid_override is not None else parsed["best_bid"]
+        yes_ask = self._yes_ask_override if self._yes_ask_override is not None else parsed["best_ask"]
         return {
-            "yes_bid": parsed["best_bid"],
-            "yes_ask": parsed["best_ask"],
-            "spread_cents": parsed["spread_cents"],
+            "yes_bid": yes_bid,
+            "yes_ask": yes_ask,
+            "spread_cents": parsed["spread_cents"],  # keep real spread for anomaly detection
             "bid_depth": float(parsed["bid_vol"]),
             "ask_depth": float(parsed["ask_vol"]),
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),

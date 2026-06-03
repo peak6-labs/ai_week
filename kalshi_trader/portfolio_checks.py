@@ -17,8 +17,12 @@ from __future__ import annotations
 
 from kalshi_trader.models import ExitSignal
 
-STOP_LOSS_THRESHOLD = 0.75       # exit if current_value < 75% of cost basis
-PROFIT_TARGET_THRESHOLD = 1.75   # exit if current_value > 175% of cost basis
+STOP_LOSS_THRESHOLD = 0.75        # exit if current_value < 75% of cost basis
+
+# How far the price must travel from entry toward certainty (100¢) before we
+# take profit. At 50¢ entry this equals the old 1.75× rule (target = 87.5¢).
+# At 9¢ entry it requires ~77¢ (not 16¢), letting longshots run much further.
+PROFIT_CONVERGENCE_FRACTION = 0.75
 
 
 def check_stop_loss(position: dict) -> ExitSignal | None:
@@ -44,9 +48,10 @@ def check_profit_target(position: dict) -> ExitSignal | None:
     current_price_cents = position.get("current_price_cents")
     if cost_basis <= 0 or quantity <= 0 or current_price_cents is None:
         return None
-    current_value = quantity * current_price_cents / 100.0
-    if current_value > PROFIT_TARGET_THRESHOLD * cost_basis:
-        gain_pct = round((current_value / cost_basis - 1.0) * 100.0)
+    entry_price_cents = (cost_basis / quantity) * 100.0
+    target_price_cents = entry_price_cents + PROFIT_CONVERGENCE_FRACTION * (100.0 - entry_price_cents)
+    if current_price_cents > target_price_cents:
+        gain_pct = round((current_price_cents / entry_price_cents - 1.0) * 100.0)
         return ExitSignal(
             reason="profit_target",
             exit_price_cents=position["midpoint_yes_price_cents"],

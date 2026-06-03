@@ -155,15 +155,34 @@ def _tokenize(title: str) -> tuple[set[str], list[float]]:
     return words, numbers
 
 
+# Words that describe actions, roles, or synonyms rather than identifying a
+# specific entity — exclude these when deciding whether two titles name different
+# subjects. e.g. "step down" vs "resign" are synonyms, not different subjects.
+_SUBJECT_NONWORDS = frozenset({
+    "step", "down", "resign", "leave", "depart", "exit", "retire",
+    "chair", "head", "chief", "director", "secretary", "minister", "president",
+    "lead", "leads", "leading", "serve", "serving", "holds", "hold",
+    "attend", "attend", "appears", "appear", "visit", "visits",
+    "announce", "says", "said", "declare", "confirm", "sign", "pass",
+    "beat", "beats", "wins", "lose", "loses", "defeat", "defeats",
+    "make", "takes", "gets", "runs", "leads",
+})
+
+
 def _different_subjects(words_a: set[str], words_b: set[str]) -> bool:
     """True when the two titles appear to name different people or entities.
 
-    If each title has ≥2 long tokens (>3 chars) that don't appear in the other,
-    they are likely naming different subjects (e.g. McGregor vs Carmelo Anthony)
-    and the match should be rejected even if shared event words inflate Jaccard.
+    If each title has ≥2 long tokens (>3 chars, not a common action/role word)
+    that don't appear in the other, they likely name different subjects
+    (e.g. McGregor vs Carmelo Anthony) and the match should be rejected.
+    Synonym pairs like "step down" vs "resign" are excluded so they don't
+    trigger a false mismatch when the same person is named in both titles.
     """
-    unique_a = {w for w in words_a - words_b if len(w) > 3}
-    unique_b = {w for w in words_b - words_a if len(w) > 3}
+    def _subject_tokens(unique: set[str]) -> set[str]:
+        return {w for w in unique if len(w) > 3 and w not in _SUBJECT_NONWORDS}
+
+    unique_a = _subject_tokens(words_a - words_b)
+    unique_b = _subject_tokens(words_b - words_a)
     return len(unique_a) >= 2 and len(unique_b) >= 2
 
 

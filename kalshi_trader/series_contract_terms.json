@@ -1,4 +1,476 @@
 {
+  "CONTROLS": {
+    "settlement_sources": [
+      {
+        "name": "Library of Congress",
+        "url": "https://www.congress.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/CONTROL.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/CONTROL.pdf",
+    "fetched_at": "2026-06-03T21:04:06.372655+00:00"
+  },
+  "FEDHIKE": {
+    "settlement_sources": [
+      {
+        "name": "Federal Reserve",
+        "url": "https://www.federalreserve.gov/monetarypolicy/openmarket.htm"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/FEDHIKE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/FEDHIKE.pdf",
+    "fetched_at": "2026-06-03T20:44:51.030774+00:00"
+  },
+  "GOVPARTYNV": {
+    "settlement_sources": [
+      {
+        "name": "US State Governments",
+        "url": "https://www.usa.gov/state-governments"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GOVPARTY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GOVPARTY.pdf",
+    "fetched_at": "2026-06-03T20:53:38.692765+00:00"
+  },
+  "HOUSEMI3": {
+    "settlement_sources": [
+      {
+        "name": "Library of Congress",
+        "url": "https://www.congress.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/HOUSEPARTY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/HOUSEPARTY.pdf",
+    "fetched_at": "2026-06-03T20:17:24.926398+00:00"
+  },
+  "KXALBUMRELEASEDATEUZI": {
+    "settlement_sources": [
+      {
+        "name": "Spotify",
+        "url": "https://open.spotify.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ALBUMRELEASEDATE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ALBUMRELEASEDATE.pdf",
+    "fetched_at": "2026-06-03T21:16:54.804516+00:00"
+  },
+  "KXARTISTSTREAMSY": {
+    "settlement_sources": [
+      {
+        "name": "Luminate",
+        "url": "https://luminatedata.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ARTISTSTREAMSY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ARTISTSTREAMSY.pdf",
+    "fetched_at": "2026-06-03T21:16:54.386840+00:00"
+  },
+  "KXARTISTVS": {
+    "settlement_sources": [
+      {
+        "name": "Luminate",
+        "url": "https://luminatedata.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ARTISTVS.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ARTISTVS.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014133+00:00"
+  },
+  "KXATTENDUFC250": {
+    "settlement_sources": [
+      {
+        "name": "USA Today",
+        "url": "https://www.usatoday.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Vogue",
+        "url": "https://www.vogue.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ATTEND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ATTEND.pdf",
+    "fetched_at": "2026-06-03T19:20:37.377219+00:00"
+  },
+  "KXBOND": {
+    "settlement_sources": [
+      {
+        "name": "Variety",
+        "url": "https://variety.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/BOND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/BOND.pdf",
+    "fetched_at": "2026-06-03T21:16:54.374844+00:00"
+  },
+  "KXBRPRES": {
+    "settlement_sources": [
+      {
+        "name": "AP",
+        "url": "https://apnews.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/BRPRES.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/BRPRES.pdf",
+    "fetched_at": "2026-06-03T21:04:06.402624+00:00"
+  },
+  "KXCAPRIMARY": {
+    "settlement_sources": [
+      {
+        "name": "Washington Secretary of State",
+        "url": "https://www.sos.wa.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/CAPRIMARY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/CAPRIMARY.pdf",
+    "fetched_at": "2026-06-03T20:17:24.926318+00:00"
+  },
+  "KXCOLOMBIAN2RMOV": {
+    "settlement_sources": [
+      {
+        "name": "official election authority responsible for certifying results in <geography>",
+        "url": "https://www.nass.org/can-I-vote"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ELECTIONMOV.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ELECTIONMOV.pdf",
+    "fetched_at": "2026-06-03T20:17:24.927012+00:00"
+  },
+  "KXCOPRIMARY": {
+    "settlement_sources": [
+      {
+        "name": "Republican Party",
+        "url": "https://gop.com/"
+      },
+      {
+        "name": "Democratic Party",
+        "url": "https://democrats.org/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/HOUSEPARTYNOMINATION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/HOUSEPARTYNOMINATION.pdf",
+    "fetched_at": "2026-06-03T20:17:24.926388+00:00"
+  },
+  "KXDNIANNOUNCE": {
+    "settlement_sources": [
+      {
+        "name": "the White House",
+        "url": "https://www.whitehouse.gov"
+      },
+      {
+        "name": "Federal Register",
+        "url": "https://www.federalregister.gov/"
+      },
+      {
+        "name": "the President of the United States",
+        "url": "https://www.whitehouse.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/PRESACTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/PRESACTION.pdf",
+    "fetched_at": "2026-06-03T20:44:51.278515+00:00"
+  },
+  "KXENGAGEMENTSWEENEYBRUAN": {
+    "settlement_sources": [
+      {
+        "name": "The Source Agencies are",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "\ue907 statements from person (e",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "in hierarchical order",
+        "url": "https://kalshi.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ENGAGEMENT.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ENGAGEMENT.pdf",
+    "fetched_at": "2026-06-03T21:16:54.804502+00:00"
+  },
+  "KXEVENTTIMES": {
+    "settlement_sources": [
+      {
+        "name": "person",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "event official website and social media accounts",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "official event broadcasts and production credits",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "NBC Sports",
+        "url": "https://www.nbcsports.com"
+      },
+      {
+        "name": "Sports Illustrated",
+        "url": "https://www.si.com"
+      },
+      {
+        "name": "verified venue security footage or access logs released publicly",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "ESPN",
+        "url": "https://www.espn.com"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com"
+      },
+      {
+        "name": "The Athletic",
+        "url": "https://theathletic.com"
+      },
+      {
+        "name": "CBS Sports",
+        "url": "https://www.cbssports.com"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Bloomberg News",
+        "url": "https://www.bloomberg.com/news"
+      },
+      {
+        "name": "Fox Sports",
+        "url": "https://www.foxsports.com"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/EVENTTIMES.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/EVENTTIMES.pdf",
+    "fetched_at": "2026-06-03T21:16:54.377087+00:00"
+  },
+  "KXFRENCHPRES": {
+    "settlement_sources": [
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/FRENCHPRES.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/FRENCHPRES.pdf",
+    "fetched_at": "2026-06-03T20:17:24.946447+00:00"
+  },
+  "KXGABBARDOUT": {
+    "settlement_sources": [
+      {
+        "name": "person",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Bloomberg News",
+        "url": "https://www.bloomberg.com/news"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "official government records and registries",
+        "url": "https://kalshi.com"
+      },
+      {
+        "name": "the body, agency, company, organization, or entity at which role is held",
+        "url": "https://kalshi.com"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com"
+      },
+      {
+        "name": "the New York Times",
+        "url": "https://www.nytimes.com"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/EFFECTIVELEAVE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/EFFECTIVELEAVE.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014097+00:00"
+  },
+  "KXGOVCAPRIMARYPARTY": {
+    "settlement_sources": [
+      {
+        "name": "relevant county clerk or board of elections",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "Attorney General of the United States",
+        "url": "https://www.justice.gov/ag"
+      },
+      {
+        "name": "relevant city/municipal clerk",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "in hierarchical order: the relevant state Secretary of State or chief election officer",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "the Federal Election Commission",
+        "url": "https://www.fec.gov"
+      },
+      {
+        "name": "state board of elections or canvassing board",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "The Source Agencies are",
+        "url": "https://kalshi.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/USELECTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/USELECTION.pdf",
+    "fetched_at": "2026-06-03T20:06:37.405055+00:00"
+  },
+  "KXGOVSCNOMR": {
+    "settlement_sources": [
+      {
+        "name": "Republican Party",
+        "url": "https://gop.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GOVPARTYNOM.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GOVPARTYNOM.pdf",
+    "fetched_at": "2026-06-03T20:44:51.030897+00:00"
+  },
   "KXHIGHLAX": {
     "settlement_sources": [
       {
@@ -10,6 +482,598 @@
     "contract_url": "https://kalshi-public-docs-staging.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LAXHIGH.pdf",
     "fetched_at": "2026-06-03T16:39:33.736879+00:00"
   },
+  "KXHIGHTDC": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report DC ",
+        "url": "https://forecast.weather.gov/product.php?site=LWX&product=CLI&issuedby=DCA"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-03T19:20:36.904474+00:00"
+  },
+  "KXHOUSERACE": {
+    "settlement_sources": [
+      {
+        "name": "Library of Congress",
+        "url": "https://www.congress.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/HOUSERACE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/HOUSERACE.pdf",
+    "fetched_at": "2026-06-03T20:53:38.692625+00:00"
+  },
+  "KXIPOSPACEX": {
+    "settlement_sources": [
+      {
+        "name": "the New York Times",
+        "url": "https://www.nytimes.com"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Bloomberg",
+        "url": "https://www.bloomberg.com"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Financial Times",
+        "url": "https://www.ft.com"
+      },
+      {
+        "name": "CNBC",
+        "url": "https://www.cnbc.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com"
+      },
+      {
+        "name": "BBC",
+        "url": "https://www.bbc.co.uk"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/WHENIPO.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/WHENIPO.pdf",
+    "fetched_at": "2026-06-03T21:04:06.402774+00:00"
+  },
+  "KXLAMAYORMATCHUP": {
+    "settlement_sources": [
+      {
+        "name": "Federal Reserve Board of Governors",
+        "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/MATCHUP.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/MATCHUP.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014140+00:00"
+  },
+  "KXLEAVEOPEC": {
+    "settlement_sources": [
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "Deutsche Welle",
+        "url": "https://www.dw.com"
+      },
+      {
+        "name": "Financial Times",
+        "url": "https://www.ft.com"
+      },
+      {
+        "name": "France 24 English",
+        "url": "https://www.france24.com/en/"
+      },
+      {
+        "name": "The Guardian",
+        "url": "https://www.theguardian.com/"
+      },
+      {
+        "name": "NBC News",
+        "url": "https://www.nbcnews.com/"
+      },
+      {
+        "name": "The Times of India",
+        "url": "https://timesofindia.indiatimes.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com"
+      },
+      {
+        "name": "CBS News",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "ABC News",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "NHK World-Japan",
+        "url": "https://www3.nhk.or.jp/nhkworld/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "BBC News",
+        "url": "https://www.bbc.com/"
+      },
+      {
+        "name": "The Globe and Mail",
+        "url": "https://www.theglobeandmail.com/"
+      },
+      {
+        "name": "Al Jazeera English",
+        "url": "https://www.aljazeera.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com"
+      },
+      {
+        "name": "The South China Morning Post",
+        "url": "https://www.scmp.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      },
+      {
+        "name": "Channel NewsAsia",
+        "url": "https://www.channelnewsasia.com/us"
+      },
+      {
+        "name": "Bloomberg News",
+        "url": "https://www.bloomberg.com/news"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/COUNTRYACTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/COUNTRYACTION.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014199+00:00"
+  },
+  "KXLIUSAELIMINATION": {
+    "settlement_sources": [
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUSAELIMINATION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUSAELIMINATION.pdf",
+    "fetched_at": "2026-06-03T21:34:49.206545+00:00"
+  },
+  "KXLLM1": {
+    "settlement_sources": [
+      {
+        "name": "LM Arena Leaderboard (Remove Style Control)",
+        "url": "https://lmarena.ai/leaderboard/text"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LLM1.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LLM1.pdf",
+    "fetched_at": "2026-06-03T21:04:06.365421+00:00"
+  },
+  "KXLOVEISLANDUKRANK": {
+    "settlement_sources": [
+      {
+        "name": "BBC",
+        "url": "https://www.bbc.co.uk"
+      },
+      {
+        "name": "NBC",
+        "url": "https://www.nbcnews.com/"
+      },
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      },
+      {
+        "name": "itv",
+        "url": "https://www.itv.com/"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/COMPETITIONREALITYPLACE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/COMPETITIONREALITYPLACE.pdf",
+    "fetched_at": "2026-06-03T21:16:54.804541+00:00"
+  },
+  "KXLOVEISLMENTION": {
+    "settlement_sources": [
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/MENTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/MENTION.pdf",
+    "fetched_at": "2026-06-03T21:34:49.206501+00:00"
+  },
+  "KXLOWTBOS": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Boston",
+        "url": "https://forecast.weather.gov/product.php?site=BOX&product=CLI&issuedby=BOS"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-03T19:20:37.229524+00:00"
+  },
+  "KXLOWTLV": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Las Vegas",
+        "url": "https://forecast.weather.gov/product.php?site=VEF&product=CLI&issuedby=LAS"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-03T19:20:37.068680+00:00"
+  },
+  "KXLOWTSFO": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report San Francisco",
+        "url": "https://forecast.weather.gov/product.php?site=MTR&product=CLI&issuedby=SFO"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-03T19:20:36.826519+00:00"
+  },
+  "KXMARTINDNCOUT": {
+    "settlement_sources": [
+      {
+        "name": "person",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Bloomberg News",
+        "url": "https://www.bloomberg.com/news"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "official government records and registries",
+        "url": "https://kalshi.com"
+      },
+      {
+        "name": "the body, agency, company, organization, or entity at which role is held",
+        "url": "https://kalshi.com"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com"
+      },
+      {
+        "name": "the New York Times",
+        "url": "https://www.nytimes.com"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/EFFECTIVELEAVE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/EFFECTIVELEAVE.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014191+00:00"
+  },
+  "KXMIDTERMMOV": {
+    "settlement_sources": [
+      {
+        "name": "official election authority responsible for certifying results in <geography>",
+        "url": "https://www.nass.org/can-I-vote"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/MIDTERMMOV.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/MIDTERMMOV.pdf",
+    "fetched_at": "2026-06-03T20:17:24.927186+00:00"
+  },
+  "KXMIDTERMVOTETURN": {
+    "settlement_sources": [
+      {
+        "name": "the relevant election commission of the country in which <election> takes place",
+        "url": "https://kalshi.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/MIDTERMVOTETURN.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/MIDTERMVOTETURN.pdf",
+    "fetched_at": "2026-06-03T20:44:51.030738+00:00"
+  },
+  "KXMLBMENTION": {
+    "settlement_sources": [
+      {
+        "name": "the Governing League",
+        "url": "https://www.mlb.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/SPORTSMENTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SPORTSMENTION.pdf",
+    "fetched_at": "2026-06-03T19:20:37.199233+00:00"
+  },
+  "KXNBAMENTION": {
+    "settlement_sources": [
+      {
+        "name": "the Governing League",
+        "url": "https://www.nba.com"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/SPORTSMENTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SPORTSMENTION.pdf",
+    "fetched_at": "2026-06-03T19:20:36.904444+00:00"
+  },
+  "KXNEWOUTBREAKHANTA": {
+    "settlement_sources": [
+      {
+        "name": "WHO",
+        "url": "https://www.who.int/emergencies/situations"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NEWOUTBREAK.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NEWOUTBREAK.pdf",
+    "fetched_at": "2026-06-03T21:04:06.372629+00:00"
+  },
+  "KXNEXTROMANIAPM": {
+    "settlement_sources": [
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NEXTPM.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NEXTPM.pdf",
+    "fetched_at": "2026-06-03T20:29:19.260050+00:00"
+  },
+  "KXPRIMARYMOV": {
+    "settlement_sources": [
+      {
+        "name": "official election authority responsible for certifying results in <geography>",
+        "url": "https://www.nass.org/can-I-vote"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ELECTIONMOV.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ELECTIONMOV.pdf",
+    "fetched_at": "2026-06-03T20:53:38.690515+00:00"
+  },
+  "KXPRIMARYTURNOUT": {
+    "settlement_sources": [
+      {
+        "name": "the relevant election commission of the country in which <election> takes place",
+        "url": "https://kalshi.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/VOTECOUNT.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/VOTECOUNT.pdf",
+    "fetched_at": "2026-06-03T21:04:06.365351+00:00"
+  },
+  "KXRAINNYCM": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report NY",
+        "url": "https://forecast.weather.gov/product.php?site=OKX&product=CLI&issuedby=NYC"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RAINNYCM.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINNYCM.pdf",
+    "fetched_at": "2026-06-03T19:20:37.285400+00:00"
+  },
+  "KXRANKLIST1SONG": {
+    "settlement_sources": [
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RANKLISTSONG.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RANKLISTSONG.pdf",
+    "fetched_at": "2026-06-03T20:06:37.372003+00:00"
+  },
+  "KXRT": {
+    "settlement_sources": [
+      {
+        "name": "Rotten Tomatoes",
+        "url": "https://www.rottentomatoes.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RT.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RT.pdf",
+    "fetched_at": "2026-06-03T21:16:54.400837+00:00"
+  },
+  "KXRUBIOMENTION": {
+    "settlement_sources": [
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/MENTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/MENTION.pdf",
+    "fetched_at": "2026-06-03T19:53:09.619218+00:00"
+  },
+  "KXSENATEMAD": {
+    "settlement_sources": [
+      {
+        "name": "Republican Party",
+        "url": "https://gop.com/"
+      },
+      {
+        "name": "Democratic Party",
+        "url": "https://democrats.org/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/SENATEPARTYNOM.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SENATEPARTYNOM.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014123+00:00"
+  },
+  "KXSPACEXSTARSHIP": {
+    "settlement_sources": [
+      {
+        "name": "FAA",
+        "url": "https://www.faa.gov/newsroom/updates-grounding-boeing-737-max-9-aircraft"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/SPACEX.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SPACEX.pdf",
+    "fetched_at": "2026-06-03T20:53:38.652573+00:00"
+  },
+  "KXSTRMRSOTY": {
+    "settlement_sources": [
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "The Hollywood Reporter",
+        "url": "https://www.hollywoodreporter.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "Variety",
+        "url": "https://variety.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/STREAMERAWARDS.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/STREAMERAWARDS.pdf",
+    "fetched_at": "2026-06-03T21:16:54.804236+00:00"
+  },
   "KXTEMPNYCH": {
     "settlement_sources": [
       {
@@ -20,5 +1084,609 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NHIGHD.pdf",
     "contract_url": "https://kalshi-public-docs-staging.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NHIGHD.pdf",
     "fetched_at": "2026-06-03T16:39:33.732234+00:00"
+  },
+  "KXTONYAWARDS": {
+    "settlement_sources": [
+      {
+        "name": "Tony Awards",
+        "url": "https://www.tonyawards.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TONYS.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TONYS.pdf",
+    "fetched_at": "2026-06-03T20:53:38.743607+00:00"
+  },
+  "KXTOPARTIST": {
+    "settlement_sources": [
+      {
+        "name": "Spotify",
+        "url": "https://open.spotify.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TOPARTIST.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TOPARTIST.pdf",
+    "fetched_at": "2026-06-03T21:16:54.386893+00:00"
+  },
+  "KXTOPARTISTRUNNERUP": {
+    "settlement_sources": [
+      {
+        "name": "Spotify",
+        "url": "https://newsroom.spotify.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/STREAMRANK.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/STREAMRANK.pdf",
+    "fetched_at": "2026-06-03T21:16:54.377217+00:00"
+  },
+  "KXTOPCHEF": {
+    "settlement_sources": [
+      {
+        "name": "\ue907the official broadcaster or streaming platform of <competition> (e",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "The Source Agencies are",
+        "url": "https://kalshi.com/"
+      },
+      {
+        "name": "in hierarchical order",
+        "url": "https://kalshi.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/COMPETITIONREALITYWIN.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/COMPETITIONREALITYWIN.pdf",
+    "fetched_at": "2026-06-03T21:25:05.642611+00:00"
+  },
+  "KXTOUR": {
+    "settlement_sources": [
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "Pitchfork",
+        "url": "https://pitchfork.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "Variety",
+        "url": "https://variety.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TOUR.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TOUR.pdf",
+    "fetched_at": "2026-06-03T21:16:54.775376+00:00"
+  },
+  "KXTROPSTORM": {
+    "settlement_sources": [
+      {
+        "name": "National Oceanic and Atmospheric Administration",
+        "url": "https://www.nhc.noaa.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LTHUR.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LTHUR.pdf",
+    "fetched_at": "2026-06-03T19:20:36.828554+00:00"
+  },
+  "KXTRUMPNBAFINALS": {
+    "settlement_sources": [
+      {
+        "name": "USA Today",
+        "url": "https://www.usatoday.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Vogue",
+        "url": "https://www.vogue.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ATTEND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ATTEND.pdf",
+    "fetched_at": "2026-06-03T19:20:36.935244+00:00"
+  },
+  "KXTRUMPSAYMONTH": {
+    "settlement_sources": [
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "the President of the United States",
+        "url": "https://www.whitehouse.gov/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TRUMPSAY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TRUMPSAY.pdf",
+    "fetched_at": "2026-06-03T19:41:07.605199+00:00"
+  },
+  "KXTVSEASONANNOUNCEST": {
+    "settlement_sources": [
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Variety",
+        "url": "https://variety.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TVSEASONANNOUNCE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TVSEASONANNOUNCE.pdf",
+    "fetched_at": "2026-06-03T21:16:54.386823+00:00"
+  },
+  "KXTVSEASONRELEASEOUTBANKS": {
+    "settlement_sources": [
+      {
+        "name": "ABC",
+        "url": "https://www.abc.net.au/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Variety",
+        "url": "https://variety.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TVSEASONRELEASE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TVSEASONRELEASE.pdf",
+    "fetched_at": "2026-06-03T21:16:54.832987+00:00"
+  },
+  "KXTVSHOWSCANCELLED": {
+    "settlement_sources": [
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "Variety",
+        "url": "https://variety.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TVCANCELLED.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TVCANCELLED.pdf",
+    "fetched_at": "2026-06-03T21:16:54.377224+00:00"
+  },
+  "KXTWOW": {
+    "settlement_sources": [
+      {
+        "name": "George R.R. Martin",
+        "url": "https://georgerrmartin.com/notablog/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/TWOW.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TWOW.pdf",
+    "fetched_at": "2026-06-03T21:16:54.814875+00:00"
+  },
+  "KXUT1D": {
+    "settlement_sources": [
+      {
+        "name": "Republican Party",
+        "url": "https://gop.com/"
+      },
+      {
+        "name": "Democratic Party",
+        "url": "https://democrats.org/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/HOUSEPARTYNOM.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/HOUSEPARTYNOM.pdf",
+    "fetched_at": "2026-06-03T20:17:24.927026+00:00"
+  },
+  "KXVOTEPRIMARY": {
+    "settlement_sources": [
+      {
+        "name": "official government website of <geography>",
+        "url": "https://www.usa.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/VOTEPERCENT.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/VOTEPERCENT.pdf",
+    "fetched_at": "2026-06-03T19:43:10.014113+00:00"
+  },
+  "KXWHPRESSBRIEFING": {
+    "settlement_sources": [
+      {
+        "name": "USA Today",
+        "url": "https://www.usatoday.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Vogue",
+        "url": "https://www.vogue.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ATTEND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ATTEND.pdf",
+    "fetched_at": "2026-06-03T20:17:24.927035+00:00"
+  },
+  "SENATEFLS": {
+    "settlement_sources": [
+      {
+        "name": "United States Congress",
+        "url": "https://www.congress.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/SENATEPARTY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SENATEPARTY.pdf",
+    "fetched_at": "2026-06-03T19:43:10.013842+00:00"
   }
 }

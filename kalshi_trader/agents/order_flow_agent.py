@@ -192,6 +192,7 @@ class OrderFlowAgent:
             "ofi_score": ofi_result["ofi_score"],
             "direction": ofi_result["direction"],
             "buying_fraction": ofi_result["buying_fraction"],
+            "recent_ofi_trades": ofi_result["recent_ofi_trades"],
             "recent_trade_count": _recent_trade_count(trades, window_minutes=cfg.get("trade_count_window_minutes")),
             "total_trades": len(trades),
         }
@@ -207,23 +208,32 @@ class OrderFlowAgent:
         }
 
     async def _compute_ofi(self, trades: list[dict]) -> dict:
-        ofi_score = compute_ofi(trades, window_minutes=cfg.get("ofi_window_minutes"))
+        window_minutes = cfg.get("ofi_window_minutes")
+        ofi_score = compute_ofi(trades, window_minutes=window_minutes)
+
+        # buying_fraction must use the same window as OFI so they can't contradict each other
+        now = datetime.now(tz=timezone.utc)
+        cutoff = now.timestamp() - window_minutes * 60
+        windowed_trades = [t for t in trades if _parse_trade_time(t).timestamp() >= cutoff]
+
         if ofi_score > 0.1:
             direction = "YES"
         elif ofi_score < -0.1:
             direction = "NO"
         else:
             direction = "neutral"
+
         total_buy = sum(
-            _trade_dollar_volume(t) for t in trades
+            _trade_dollar_volume(t) for t in windowed_trades
             if t.get("taker_side", t.get("side", "yes")) == "yes"
         )
-        total_all = sum(_trade_dollar_volume(t) for t in trades)
+        total_all = sum(_trade_dollar_volume(t) for t in windowed_trades)
         buying_fraction = round(total_buy / total_all, 4) if total_all > 0 else 0.5
         return {
             "ofi_score": round(ofi_score, 4),
             "direction": direction,
             "buying_fraction": buying_fraction,
+            "recent_ofi_trades": len(windowed_trades),
         }
 
     async def _build_order_flow_signal(
