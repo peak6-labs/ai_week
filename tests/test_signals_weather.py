@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import pytest
+import scipy.stats
 from datetime import datetime, timedelta, timezone
 
 from kalshi_trader.signals.weather import (
     build_authority_signal,
     build_ensemble_signal,
     build_weather_signal,
+    observation_lock_fraction,
 )
 
 
@@ -468,3 +470,167 @@ def test_build_ensemble_signal_source_weight_uncertainty_metadata():
     assert "ensemble_median" in sig.metadata
     assert "percentile_10" in sig.metadata
     assert "percentile_90" in sig.metadata
+
+
+# ---------------------------------------------------------------------------
+# Band / range markets (operator="between" → closed interval [low, high])
+# ---------------------------------------------------------------------------
+
+def test_build_ensemble_signal_between_counts_members_in_band():
+    members = [70.0 + index for index in range(31)]  # 70..100; only 85 and 86 are in [85, 86]
+    sig = build_ensemble_signal(
+        ticker="KXHIGHTMIN-26JUN03-B85.5", metric="temp_high", threshold=85.0,
+        operator="between", ensemble=_ensemble(members), threshold_high=86.0,
+    )
+    expected_satisfying = sum(1 for value in members if 85.0 <= value <= 86.0)
+    assert expected_satisfying == 2
+    assert sig.probability == pytest.approx(expected_satisfying / len(members))
+    assert sig.metadata["members_satisfying"] == 2
+    assert "in [85.0, 86.0]" in sig.metadata["narrative"]
+
+
+# ---------------------------------------------------------------------------
+# Live-observation override: member clamp + lock fraction
+# ---------------------------------------------------------------------------
+
+def _observation(realized_extreme, station_id="KATL", timezone_name="America/New_York",
+                 latest_timestamp="2026-06-03T19:45:00+00:00") -> dict:
+    return {
+        "station_id": station_id,
+        "timezone": timezone_name,
+        "realized_extreme": realized_extreme,
+        "at_timestamp": "2026-06-03T09:50:00+00:00",
+        "latest_timestamp": latest_timestamp,
+        "obs_count": 200,
+    }
+
+
+def test_clamp_temp_low_cap_pulls_warm_members_into_band_atlanta():
+    # Atlanta case: ensemble centered 59.6 (above the 57-58 band) → bare P ~1%.
+    # Realized low 57.2 caps every member into the band → P → ~0.99.
+    members = [59.6] * 31
+    sig = build_ensemble_signal(
+        ticker="KXLOWTATL-26JUN03-B57.5", metric="temp_low", threshold=57.0,
+        operator="between", ensemble=_ensemble(members, field="temperature_2m_min"),
+        threshold_high=58.0, observation=_observation(57.2), lock_fraction=1.0,
+    )
+    assert sig.probability == pytest.approx(0.99)
+    assert sig.metadata["members_clamped"] is True
+    assert sig.metadata["realized_extreme"] == pytest.approx(57.2)
+    assert sig.metadata["observation_station"] == "KATL"
+    # lock_fraction 1.0 collapses uncertainty to the floor.
+    assert sig.uncertainty == pytest.approx(0.02)
+
+
+def test_clamp_temp_low_cap_collapses_in_band_members_to_miss_austin():
+    # Austin case: ensemble at 70.5 (inside the 70-71 band) → bare P ~0.99.
+    # Realized low 69.8 caps every member below the band → P → ~0.01 (YES missed).
+    members = [70.5] * 31
+    sig = build_ensemble_signal(
+        ticker="KXLOWTAUS-26JUN03-B70.5", metric="temp_low", threshold=70.0,
+        operator="between", ensemble=_ensemble(members, field="temperature_2m_min"),
+        threshold_high=71.0, observation=_observation(69.8, station_id="KAUS"),
+        lock_fraction=1.0,
+    )
+    assert sig.probability == pytest.approx(0.01)
+    assert sig.metadata["members_clamped"] is True
+
+
+def test_clamp_temp_high_floor_lifts_cool_members_into_band():
+    # Cool ensemble (all 80) below an 83-85 band → bare P ~1%. A realized high of
+    # 84 floors every member into the band → P → ~0.99.
+    members = [80.0] * 31
+    sig = build_ensemble_signal(
+        ticker="KXHIGHT-26JUN03-B84", metric="temp_high", threshold=83.0,
+        operator="between", ensemble=_ensemble(members), threshold_high=85.0,
+        observation=_observation(84.0, station_id="KMSP", timezone_name="America/Chicago"),
+        lock_fraction=1.0,
+    )
+    assert sig.probability == pytest.approx(0.99)
+
+
+def test_clamp_metadata_and_narrative_present():
+    members = [80.0] * 31
+    sig = build_ensemble_signal(
+        ticker="T", metric="temp_high", threshold=83.0, operator="between",
+        ensemble=_ensemble(members), threshold_high=85.0,
+        observation=_observation(84.0, station_id="KMSP"), lock_fraction=0.5,
+    )
+    assert sig.metadata["lock_fraction"] == pytest.approx(0.5)
+    assert "Clamped to realized" in sig.metadata["narrative"]
+    # lock 0.5 blends base 0.07 with floor 0.02 → 0.045.
+    assert sig.uncertainty == pytest.approx(0.07 * 0.5 + 0.02 * 0.5)
+
+
+def test_observation_none_is_regression_identical():
+    members = [70.0 + index for index in range(31)]
+    baseline = build_ensemble_signal(
+        ticker="T", metric="temp_high", threshold=85.0, operator="above",
+        ensemble=_ensemble(members),
+    )
+    with_none = build_ensemble_signal(
+        ticker="T", metric="temp_high", threshold=85.0, operator="above",
+        ensemble=_ensemble(members), observation=None, lock_fraction=0.0,
+    )
+    assert with_none.probability == pytest.approx(baseline.probability)
+    assert with_none.uncertainty == pytest.approx(baseline.uncertainty)
+    assert with_none.metadata["members_clamped"] is False
+    assert with_none.metadata["realized_extreme"] is None
+
+
+def test_observation_lock_fraction_temp_low_ramps_to_one_after_sunrise():
+    # America/New_York EDT (UTC-4): 13:00Z = 09:00 local = lock hour for lows.
+    assert observation_lock_fraction(
+        "temp_low", _observation(57.0, latest_timestamp="2026-06-03T13:00:00+00:00")
+    ) == pytest.approx(1.0)
+    # 10:00Z = 06:00 local = ramp start → 0.0
+    assert observation_lock_fraction(
+        "temp_low", _observation(57.0, latest_timestamp="2026-06-03T10:00:00+00:00")
+    ) == pytest.approx(0.0)
+    # 11:30Z = 07:30 local = halfway up the ramp → 0.5
+    assert observation_lock_fraction(
+        "temp_low", _observation(57.0, latest_timestamp="2026-06-03T11:30:00+00:00")
+    ) == pytest.approx(0.5)
+
+
+def test_observation_lock_fraction_temp_high_ramps_in_afternoon():
+    # America/Chicago CDT (UTC-5): 22:00Z = 17:00 local = lock hour for highs.
+    obs = _observation(84.0, timezone_name="America/Chicago",
+                       latest_timestamp="2026-06-03T22:00:00+00:00")
+    assert observation_lock_fraction("temp_high", obs) == pytest.approx(1.0)
+    obs_early = _observation(84.0, timezone_name="America/Chicago",
+                             latest_timestamp="2026-06-03T19:00:00+00:00")  # 14:00 local
+    assert observation_lock_fraction("temp_high", obs_early) == pytest.approx(0.0)
+
+
+def test_observation_lock_fraction_missing_timezone_is_zero():
+    assert observation_lock_fraction("temp_low", {"realized_extreme": 57.0}) == 0.0
+    assert observation_lock_fraction("temp_low", None) == 0.0
+
+
+def test_build_weather_signal_between_is_cdf_difference():
+    # Forecast high 86, std = max((86-68)/6, 2) = 3. P(85 ≤ high ≤ 86) = cdf(86) - cdf(85).
+    forecast = {"temp_high": 86, "temp_low": 68, "precip_pct": 0, "data_age_minutes": 10}
+    sig = build_weather_signal(
+        ticker="KXHIGHTMIN-26JUN03-B85.5", metric="temp_high", threshold=85.0,
+        operator="between", forecast=forecast, threshold_high=86.0,
+    )
+    dist = scipy.stats.norm(86.0, 3.0)
+    expected = float(dist.cdf(86.0) - dist.cdf(85.0))
+    assert sig.probability == pytest.approx(expected, abs=1e-6)
+    assert "85.0 ≤ temp_high ≤ 86.0" in sig.metadata["narrative"]
+
+
+def test_build_authority_signal_between_uses_band_probability():
+    forecast = {
+        "temp_high": 86, "temp_low": 68, "precip_pct": 0,
+        "confidence": "high", "post_count": 2, "issued_at": _now_iso(), "handles": ["wfaaweather"],
+    }
+    sig = build_authority_signal(
+        ticker="KXHIGHTMIN-26JUN03-B85.5", metric="temp_high", threshold=85.0,
+        operator="between", authority_forecast=forecast, independent_of_noaa=True,
+        threshold_high=86.0,
+    )
+    dist = scipy.stats.norm(86.0, 3.0)
+    expected = float(dist.cdf(86.0) - dist.cdf(85.0))
+    assert sig.probability == pytest.approx(expected, abs=1e-6)
