@@ -16,6 +16,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+# Route SSL through the system trust store so the Supabase httpx client works
+# behind the corporate proxy (Zscaler self-signed cert). inject_into_ssl()
+# patches the stdlib ssl module httpx builds its default context from.
+try:
+    import truststore as _truststore
+    _truststore.inject_into_ssl()
+except Exception:  # pragma: no cover - truststore optional
+    pass
+
 from supabase import AsyncClient, acreate_client
 
 from kalshi_trader import config
@@ -210,6 +219,63 @@ async def insert_reviewed_idea(
     }
     resp = await client.table("reviewed_ideas").insert(row).execute()
     return resp.data[0]["id"]
+
+
+# ---------------------------------------------------------------------------
+# paper-trade calibration (recommendations + marks + cycles)
+# Tables are created by sql/001_paper_calibration.sql. These helpers no-op
+# gracefully (caller wraps in try/except) until that migration is applied.
+# ---------------------------------------------------------------------------
+
+async def insert_recommendation(rec: dict) -> None:
+    """Insert one paper recommendation. ``rec`` carries the local rec_id as id."""
+    client = await _get_client()
+    row = {
+        "id": rec["rec_id"],
+        "cycle_ts": rec.get("cycle_ts", ""),
+        "ticker": rec["ticker"],
+        "side": rec["side"],
+        "entry_price_cents": rec["entry_price_cents"],
+        "predicted_prob": rec.get("predicted_prob"),
+        "edge_cents": rec.get("edge_cents"),
+        "n_sources": rec.get("n_sources"),
+        "sources": rec.get("sources", []),
+        "category": rec.get("category", ""),
+        "suggested_size_dollars": rec.get("suggested_size_dollars"),
+        "status": "open",
+        "paper_only": True,
+    }
+    await client.table("recommendations").upsert(row, on_conflict="id").execute()
+
+
+async def insert_recommendation_mark(recommendation_id: str, mark: dict) -> None:
+    """Insert one mark-to-market check for a recommendation."""
+    client = await _get_client()
+    await client.table("recommendation_marks").insert({
+        "recommendation_id": recommendation_id,
+        "current_value_cents": mark.get("current_value_cents"),
+        "pnl_cents": mark.get("pnl_cents"),
+        "would_profit": mark.get("would_profit"),
+        "resolved": bool(mark.get("resolved")),
+    }).execute()
+
+
+async def resolve_recommendation(recommendation_id: str) -> None:
+    """Mark a recommendation resolved (idempotent)."""
+    client = await _get_client()
+    await (
+        client.table("recommendations")
+        .update({"status": "resolved"})
+        .eq("id", recommendation_id)
+        .execute()
+    )
+
+
+async def upsert_cycle(cycle_ts: str, stats: dict) -> None:
+    """Record per-cycle pipeline stats (markets scored, candidates, ideas)."""
+    client = await _get_client()
+    row = {"cycle_ts": cycle_ts, **stats}
+    await client.table("cycles").upsert(row, on_conflict="cycle_ts").execute()
 
 
 async def close_trade(
