@@ -57,6 +57,7 @@ def _cmd_record(args) -> None:
             continue
         confidence = float(idea.get("confidence", 0) or 0)
         sources = idea.get("signal_sources", []) or []
+        reasoning = idea.get("reasoning", "") or ""
         rec_id = paper.record_recommendation(
             cycle_ts=args.cycle_ts,
             ticker=idea["ticker"],
@@ -69,6 +70,7 @@ def _cmd_record(args) -> None:
             category=idea.get("category", ""),
             suggested_size_dollars=idea.get("suggested_size_dollars"),
             disposition=args.disposition,
+            reasoning=reasoning,
         )
         recorded_rows.append({
             "rec_id": rec_id, "cycle_ts": args.cycle_ts, "ticker": idea["ticker"],
@@ -76,7 +78,7 @@ def _cmd_record(args) -> None:
             "edge_cents": confidence * 100 - entry, "n_sources": len(sources),
             "sources": sources, "category": idea.get("category", ""),
             "suggested_size_dollars": idea.get("suggested_size_dollars"),
-            "disposition": args.disposition,
+            "disposition": args.disposition, "reasoning": reasoning,
         })
         recorded += 1
 

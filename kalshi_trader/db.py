@@ -245,6 +245,7 @@ async def insert_recommendation(rec: dict) -> None:
         "suggested_size_dollars": rec.get("suggested_size_dollars"),
         "status": "open",
         "disposition": rec.get("disposition", "candidate"),
+        "reasoning": rec.get("reasoning", "") or "",
         "paper_only": True,
     }
     # Mirror the true record time when known; otherwise let the DB default

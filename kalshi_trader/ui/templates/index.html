@@ -1457,6 +1457,25 @@ function fmtInterval(elapsedSeconds) {
   return '+' + Math.round(hours / 24) + 'd';
 }
 
+function dispositionSummary(idea) {
+  const disp = idea.disposition || 'candidate';
+  const edge = idea.edge_cents != null ? idea.edge_cents.toFixed(1) + '¢' : '—';
+  const prob = idea.predicted_prob != null ? Math.round(idea.predicted_prob * 100) + '%' : '—';
+  const entry = idea.entry_price_cents != null ? idea.entry_price_cents + '¢' : '—';
+  const n = idea.n_sources || 0;
+  const srcList = (idea.sources || []).join(', ') || 'none';
+  if (disp === 'insufficient_edge') {
+    return `Fee-adjusted edge of ${edge} was below the minimum threshold — did not reach adversarial review.\nModel estimated ${prob} probability vs ${entry} market price on the ${String(idea.side || '').toUpperCase()} side.\nSignals: ${srcList}.`;
+  }
+  if (disp === 'worth_trading') {
+    return `Cleared the edge bar (${edge}) but was dropped before the approved slate.\nLikely filtered by the adversarial challenge or risk checks.\n${n} signal${n !== 1 ? 's' : ''} fired: ${srcList}.`;
+  }
+  if (disp === 'approved') {
+    return `Passed edge check, adversarial challenge, and risk filters.\n${n} signal${n !== 1 ? 's' : ''} agreed: ${srcList}. Edge: ${edge}.`;
+  }
+  return `${n} signal${n !== 1 ? 's' : ''}: ${srcList}.`;
+}
+
 function renderIdeasHistory() {
   const tbody = document.getElementById('history-tbody');
   const dispFilter = document.getElementById('history-disposition-filter').value;
@@ -1526,12 +1545,16 @@ function renderIdeasHistory() {
     const sources = (idea.sources || []).map(s =>
       `<span class="signal-tag">${escHtml(String(s))}</span>`
     ).join('');
+    const reasoningText = idea.reasoning && idea.reasoning.trim()
+      ? idea.reasoning.trim()
+      : dispositionSummary(idea);
     const detailRow = `<tr class="history-detail-row hidden" data-detail="${index}">
       <td colspan="11">
-        <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">
+        <div style="margin-bottom:6px;font-size:11px;color:var(--text-secondary);">
           Cycle ${escHtml(idea.cycle_ts ?? '—')} &middot; ${idea.n_sources ?? 0} sources &middot; ${escHtml(idea.category ?? '')}
         </div>
-        ${sources ? `<div class="idea-signals" style="margin-bottom:10px;">${sources}</div>` : ''}
+        ${sources ? `<div class="idea-signals" style="margin-bottom:8px;">${sources}</div>` : ''}
+        <div style="font-size:12px;line-height:1.5;color:var(--text-primary);white-space:pre-wrap;border-left:2px solid var(--border);padding-left:10px;">${escHtml(reasoningText)}</div>
       </td>
     </tr>`;
     return mainRow + detailRow;

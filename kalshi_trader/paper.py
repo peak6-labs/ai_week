@@ -112,6 +112,7 @@ def record_recommendation(
     category: str = "",
     suggested_size_dollars: float | None = None,
     disposition: str = "candidate",
+    reasoning: str = "",
 ) -> str:
     """Append one open recommendation to the local store. Returns its id.
 
@@ -139,6 +140,7 @@ def record_recommendation(
         "suggested_size_dollars": suggested_size_dollars,
         "status": "open",
         "disposition": disposition,
+        "reasoning": reasoning,
     })
     return rec_id
 
