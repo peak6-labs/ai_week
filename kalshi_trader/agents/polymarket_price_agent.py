@@ -195,4 +195,4 @@ class PolymarketPriceAgent:
         return estimate_to_dict(estimate)
 
     async def close(self) -> None:
-        pass
+        await self._client.close()

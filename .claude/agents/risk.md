@@ -18,7 +18,7 @@ You are the **Risk Agent**. You apply hard risk rules and Kelly sizing to trade 
 
 ## Inputs required
 
-- `IDEAS_FILE` — path to JSON array of trade ideas from data-orchestrator
+- `IDEAS_FILE` — path to JSON array of trade ideas from the orchestrate pipeline
 - `BALANCE` — available balance in dollars
 - `POSITIONS_FILE` — (optional) path to JSON with open positions
 
@@ -41,4 +41,4 @@ You are the **Risk Agent**. You apply hard risk rules and Kelly sizing to trade 
    - List rejected ideas: ticker, reason
    - Flag anything unusual (e.g. all ideas rejected, suspiciously large sizes)
 
-4. **Return the approved ideas JSON** for the orchestrator to act on.
+4. **Return the approved ideas JSON** for the orchestrate pipeline to act on.

@@ -27,6 +27,22 @@ class KalshiClient:
         # from bursty bulk traffic (e.g. the candle/scoring scan).
         self._executor = executor or _EXECUTOR
 
+    async def __aenter__(self) -> "KalshiClient":
+        return self
+
+    async def __aexit__(self, *exception_details: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Close the per-instance requests session off the event loop.
+
+        Each instance owns its own ``_SyncKalshiClient`` session, so closing it
+        never affects the shared thread-pool executor or other clients.
+        """
+        session = getattr(self._sync, "_session", None)
+        if session is not None:
+            await asyncio.to_thread(session.close)
+
     async def get(self, endpoint: str, params: dict | None = None) -> dict:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, self._sync.get, endpoint, params)

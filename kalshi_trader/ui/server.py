@@ -163,6 +163,26 @@ def create_app(
             return JSONResponse({"errors": errors}, status_code=422)
         return JSONResponse({"ok": True})
 
+    @app.post("/api/state")
+    async def post_state(request: Request) -> JSONResponse:
+        """Merge a partial state update pushed by the orchestrate pipeline.
+
+        Accepts a JSON object with any subset of: ``cycle_number``,
+        ``last_cycle_at``, ``daily_pnl_dollars``, ``positions``,
+        ``recent_ideas``, ``agent_statuses``. Unknown keys are ignored. Always
+        returns 200 — telemetry must never break the pipeline. (Balance and
+        live positions are owned by the account poller; the pipeline should not
+        push those.)
+        """
+        state: TradingState = request.app.state.trading_state
+        try:
+            body: dict = await request.json()
+            if isinstance(body, dict):
+                state.apply_update(body)
+        except Exception:
+            pass
+        return JSONResponse({"ok": True})
+
     @app.post("/api/log")
     async def post_log(request: Request) -> JSONResponse:
         """Append a log line from an external agent or script.

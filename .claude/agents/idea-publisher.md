@@ -2,7 +2,7 @@
 name: idea-publisher
 description: >-
   Publishes trade ideas to the running trading dashboard UI for human review.
-  Call after the data-orchestrator has produced a trade slate. Reads the ideas
+  Call after the orchestrate pipeline has produced a trade slate. Reads the ideas
   from IDEAS_FILE (a JSON array of trade idea dicts) and POSTs them to
   http://localhost:8000/api/ideas. Ideas will appear in the Trade Ideas tab
   for approve/reject review.

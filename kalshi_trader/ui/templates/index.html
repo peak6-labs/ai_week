@@ -1291,7 +1291,7 @@ function renderPositions(positions) {
   }
   tbody.innerHTML = positions.map(p => {
     const upnl = p.unrealized_pnl_dollars ?? 0;
-    const sideBadge = p.side === 'YES'
+    const sideBadge = String(p.side || '').toUpperCase() === 'YES'
       ? '<span class="badge badge-yes">YES</span>'
       : '<span class="badge badge-no">NO</span>';
     const posUrl = p.ticker ? `https://kalshi.com/markets/${p.ticker.split('-')[0].toLowerCase()}` : null;
@@ -1319,7 +1319,7 @@ function renderIdeas(ideas) {
     return;
   }
   tbody.innerHTML = ideas.map(idea => {
-    const sideBadge = idea.side === 'YES'
+    const sideBadge = String(idea.side || '').toUpperCase() === 'YES'
       ? '<span class="badge badge-yes">YES</span>'
       : '<span class="badge badge-no">NO</span>';
     const confBadge = `<span class="badge badge-conf">${fmtConf(idea.confidence ?? 0)}</span>`;
@@ -1658,7 +1658,7 @@ function renderPendingIdeas(ideas) {
   }
   empty.classList.add('hidden');
   grid.innerHTML = ideas.map(idea => {
-    const sideBadge = idea.side === 'YES'
+    const sideBadge = String(idea.side || '').toUpperCase() === 'YES'
       ? '<span class="badge badge-yes">YES</span>'
       : '<span class="badge badge-no">NO</span>';
     const confPct = idea.confidence !== undefined ? Math.round(idea.confidence * 100) + '%' : '—';
@@ -1740,7 +1740,7 @@ function renderReviewedIdeas(ideas) {
     return;
   }
   tbody.innerHTML = ideas.map(idea => {
-    const sideBadge = idea.side === 'YES'
+    const sideBadge = String(idea.side || '').toUpperCase() === 'YES'
       ? '<span class="badge badge-yes">YES</span>'
       : '<span class="badge badge-no">NO</span>';
     const confPct = idea.confidence !== undefined ? Math.round(idea.confidence * 100) + '%' : '—';

@@ -36,7 +36,7 @@ report plus an inline summary. You generate ideas; a human decides.
 ## Workflow
 
 1. **Generate the data (snapshot-first — this is the fast path).** Work from the
-   repo root (`/Users/llewis/ai_week`). The slow part of a full-board scan is
+   repo root (`/Users/scorley/code`). The slow part of a full-board scan is
    pulling the entire ~480-page market list from the API (minutes). The actual
    signal data — candles, trades, orderbooks — is always fetched live and is
    cheap. So score from a **same-day market-list snapshot**: the signals stay
@@ -52,17 +52,21 @@ report plus an inline summary. You generate ideas; a human decides.
       ```
 
    b. Score from the snapshot and emit JSON (seconds when the candle cache is
-      warm):
+      warm). If the **caller gave you an explicit output JSON path** (e.g. the
+      orchestrate pipeline passes one so it can read the file back), write there;
+      otherwise default to a timestamped `/tmp` path:
 
       ```bash
-      TS=$(date -u +%Y%m%dT%H%M%SZ)
+      OUTPUT_JSON="${OUTPUT_JSON:-/tmp/market_scout_$(date -u +%Y%m%dT%H%M%SZ).json}"
       KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/score_markets.py \
-          --json --markets-file live_markets.json > "/tmp/market_scout_$TS.json"
-      echo "TS=$TS  ->  /tmp/market_scout_$TS.json"
+          --json --markets-file live_markets.json > "$OUTPUT_JSON"
+      echo "wrote -> $OUTPUT_JSON"
       ```
 
-   Note the `TS` it prints; reuse it for the report filename. Set a high Bash
-   timeout (e.g. 600000 ms) to cover a snapshot refresh or a cold candle cache.
+   Reuse the timestamp in `OUTPUT_JSON` for the report filename, and **report the
+   exact JSON path back in your final message** so the caller can read it. Set a
+   high Bash timeout (e.g. 600000 ms) to cover a snapshot refresh or a cold
+   candle cache.
 
 2. **Read the JSON.** `Read` `/tmp/market_scout_<TS>.json`. It is a list of event
    rows, already sorted by `average_score` descending. Each row has:
