@@ -65,12 +65,8 @@ BALANCE=${BALANCE:-${KALSHI_BALANCE:-1000}}
 echo "BALANCE=$BALANCE"
 ```
 
-**Mark prior paper recommendations to market** (updates would-be P&L on past
-recommendations; read-only, never executes):
-
-```bash
-KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/paper_track.py mark || true
-```
+(Marking prior recommendations to market happens **last**, as a trailing
+low-priority step — see Step 10 — so it never delays analysis.)
 
 ---
 
@@ -439,6 +435,29 @@ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) | N markets | K approved | top: TICKER EDGE
 
 Return a short summary to the user: markets evaluated, candidates after scoring,
 ideas after the adversarial challenge, ideas approved by risk, and the top idea.
+
+---
+
+## Step 10 — Mark prior recommendations (trailing, lowest priority)
+
+**Only after** publishing, mark prior recommendations to current market prices.
+This is the **lowest-priority** step and must never delay analysis: it runs
+last, and **if the cycle is already running long, skip it** — the next cycle
+catches up (marks being a little late is fine).
+
+Source open recommendations from **Supabase** with `--from-supabase` so ideas
+recorded on *any* machine get marked (the dashboard reads Supabase; local-only
+marking misses ideas recorded elsewhere). Bound the work with
+`--max-age-minutes` so it re-prices only recently-recorded ideas (toward the
+5/15/30/60/120-minute checkpoints) rather than the whole open book:
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python \
+  scripts/paper_track.py mark --from-supabase --max-age-minutes 130 || true
+```
+
+Read-only; never executes trades. This is what keeps the Ideas History P&L
+timeline populated.
 
 ---
 
