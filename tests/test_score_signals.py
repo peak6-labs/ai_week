@@ -11,6 +11,8 @@ import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 _MODULE_PATH = Path(__file__).resolve().parent.parent / "scripts" / "score_signals.py"
 _spec = importlib.util.spec_from_file_location("score_signals", _MODULE_PATH)
 score_signals = importlib.util.module_from_spec(_spec)
@@ -149,6 +151,94 @@ def test_x_grok_slices_collapse_to_one_source() -> None:
     assert len(collapsed) == 1
     assert collapsed[0]["source"] == "x_grok"
     assert collapsed[0]["probability"] == 0.25  # mean of 0.20/0.30/0.20/0.30
+
+
+def test_x_profile_collapses_into_x_grok_family() -> None:
+    # The mentions X-profile slice (x_grok_profile) shares the X family with the
+    # broad x-signal slices, so they must collapse to ONE x_grok source — the
+    # profile scan must not double-count X.
+    estimates = [
+        {"source": "x_grok_profile", "probability": 0.70, "uncertainty": 0.20, "weight": 0.42,
+         "data_age_minutes": 0.0},
+        {"source": "x_grok_sentiment", "probability": 0.50, "uncertainty": 0.10, "weight": 0.25,
+         "data_age_minutes": 0.0},
+    ]
+    collapsed = score_signals.collapse_source_families(estimates)
+    assert len(collapsed) == 1
+    assert collapsed[0]["source"] == "x_grok"
+    assert collapsed[0]["probability"] == 0.60  # mean of 0.70/0.50
+
+
+def test_mentions_base_plus_x_profile_count_as_two_sources() -> None:
+    # mentions_base is its own family; x_grok_profile folds into x_grok → 2 sources.
+    market = {
+        "ticker": "KXMENTION-TRUMP-URANIUM", "yes_ask": 40.0, "yes_bid": 38.0,
+        "signal_estimates": [
+            {"source": "mentions_base", "probability": 0.30, "uncertainty": 0.18, "weight": 0.55},
+            {"source": "x_grok_profile", "probability": 0.70, "uncertainty": 0.20, "weight": 0.42},
+        ],
+    }
+    result = score_signals.score_market(market, DEFAULT_CONFIG)
+    assert result["n_sources"] == 2
+    assert sorted(result["sources"]) == ["mentions_base", "x_grok"]
+
+
+def test_mentions_base_and_live_agreement_gets_no_boost() -> None:
+    # mentions_base + mentions_live both derive from GDELT (live is independent=False),
+    # so even agreeing within the tight spread they must NOT earn the agreement boost.
+    cfg = {"agreement_boost_enabled": True, "agreement_spread_threshold": 0.03,
+           "agreement_uncertainty_factor": 0.85}
+    correlated = score_signals.combine_signals([
+        {"source": "mentions_base", "probability": 0.90, "uncertainty": 0.18, "weight": 0.55,
+         "data_age_minutes": 0.0, "independent": True},
+        {"source": "mentions_live", "probability": 0.92, "uncertainty": 0.08, "weight": 0.85,
+         "data_age_minutes": 0.0, "independent": False},
+    ], cfg)
+    # Weighted-average uncertainty with no boost applied.
+    expected_unc = (0.55 * 0.18 + 0.85 * 0.08) / (0.55 + 0.85)
+    assert correlated["uncertainty"] == pytest.approx(round(expected_unc, 4))
+
+
+def test_two_independent_sources_agreement_does_get_boost() -> None:
+    # Control: the same tight agreement between two independent sources IS boosted.
+    cfg = {"agreement_boost_enabled": True, "agreement_spread_threshold": 0.03,
+           "agreement_uncertainty_factor": 0.85}
+    boosted = score_signals.combine_signals([
+        {"source": "mentions_base", "probability": 0.90, "uncertainty": 0.18, "weight": 0.55,
+         "data_age_minutes": 0.0, "independent": True},
+        {"source": "polymarket_price", "probability": 0.92, "uncertainty": 0.08, "weight": 0.85,
+         "data_age_minutes": 0.0, "independent": True},
+    ], cfg)
+    plain_unc = (0.55 * 0.18 + 0.85 * 0.08) / (0.55 + 0.85)
+    assert boosted["uncertainty"] < round(plain_unc, 4)
+
+
+def test_independent_false_propagates_through_family_collapse() -> None:
+    # A non-independent slice taints the whole collapsed family.
+    collapsed = score_signals.collapse_source_families([
+        {"source": "x_grok_profile", "probability": 0.7, "uncertainty": 0.2, "weight": 0.42,
+         "data_age_minutes": 0.0, "independent": False},
+        {"source": "x_grok_sentiment", "probability": 0.7, "uncertainty": 0.1, "weight": 0.25,
+         "data_age_minutes": 0.0, "independent": True},
+    ])
+    assert len(collapsed) == 1
+    assert collapsed[0]["independent"] is False
+
+
+def test_hearing_schedule_veto_pulls_combined_toward_no() -> None:
+    # A near-veto schedule signal (the hearing was canceled) must drag a
+    # moderately-bullish mentions_base strongly toward NO, with 2 sources.
+    market = {
+        "ticker": "KXMENTION-POWELL-RECESSION", "yes_ask": 60.0, "yes_bid": 58.0,
+        "signal_estimates": [
+            {"source": "mentions_base", "probability": 0.60, "uncertainty": 0.18, "weight": 0.55},
+            {"source": "hearing_schedule", "probability": 0.03, "uncertainty": 0.05, "weight": 0.95},
+        ],
+    }
+    result = score_signals.score_market(market, DEFAULT_CONFIG)
+    assert result["n_sources"] == 2
+    assert sorted(result["sources"]) == ["hearing_schedule", "mentions_base"]
+    assert result["combined_probability"] < 0.30  # pulled strongly toward NO
 
 
 def test_x_grok_slices_count_as_single_source_in_score_market() -> None:

@@ -185,6 +185,97 @@ def _parse_authority_response(text: str) -> AuthorityForecast:
         return _empty_authority_result()
 
 
+class ProfileScan(TypedDict):
+    post_count: int           # relevant on-topic posts found (0 = nothing usable)
+    probability: float        # inferred P(speaker says the phrase aloud in the window)
+    uncertainty: float
+    issued_at: str            # ISO 8601 timestamp of the MOST RECENT relevant post
+    summary: str
+    key_quotes: list
+
+
+_PROFILE_REQUIRED_KEYS = {
+    "post_count", "probability", "uncertainty", "issued_at", "summary", "key_quotes",
+}
+
+
+def _empty_profile_result() -> ProfileScan:
+    """No-data sentinel. ``post_count=0`` is the flag the scorer/pipeline drops on."""
+    return ProfileScan(
+        post_count=0,
+        probability=0.5,
+        uncertainty=1.0,
+        issued_at=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+        summary="",
+        key_quotes=[],
+    )
+
+
+def _parse_profile_response(text: str) -> ProfileScan:
+    """Parse Grok's profile-scan JSON, falling back to empty on any failure.
+
+    Mirrors ``_parse_authority_response``: tolerates ```json fences, validates the
+    required keys, clamps ``probability``/``uncertainty`` to [0,1] and coerces
+    ``post_count`` to a non-negative int.
+    """
+    text = text.strip()
+    if "```" in text:
+        parts = text.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                text = part
+                break
+    try:
+        data = json.loads(text)
+        if not isinstance(data, dict) or not _PROFILE_REQUIRED_KEYS.issubset(data):
+            return _empty_profile_result()
+        try:
+            post_count = max(0, int(data.get("post_count") or 0))
+        except (TypeError, ValueError):
+            post_count = 0
+        probability = _coerce_optional_float(data.get("probability"))
+        uncertainty = _coerce_optional_float(data.get("uncertainty"))
+        if not data.get("issued_at"):
+            data["issued_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        return ProfileScan(
+            post_count=post_count,
+            probability=min(max(probability if probability is not None else 0.5, 0.0), 1.0),
+            uncertainty=min(max(uncertainty if uncertainty is not None else 0.3, 0.0), 1.0),
+            issued_at=str(data["issued_at"]),
+            summary=str(data.get("summary") or ""),
+            key_quotes=list(data.get("key_quotes") or []),
+        )
+    except (json.JSONDecodeError, ValueError):
+        return _empty_profile_result()
+
+
+_PROFILE_PROMPT = (
+    "Search X for recent posts from these accounts: {handles}\n\n"
+    "You are gauging whether the person behind these accounts is likely to SAY the "
+    "word/phrase \"{phrase}\" out loud in public during {window}, judging by how much "
+    "and how recently these accounts have posted about that topic. Someone hammering a "
+    "subject online is more likely to say it out loud that week.\n\n"
+    "Rules:\n"
+    "- Count only posts from {window} that are genuinely about \"{phrase}\" or its topic.\n"
+    "- If none of these accounts posted about it in {window}, set post_count to 0 and "
+    "probability to 0.5. Do not infer or guess — a quiet timeline is NOT evidence against.\n"
+    "- Heavier and more recent on-topic posting → higher probability.\n"
+    "- issued_at must be the ISO 8601 timestamp of the MOST RECENT relevant post.\n\n"
+    "Return ONLY a JSON object with exactly these fields:\n"
+    '{{\n'
+    '  "post_count": <int, number of relevant posts found>,\n'
+    '  "probability": <float 0.0-1.0, P(they say it aloud in the window)>,\n'
+    '  "uncertainty": <float 0.0-1.0, where 0.1=confident, 0.4=uncertain>,\n'
+    '  "issued_at": "<ISO 8601 timestamp of the most recent relevant post>",\n'
+    '  "summary": "<1-2 sentence summary of what these accounts are posting>",\n'
+    '  "key_quotes": ["<post 1>", "<post 2>"]\n'
+    '}}'
+)
+
+
 _AUTHORITY_PROMPT = (
     "Search X for the most recent forecast posts from these meteorologist accounts: {handles}\n\n"
     "You are extracting the forecast these named meteorologist authorities give for "
@@ -312,6 +403,37 @@ class XClient:
             return _parse_authority_response(text)
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError, KeyError, IndexError):
             return _empty_authority_result()
+
+    async def profile_topic_scan(
+        self,
+        handles: list[str],
+        phrase: str,
+        window: str,
+    ) -> ProfileScan:
+        """Scan a speaker's own X accounts for how much they're posting about a topic.
+
+        A *leading indicator* for a "Will <person> say <phrase>" market: someone
+        hammering a subject on their timeline is more likely to say it out loud in
+        the window. Restricts ``x_search`` to ``handles`` via ``allowed_x_handles``
+        (capped at 20) and asks Grok for a ``post_count`` + an inferred probability +
+        the most-recent relevant-post timestamp. Returns ``_empty_profile_result()``
+        (``post_count=0``) immediately when there are no handles or no API key, and
+        on any error — a quiet timeline never counts against the market.
+        """
+        handles = handles[:20]
+        if not handles or not config.XAI_API_KEY:
+            return _empty_profile_result()
+
+        content = _PROFILE_PROMPT.format(
+            handles=", ".join(f"@{handle}" for handle in handles),
+            phrase=phrase, window=window,
+        )
+        tools = [{"type": "x_search", "allowed_x_handles": handles}]
+        try:
+            text = await self._responses_text(content, tools)
+            return _parse_profile_response(text)
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError, KeyError, IndexError):
+            return _empty_profile_result()
 
     async def __aenter__(self) -> "XClient":
         return self
