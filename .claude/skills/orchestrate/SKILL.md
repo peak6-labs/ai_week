@@ -206,8 +206,12 @@ scout signals, which are correlated with each other):
   (e.g. "receive at least 30% of the vote", "first round") — 538 yields a
   head-to-head win margin, not a vote-share, so the agent returns no signal there.
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
-- `order-flow-signal` / `market-maker-signal` — only if `volume_24h > 5000`
-  (sparse trade history makes them empty on thin markets); args: ticker, title
+- `market-maker-signal` — **every market in the deep-signal subset**; args:
+  ticker, title. This is an orderbook-snapshot signal — it does not require
+  trade history and is the highest-value signal we have. Dispatch it for every
+  market in every batch, no volume gate.
+- `order-flow-signal` — only if `volume_24h > 5000` (reads live trade tape;
+  returns empty on thin markets); args: ticker, title
 
 When dispatching the **cross-venue** agents (`polymarket-price-signal`,
 `sportsbook-odds-signal`), include the market's `rules_primary` in the prompt and
@@ -270,6 +274,7 @@ objects:
     "hours_to_close": 24.0,
     "actionability_score": 0.72,
     "coverage_pct": 80.0,
+    "volume_24h": 12708,
     "signal_estimates": [
       {"source": "kalshi_bias", "probability": 0.62, "uncertainty": 0.05, "weight": 0.65, "data_issued_at": "...", "metadata": {}},
       {"source": "polymarket_price", "probability": 0.58, "uncertainty": 0.03, "weight": 0.75, "data_issued_at": "...", "metadata": {}}
