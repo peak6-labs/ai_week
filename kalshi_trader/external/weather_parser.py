@@ -93,6 +93,31 @@ _MONTH_MAP = {
     "november": 11, "december": 12,
 }
 
+def _parse_band(title: str, ticker: str) -> tuple[float, float] | None:
+    """Detect a temperature *band* contract → (low_edge, high_edge), else None.
+
+    Kalshi band markets ask "be 85-86°" (a closed interval) rather than a
+    one-sided "<NN"/">NN" threshold. The band has no comparator, so the
+    single-threshold extraction in ``parse_title`` (which deliberately ignores
+    bare integers to avoid grabbing the day-of-month) never fires. We read the
+    two edges from the title's ``NN-NN°`` text, cross-checked against the
+    ticker's ``B<midpoint>`` suffix (e.g. ``B85.5`` ⇒ ``[85, 86]``) as a fallback.
+    """
+    band_match = re.search(r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*°", title)
+    if band_match:
+        low_edge = float(band_match.group(1))
+        high_edge = float(band_match.group(2))
+        if high_edge >= low_edge:
+            return low_edge, high_edge
+    # Fallback: the ticker encodes the band midpoint in a "B<NN.5>" suffix.
+    suffix_match = re.search(r"-B(\d+(?:\.\d+)?)\b", ticker.upper())
+    if suffix_match:
+        midpoint = float(suffix_match.group(1))
+        low_edge = float(int(midpoint))  # floor → e.g. 85.5 → 85
+        return low_edge, low_edge + 1.0
+    return None
+
+
 _UNCERTAINTY_KW = ["uncertain", "unsettled", "possible", "potential", "could", "may "]
 _HIGH_CONFIDENCE_KW = ["high confidence", "confidence is high", "well-defined", "clear skies"]
 _LOW_CONFIDENCE_KW = ["confidence is low", "low confidence"]
@@ -133,39 +158,48 @@ def parse_title(ticker: str, title: str) -> dict | None:
         if metric is None:
             return None
 
-    # Operator — symbols (< / >) take precedence, then keyword phrasing.
-    if "<" in title:
-        operator = "below"
-    elif ">" in title:
-        operator = "above"
-    elif any(kw in t for kw in ["above", "exceed", "or more", "at least", "over"]):
-        operator = "above"
-    elif any(kw in t for kw in ["below", "under", "less than"]):
-        operator = "below"
+    # Band contracts ("be 85-86°") settle on a closed interval, not a one-sided
+    # threshold. Detect these first: operator is "between" and the threshold is
+    # the low edge, with the high edge carried in threshold_high.
+    threshold_high = None
+    band = _parse_band(title, ticker) if metric in ("temp_high", "temp_low") else None
+    if band is not None:
+        operator = "between"
+        threshold, threshold_high = band
     else:
-        operator = "above"
+        # Operator — symbols (< / >) take precedence, then keyword phrasing.
+        if "<" in title:
+            operator = "below"
+        elif ">" in title:
+            operator = "above"
+        elif any(kw in t for kw in ["above", "exceed", "or more", "at least", "over"]):
+            operator = "above"
+        elif any(kw in t for kw in ["below", "under", "less than"]):
+            operator = "below"
+        else:
+            operator = "above"
 
-    # Threshold — a number tied to a comparator (< / > or a keyword) or written
-    # with °F. Never a bare integer (which could be the day-of-month in the date).
-    threshold = None
-    m = re.search(r"[<>]\s*(\d+(?:\.\d+)?)", t)
-    if m:
-        threshold = float(m.group(1))
-    if threshold is None:
-        m = re.search(r"(\d+(?:\.\d+)?)\s*°?\s*f\b", t)
+        # Threshold — a number tied to a comparator (< / > or a keyword) or
+        # written with °F. Never a bare integer (could be the day-of-month).
+        threshold = None
+        m = re.search(r"[<>]\s*(\d+(?:\.\d+)?)", t)
         if m:
             threshold = float(m.group(1))
-    if threshold is None:
-        m = re.search(r"(?:above|below|under|over|exceed|at least|or more|less than)\s*(\d+(?:\.\d+)?)", t)
-        if m:
-            threshold = float(m.group(1))
-    if threshold is None and metric == "wind":
-        m = re.search(r"(\d+)\s*mph", t)
-        if m:
-            threshold = float(m.group(1))
+        if threshold is None:
+            m = re.search(r"(\d+(?:\.\d+)?)\s*°?\s*f\b", t)
+            if m:
+                threshold = float(m.group(1))
+        if threshold is None:
+            m = re.search(r"(?:above|below|under|over|exceed|at least|or more|less than)\s*(\d+(?:\.\d+)?)", t)
+            if m:
+                threshold = float(m.group(1))
+        if threshold is None and metric == "wind":
+            m = re.search(r"(\d+)\s*mph", t)
+            if m:
+                threshold = float(m.group(1))
 
-    if threshold is None and metric not in ("precipitation",):
-        return None
+        if threshold is None and metric not in ("precipitation",):
+            return None
 
     # Date — month/day from the title, plus an explicit 4-digit year if present
     # (otherwise assume the current year).
@@ -187,7 +221,7 @@ def parse_title(ticker: str, title: str) -> dict | None:
     if target_date is None:
         return None
 
-    return {
+    parsed = {
         "city": city_name,
         "lat": lat,
         "lon": lon,
@@ -196,6 +230,11 @@ def parse_title(ticker: str, title: str) -> dict | None:
         "operator": operator,
         "target_date": target_date.isoformat(),
     }
+    # Only band markets carry an upper edge; one-sided markets keep the original
+    # single-threshold shape.
+    if threshold_high is not None:
+        parsed["threshold_high"] = threshold_high
+    return parsed
 
 
 def parse_discussion(text: str) -> dict:

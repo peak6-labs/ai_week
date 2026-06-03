@@ -45,6 +45,11 @@ echo "TS=$TS"
 CYCLE=$(( $(wc -l < reports/cycle-log.txt 2>/dev/null || echo 0) + 1 ))
 .venv/bin/python scripts/ui_log.py "Orchestrator: cycle $CYCLE started (TS=$TS)"
 .venv/bin/python scripts/ui_state.py "{\"cycle_number\": $CYCLE, \"last_cycle_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+
+# Top up the mentions archive for any source past its TTL (cheap no-op when warm;
+# only stale sources fetch). Keeps the speaker-attributed corpus + hearing schedule
+# fresh for this cycle's mentions markets. Fail-soft — never blocks the cycle.
+.venv/bin/python -m kalshi_trader.refresh_mentions_archive --if-stale || true
 ```
 
 Remember `TS` and `CYCLE` — every output path below uses `TS`.

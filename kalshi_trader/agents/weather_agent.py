@@ -2,10 +2,12 @@ from __future__ import annotations
 from datetime import date as date_type, datetime, timezone
 from pathlib import Path
 from kalshi_trader.models import SignalEstimate
+from kalshi_trader.contract_terms import load_contract_terms
 from kalshi_trader.external.noaa import NOAAClient
 from kalshi_trader.external.open_meteo import OpenMeteoClient
 from kalshi_trader.external.weather_parser import parse_title, parse_discussion
 from kalshi_trader.external.weather_authorities import get_authorities, is_independent_authority
+from kalshi_trader.external.weather_settlement import resolve_settlement_station
 from kalshi_trader.external.x_client import XClient
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
@@ -13,7 +15,9 @@ from kalshi_trader.signals.weather import (
     build_authority_signal,
     build_ensemble_signal,
     build_weather_signal,
+    observation_lock_fraction,
 )
+from kalshi_trader.ui.config_manager import cfg
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -68,8 +72,9 @@ _SCHEMAS: list[dict] = [
             "properties": {
                 "ticker": {"type": "string"},
                 "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
-                "threshold": {"type": "number"},
-                "operator": {"type": "string", "enum": ["above", "below"]},
+                "threshold": {"type": "number", "description": "Condition threshold; the low edge of the band when operator is 'between'."},
+                "threshold_high": {"type": "number", "description": "Upper edge of the band; pass only when operator is 'between' (from parse_weather_market's threshold_high)."},
+                "operator": {"type": "string", "enum": ["above", "below", "between"]},
                 "forecast": {"type": "object"},
                 "discussion": {"type": "object"},
             },
@@ -92,17 +97,33 @@ _SCHEMAS: list[dict] = [
     },
     {
         "name": "build_ensemble_signal",
-        "description": "Convert an ensemble dict (from get_ensemble_forecast) into a SignalEstimate dict whose probability is the fraction of members past the threshold (the empirical CDF). Only call when member_count >= the minimum. Pass the FULL dict returned by get_ensemble_forecast as ensemble, unchanged — do not modify the members array.",
+        "description": "Convert an ensemble dict (from get_ensemble_forecast) into a SignalEstimate dict whose probability is the fraction of members past the threshold (the empirical CDF). Only call when member_count >= the minimum. Pass the FULL dict returned by get_ensemble_forecast as ensemble, unchanged — do not modify the members array. For a SAME-DAY market, also pass the FULL dict from get_observed_extreme as `observation` (only when its realized_extreme is non-null) so members are clamped to what has already been observed; the lock_fraction rides along inside that dict.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "ticker": {"type": "string"},
                 "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
-                "threshold": {"type": "number"},
-                "operator": {"type": "string", "enum": ["above", "below"]},
+                "threshold": {"type": "number", "description": "Condition threshold; the low edge of the band when operator is 'between'."},
+                "threshold_high": {"type": "number", "description": "Upper edge of the band; pass only when operator is 'between' (from parse_weather_market's threshold_high)."},
+                "operator": {"type": "string", "enum": ["above", "below", "between"]},
                 "ensemble": {"type": "object"},
+                "observation": {"type": "object", "description": "Same-day live observation from get_observed_extreme (full dict). Omit when there is no usable observation (realized_extreme null / station not resolved)."},
             },
             "required": ["ticker", "metric", "threshold", "operator", "ensemble"],
+        },
+    },
+    {
+        "name": "get_observed_extreme",
+        "description": "SAME-DAY markets only: fetch the realized daily extreme observed SO FAR at the contract's settlement station (resolved from the series' settlement source — never a guessed airport). Returns realized_extreme, station_id, timezone, at_timestamp, lock_fraction, station_resolved. If station_resolved is false or realized_extreme is null there is no usable observation — call build_ensemble_signal WITHOUT an observation. When realized_extreme is present, pass the FULL returned dict as build_ensemble_signal's `observation`. Only call this when target_date is today.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "series_ticker": {"type": "string", "description": "The market ticker or its series prefix (e.g. KXLOWTATL or KXLOWTATL-26JUN03-B57.5)."},
+                "target_date": {"type": "string", "description": "YYYY-MM-DD; only call when this is today."},
+                "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
+                "station_id": {"type": "string", "description": "Optional NWS station/office code if the settlement context names one; otherwise omit and it is resolved from cached settlement sources."},
+            },
+            "required": ["series_ticker", "target_date", "metric"],
         },
     },
     {
@@ -126,8 +147,9 @@ _SCHEMAS: list[dict] = [
             "properties": {
                 "ticker": {"type": "string"},
                 "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
-                "threshold": {"type": "number"},
-                "operator": {"type": "string", "enum": ["above", "below"]},
+                "threshold": {"type": "number", "description": "Condition threshold; the low edge of the band when operator is 'between'."},
+                "threshold_high": {"type": "number", "description": "Upper edge of the band; pass only when operator is 'between' (from parse_weather_market's threshold_high)."},
+                "operator": {"type": "string", "enum": ["above", "below", "between"]},
                 "authority_forecast": {"type": "object"},
             },
             "required": ["ticker", "metric", "threshold", "operator", "authority_forecast"],
@@ -151,6 +173,7 @@ class WeatherAgent:
                 "build_weather_signal": self._build_weather_signal,
                 "get_ensemble_forecast": self._get_ensemble_forecast,
                 "build_ensemble_signal": self._build_ensemble_signal,
+                "get_observed_extreme": self._get_observed_extreme,
                 "get_authority_forecast": self._get_authority_forecast,
                 "build_authority_signal": self._build_authority_signal,
             },
@@ -204,8 +227,11 @@ class WeatherAgent:
         operator: str,
         forecast: dict,
         discussion: dict | None = None,
+        threshold_high: float | None = None,
     ) -> dict:
-        estimate = build_weather_signal(ticker, metric, threshold, operator, forecast, discussion)
+        estimate = build_weather_signal(
+            ticker, metric, threshold, operator, forecast, discussion, threshold_high
+        )
         return estimate_to_dict(estimate)
 
     async def _get_ensemble_forecast(
@@ -215,10 +241,61 @@ class WeatherAgent:
         return await self._open_meteo.get_ensemble_members(lat, lon, target, metric)
 
     async def _build_ensemble_signal(
-        self, ticker: str, metric: str, threshold: float, operator: str, ensemble: dict
+        self,
+        ticker: str,
+        metric: str,
+        threshold: float,
+        operator: str,
+        ensemble: dict,
+        threshold_high: float | None = None,
+        observation: dict | None = None,
+        lock_fraction: float | None = None,
     ) -> dict:
-        estimate = build_ensemble_signal(ticker, metric, threshold, operator, ensemble)
+        # The lock fraction is computed in _get_observed_extreme and rides along in
+        # the observation dict; read it back unless the caller passed it explicitly.
+        if lock_fraction is None:
+            lock_fraction = (observation or {}).get("lock_fraction", 0.0) if isinstance(observation, dict) else 0.0
+        estimate = build_ensemble_signal(
+            ticker, metric, threshold, operator, ensemble, threshold_high,
+            observation, lock_fraction,
+        )
         return estimate_to_dict(estimate)
+
+    async def _get_observed_extreme(
+        self,
+        series_ticker: str,
+        target_date: str,
+        metric: str,
+        station_id: str | None = None,
+    ) -> dict:
+        """Resolve the settlement station and fetch the realized extreme so far.
+
+        Station resolution is authoritative (the series' settlement source), never
+        a guessed airport. Returns ``station_resolved: False`` (override skipped)
+        when the override is disabled, the series has no cached NWS-station
+        settlement source, or no station id is supplied.
+        """
+        not_resolved = {"realized_extreme": None, "station_resolved": False}
+        if not cfg.get("enable_observation_override"):
+            return {**not_resolved, "reason": "observation override disabled by config"}
+
+        if station_id:
+            resolved_station = station_id
+        else:
+            series_prefix = series_ticker.split("-", 1)[0].upper()
+            terms_entry = load_contract_terms().get(series_prefix)
+            resolved = resolve_settlement_station(
+                series_prefix, (terms_entry or {}).get("settlement_sources")
+            )
+            if not resolved or not resolved.get("station_id"):
+                return {**not_resolved, "reason": "no NWS settlement station resolved for this series"}
+            resolved_station = resolved["station_id"]
+
+        target = date_type.fromisoformat(target_date)
+        observation = await self._noaa.get_observed_extreme(resolved_station, target, metric)
+        observation["lock_fraction"] = observation_lock_fraction(metric, observation)
+        observation["station_resolved"] = observation.get("realized_extreme") is not None
+        return observation
 
     async def _get_authority_forecast(self, city: str, target_date: str, metric: str) -> dict:
         """Poll the city's named meteorologist authorities via Grok.
@@ -256,12 +333,14 @@ class WeatherAgent:
         threshold: float,
         operator: str,
         authority_forecast: dict,
+        threshold_high: float | None = None,
     ) -> dict:
         # The independence flag travels in the forecast dict (set by
         # _get_authority_forecast). Default to independent if absent.
         independent_of_noaa = authority_forecast.get("independent_of_noaa", True)
         estimate = build_authority_signal(
-            ticker, metric, threshold, operator, authority_forecast, independent_of_noaa
+            ticker, metric, threshold, operator, authority_forecast,
+            independent_of_noaa, threshold_high,
         )
         return estimate_to_dict(estimate)
 

@@ -257,13 +257,18 @@ def combine_signals(signals: list[dict], cfg: dict) -> dict:
     # corroborate within a tight spread AND none is flagged non-independent,
     # tighten combined uncertainty (bounded by a floor). Probability is NOT
     # altered — the boost only sharpens confidence so a real edge clears the bar;
-    # moving the probability would distort calibration. An NWS-office weather
-    # authority sets independent_of_noaa False, so its agreement with noaa_gfs is
-    # excluded (same model family — circular, not corroboration).
+    # moving the probability would distort calibration. Two independence flags gate
+    # this: the weather-specific ``independent_of_noaa`` (an NWS-office authority
+    # shares the NOAA model family) and the domain-neutral ``independent`` (e.g.
+    # mentions_live shares GDELT lineage with mentions_base). Either being False
+    # makes that signal's agreement circular, not corroboration.
     if bool(cfg.get("agreement_boost_enabled", True)) and len(signals) >= 2:
         agreement_spread_threshold = float(cfg.get("agreement_spread_threshold", 0.03))
         agreement_uncertainty_factor = float(cfg.get("agreement_uncertainty_factor", 0.85))
-        all_independent = all(bool(s.get("independent_of_noaa", True)) for s in signals)
+        all_independent = all(
+            bool(s.get("independent_of_noaa", True)) and bool(s.get("independent", True))
+            for s in signals
+        )
         if spread <= agreement_spread_threshold and all_independent:
             combined_unc = max(
                 _AGREEMENT_UNCERTAINTY_FLOOR, combined_unc * agreement_uncertainty_factor
@@ -394,10 +399,12 @@ def usable_estimates(estimates: list[dict]) -> list[dict]:
             "uncertainty": uncertainty,
             "weight": weight,
             "data_age_minutes": age_minutes,
-            # Independence flag for the agreement boost. Absent → independent.
-            # An NWS-office weather authority stamps this False (same model
-            # family as noaa_gfs, so its agreement is circular, not corroboration).
+            # Independence flags for the agreement boost. Absent → independent.
+            # An NWS-office weather authority stamps independent_of_noaa False (same
+            # model family as noaa_gfs); the domain-neutral `independent` flags any
+            # other correlated source (e.g. mentions_live vs mentions_base, both GDELT).
             "independent_of_noaa": metadata.get("independent_of_noaa", True),
+            "independent": metadata.get("independent", True),
         })
     return usable
 
@@ -446,8 +453,9 @@ def collapse_source_families(estimates: list[dict]) -> list[dict]:
             "uncertainty": sum(float(m["uncertainty"]) for m in members) / count,
             "weight": sum(float(m["weight"]) for m in members) / count,
             "data_age_minutes": min(float(m.get("data_age_minutes", 0)) for m in members),
-            # The family is independent only if every slice is.
+            # The family is independent only if every slice is (both flags).
             "independent_of_noaa": all(m.get("independent_of_noaa", True) for m in members),
+            "independent": all(m.get("independent", True) for m in members),
         })
     return collapsed
 

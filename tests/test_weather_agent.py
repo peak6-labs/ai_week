@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import date, datetime, timezone
 
 from kalshi_trader.agents.weather_agent import _parse_weather_market, WeatherAgent
@@ -201,6 +201,133 @@ async def test_build_ensemble_signal_handler_tolerates_roundtripped_string_times
     )
     assert result["source"] == "gfs_ensemble"
     assert isinstance(result["data_issued_at"], str)
+
+
+@pytest.mark.asyncio
+async def test_build_ensemble_signal_handler_threads_threshold_high():
+    # Band market: handler must forward threshold_high so the builder counts
+    # members inside [85, 86] (only 85 and 86 of the 70..100 ladder).
+    agent = WeatherAgent.__new__(WeatherAgent)
+    ensemble = {"members": [70.0 + index for index in range(31)], "member_count": 31}
+    result = await agent._build_ensemble_signal(
+        ticker="KXHIGHTMIN-26JUN03-B85.5", metric="temp_high", threshold=85.0,
+        operator="between", ensemble=ensemble, threshold_high=86.0,
+    )
+    assert result["source"] == "gfs_ensemble"
+    assert result["metadata"]["members_satisfying"] == 2
+
+
+def test_weather_agent_schemas_support_between_and_threshold_high():
+    from kalshi_trader.agents.weather_agent import _SCHEMAS
+    build_tools = {
+        schema["name"]: schema for schema in _SCHEMAS
+        if schema["name"] in (
+            "build_weather_signal", "build_ensemble_signal", "build_authority_signal"
+        )
+    }
+    assert len(build_tools) == 3
+    for schema in build_tools.values():
+        properties = schema["input_schema"]["properties"]
+        assert "between" in properties["operator"]["enum"]
+        assert "threshold_high" in properties
+
+
+# ---------------------------------------------------------------------------
+# Live-observation override wiring
+# ---------------------------------------------------------------------------
+
+def test_weather_agent_schemas_include_observation_override():
+    from kalshi_trader.agents.weather_agent import _SCHEMAS
+    by_name = {schema["name"]: schema for schema in _SCHEMAS}
+    assert "get_observed_extreme" in by_name
+    assert "observation" in by_name["build_ensemble_signal"]["input_schema"]["properties"]
+
+
+@pytest.mark.asyncio
+async def test_get_observed_extreme_with_explicit_station_delegates_and_adds_lock():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    agent._noaa = MagicMock()
+    agent._noaa.get_observed_extreme = AsyncMock(return_value={
+        "station_id": "KATL", "timezone": "America/New_York",
+        "realized_extreme": 57.2, "at_timestamp": "2026-06-03T09:50:00+00:00",
+        "latest_timestamp": "2026-06-03T19:45:00+00:00", "obs_count": 200,
+    })
+
+    result = await agent._get_observed_extreme(
+        "KXLOWTATL-26JUN03-B57.5", "2026-06-03", "temp_low", station_id="KATL"
+    )
+
+    agent._noaa.get_observed_extreme.assert_awaited_once_with("KATL", date(2026, 6, 3), "temp_low")
+    assert result["realized_extreme"] == 57.2
+    assert result["station_resolved"] is True
+    # 19:45Z is 15:45 EDT — well past the temp_low lock hour → lock_fraction 1.0.
+    assert result["lock_fraction"] == pytest.approx(1.0)
+
+
+@pytest.mark.asyncio
+async def test_get_observed_extreme_resolves_station_from_cached_terms():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    agent._noaa = MagicMock()
+    agent._noaa.get_observed_extreme = AsyncMock(return_value={
+        "station_id": "KLAX", "timezone": "America/Los_Angeles",
+        "realized_extreme": 78.0, "at_timestamp": None,
+        "latest_timestamp": "2026-06-03T22:00:00+00:00", "obs_count": 50,
+    })
+    fake_terms = {
+        "KXHIGHLAX": {"settlement_sources": [
+            {"name": "NWS", "url": "https://forecast.weather.gov/product.php?product=CLI&issuedby=LAX"}
+        ]}
+    }
+    with patch("kalshi_trader.agents.weather_agent.load_contract_terms", return_value=fake_terms):
+        result = await agent._get_observed_extreme("KXHIGHLAX-26JUN03-T80", "2026-06-03", "temp_high")
+
+    # Resolved from settlement source (issuedby=LAX), not a guessed airport.
+    agent._noaa.get_observed_extreme.assert_awaited_once_with("LAX", date(2026, 6, 3), "temp_high")
+    assert result["station_resolved"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_observed_extreme_skips_when_no_station_resolved():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    agent._noaa = MagicMock()
+    agent._noaa.get_observed_extreme = AsyncMock()
+    with patch("kalshi_trader.agents.weather_agent.load_contract_terms", return_value={}):
+        result = await agent._get_observed_extreme("KXLOWTATL-26JUN03-B57.5", "2026-06-03", "temp_low")
+
+    assert result["station_resolved"] is False
+    assert result["realized_extreme"] is None
+    agent._noaa.get_observed_extreme.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_observed_extreme_disabled_by_config():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    agent._noaa = MagicMock()
+    agent._noaa.get_observed_extreme = AsyncMock()
+    with patch("kalshi_trader.agents.weather_agent.cfg.get", return_value=False):
+        result = await agent._get_observed_extreme("KXLOWTATL", "2026-06-03", "temp_low", station_id="KATL")
+    assert result["station_resolved"] is False
+    agent._noaa.get_observed_extreme.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_build_ensemble_signal_handler_clamps_with_observation():
+    agent = WeatherAgent.__new__(WeatherAgent)
+    ensemble = {"members": [59.6] * 31, "member_count": 31}
+    observation = {
+        "station_id": "KATL", "timezone": "America/New_York",
+        "realized_extreme": 57.2, "at_timestamp": "2026-06-03T09:50:00+00:00",
+        "latest_timestamp": "2026-06-03T19:45:00+00:00", "lock_fraction": 1.0,
+        "station_resolved": True,
+    }
+    result = await agent._build_ensemble_signal(
+        ticker="KXLOWTATL-26JUN03-B57.5", metric="temp_low", threshold=57.0,
+        operator="between", ensemble=ensemble, threshold_high=58.0, observation=observation,
+    )
+    assert result["metadata"]["members_clamped"] is True
+    assert result["metadata"]["realized_extreme"] == pytest.approx(57.2)
+    # lock_fraction read from the observation dict → uncertainty at the floor.
+    assert result["uncertainty"] == pytest.approx(0.02)
 
 
 @pytest.mark.asyncio

@@ -60,6 +60,11 @@ POLYMARKET_MARKETS_CSV = os.environ.get(
 # Enable composite 3-signal whale scorer (win rate + direction accuracy + evidence weight).
 WHALE_SCORER_V2: bool = os.environ.get("WHALE_SCORER_V2", "true").lower() not in ("0", "false", "no")
 
+# One free api.data.gov key authorizes both congress.gov (hearing schedules) and
+# GovInfo (CREC/CHRG transcripts). Absent ⇒ those clients return [] and the system
+# degrades gracefully (no schedule veto, no CREC corpus).
+DATA_GOV_API_KEY = os.environ.get("DATA_GOV_API_KEY", "")
+
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"
 # Agent Tools API (/v1/responses + x_search) requires a reasoning model; the old

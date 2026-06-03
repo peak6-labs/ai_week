@@ -12,6 +12,8 @@
   "uncertainty_ensemble_temp": 0.07,
   "uncertainty_ensemble_precip": 0.05,
   "ensemble_min_members": 10,
+  "enable_observation_override": true,
+  "observation_uncertainty_floor": 0.02,
   "uncertainty_poly_price": 0.03,
   "uncertainty_whale_single": 0.15,
   "uncertainty_whale_multi": 0.1,

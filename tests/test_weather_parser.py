@@ -76,6 +76,35 @@ def test_parse_title_explicit_year_in_title_is_used():
     assert result["target_date"] == "2027-01-02"
 
 
+# --- band / range markets ("be 85-86°") → operator "between" + threshold_high ---
+
+def test_parse_title_band_market_from_title():
+    result = parse_title("KXHIGHTMIN-26JUN03-B85.5", "Will the maximum temperature be 85-86° on Jun 3, 2026?")
+    assert result is not None
+    assert result["city"] == "minneapolis"
+    assert result["metric"] == "temp_high"
+    assert result["operator"] == "between"
+    assert result["threshold"] == 85.0
+    assert result["threshold_high"] == 86.0
+
+
+def test_parse_title_band_market_from_ticker_suffix_fallback():
+    # Title lacks the "NN-NN°" range text; the B<midpoint> ticker suffix supplies it.
+    result = parse_title("KXLOWTCHI-26JUN03-B52.5", "Will the minimum temperature be on Jun 3, 2026?")
+    assert result is not None
+    assert result["operator"] == "between"
+    assert result["threshold"] == 52.0
+    assert result["threshold_high"] == 53.0
+
+
+def test_parse_title_threshold_market_has_no_threshold_high():
+    # One-sided markets keep the original shape — no threshold_high key.
+    result = parse_title("KXLOWTAUS-26JUN03-T68", "Will the minimum temperature be <68° on Jun 3, 2026?")
+    assert result is not None
+    assert result["operator"] == "below"
+    assert "threshold_high" not in result
+
+
 def test_parse_title_no_threshold_returns_none():
     result = parse_title("TICKER", "NYC high temp June 3")
     assert result is None
