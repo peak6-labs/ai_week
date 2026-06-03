@@ -4,9 +4,11 @@ from pathlib import Path
 from kalshi_trader.models import SignalEstimate
 from kalshi_trader.external.noaa import NOAAClient
 from kalshi_trader.external.weather_parser import parse_title, parse_discussion
+from kalshi_trader.external.weather_authorities import get_authorities, is_independent_authority
+from kalshi_trader.external.x_client import XClient
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
-from kalshi_trader.signals.weather import build_weather_signal
+from kalshi_trader.signals.weather import build_weather_signal, build_authority_signal
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -69,12 +71,41 @@ _SCHEMAS: list[dict] = [
             "required": ["ticker", "metric", "threshold", "operator", "forecast"],
         },
     },
+    {
+        "name": "get_authority_forecast",
+        "description": "Poll reputable named X/Twitter meteorologist authorities for a city's forecast on a target date. Returns temp_high, temp_low, precip_pct, confidence, post_count, issued_at, handles, independent_of_noaa, data_age_minutes. If post_count is 0 (or no_handles is true) there is no usable authority signal — do NOT call build_authority_signal; emit only the NOAA estimate.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "city": {"type": "string", "description": "Canonical city from parse_weather_market"},
+                "target_date": {"type": "string", "description": "YYYY-MM-DD"},
+                "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
+            },
+            "required": ["city", "target_date", "metric"],
+        },
+    },
+    {
+        "name": "build_authority_signal",
+        "description": "Convert an authority forecast dict (from get_authority_forecast) into a SignalEstimate dict. Only call when post_count > 0 AND the needed metric value (temp_high/temp_low/precip_pct) is present. Pass the full dict returned by get_authority_forecast as authority_forecast.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "metric": {"type": "string", "enum": ["temp_high", "temp_low", "precipitation"]},
+                "threshold": {"type": "number"},
+                "operator": {"type": "string", "enum": ["above", "below"]},
+                "authority_forecast": {"type": "object"},
+            },
+            "required": ["ticker", "metric", "threshold", "operator", "authority_forecast"],
+        },
+    },
 ]
 
 
 class WeatherAgent:
     def __init__(self) -> None:
         self._noaa = NOAAClient()
+        self._x = XClient()
         system_prompt = (_PROMPTS_DIR / "weather.md").read_text()
         self._agent = BaseAgent(
             tools=_SCHEMAS,
@@ -83,6 +114,8 @@ class WeatherAgent:
                 "get_noaa_forecast": self._get_noaa_forecast,
                 "get_nws_discussion": self._get_nws_discussion,
                 "build_weather_signal": self._build_weather_signal,
+                "get_authority_forecast": self._get_authority_forecast,
+                "build_authority_signal": self._build_authority_signal,
             },
             system_prompt=system_prompt,
         )
@@ -138,5 +171,51 @@ class WeatherAgent:
         estimate = build_weather_signal(ticker, metric, threshold, operator, forecast, discussion)
         return estimate_to_dict(estimate)
 
+    async def _get_authority_forecast(self, city: str, target_date: str, metric: str) -> dict:
+        """Poll the city's named meteorologist authorities via Grok.
+
+        Short-circuits to ``{"post_count": 0, "no_handles": True}`` (no Grok call)
+        when the city has no mapped authorities. Otherwise attaches ``handles``,
+        ``independent_of_noaa`` and ``data_age_minutes`` to the forecast.
+        """
+        handles = get_authorities(city)
+        if not handles:
+            return {"post_count": 0, "no_handles": True}
+
+        forecast = dict(await self._x.forecast_search(handles, city, target_date, metric))
+        forecast["handles"] = handles
+        forecast["independent_of_noaa"] = is_independent_authority(handles)
+
+        # data_age_minutes from the most-recent-post timestamp (mirrors _get_noaa_forecast).
+        issued_at = forecast.get("issued_at")
+        age = 0.0
+        if issued_at:
+            try:
+                issued_datetime = datetime.fromisoformat(str(issued_at).replace("Z", "+00:00"))
+                if issued_datetime.tzinfo is None:
+                    issued_datetime = issued_datetime.replace(tzinfo=timezone.utc)
+                age = max(0.0, (datetime.now(tz=timezone.utc) - issued_datetime).total_seconds() / 60)
+            except (ValueError, TypeError):
+                age = 0.0
+        forecast["data_age_minutes"] = round(age, 1)
+        return forecast
+
+    async def _build_authority_signal(
+        self,
+        ticker: str,
+        metric: str,
+        threshold: float,
+        operator: str,
+        authority_forecast: dict,
+    ) -> dict:
+        # The independence flag travels in the forecast dict (set by
+        # _get_authority_forecast). Default to independent if absent.
+        independent_of_noaa = authority_forecast.get("independent_of_noaa", True)
+        estimate = build_authority_signal(
+            ticker, metric, threshold, operator, authority_forecast, independent_of_noaa
+        )
+        return estimate_to_dict(estimate)
+
     async def close(self) -> None:
         await self._noaa.close()
+        await self._x.close()

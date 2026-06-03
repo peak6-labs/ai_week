@@ -26,6 +26,7 @@ CITY_COORDS: dict[str, tuple[float, float]] = {
     "san francisco": (37.7749, -122.4194),
     "austin": (30.2672, -97.7431),
     "washington": (38.9072, -77.0369),
+    "oklahoma city": (35.4676, -97.5164),
 }
 
 # Kalshi encodes the city in the *ticker* (e.g. KXLOWTBOS = low-temp Boston),
@@ -42,6 +43,7 @@ TICKER_CITY_CODES: dict[str, str] = {
     "POR": "portland", "PDX": "portland", "NAS": "nashville",
     "SFO": "san francisco", "SF": "san francisco",
     "AUS": "austin", "DC": "washington", "DCA": "washington",
+    "OKC": "oklahoma city", "OKL": "oklahoma city",
 }
 
 # Ticker metric prefixes (after the leading KX), longest first so HIGHT beats HIGH.

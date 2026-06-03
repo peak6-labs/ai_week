@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 DEFAULTS = {
     "min_agents": 2,
     "weight_noaa": 0.85,
+    "weight_x_authority": 0.70,
     "weight_polymarket_price": 0.75,
     "weight_polymarket_whale": 0.60,
     "weight_x_grok": 0.60,
@@ -31,6 +32,8 @@ DEFAULTS = {
     "uncertainty_sportsbook": 0.05,
     "uncertainty_noaa_temp": 0.08,
     "uncertainty_noaa_precip": 0.05,
+    "uncertainty_x_authority_temp": 0.10,
+    "uncertainty_x_authority_precip": 0.07,
     "uncertainty_poly_price": 0.03,
     "uncertainty_whale_single": 0.15,
     "uncertainty_whale_multi": 0.10,
@@ -71,11 +74,15 @@ DEFAULTS = {
     "agent_market_maker_enabled": True,
     "agent_kalshi_bias_enabled": True,
     "agent_x_enabled": False,
+    "agreement_boost_enabled": True,
+    "agreement_spread_threshold": 0.03,
+    "agreement_uncertainty_factor": 0.85,
 }
 
 _NUMERIC_RANGES: dict[str, tuple[float, float]] = {
     "min_agents": (1, 10),
     "weight_noaa": (0.0, 1.0),
+    "weight_x_authority": (0.0, 1.0),
     "weight_polymarket_price": (0.0, 1.0),
     "weight_polymarket_whale": (0.0, 1.0),
     "weight_x_grok": (0.0, 1.0),
@@ -90,6 +97,8 @@ _NUMERIC_RANGES: dict[str, tuple[float, float]] = {
     "uncertainty_sportsbook": (0.0, 0.5),
     "uncertainty_noaa_temp": (0.0, 0.5),
     "uncertainty_noaa_precip": (0.0, 0.5),
+    "uncertainty_x_authority_temp": (0.0, 0.5),
+    "uncertainty_x_authority_precip": (0.0, 0.5),
     "uncertainty_poly_price": (0.0, 0.5),
     "uncertainty_whale_single": (0.0, 0.5),
     "uncertainty_whale_multi": (0.0, 0.5),
@@ -124,6 +133,8 @@ _NUMERIC_RANGES: dict[str, tuple[float, float]] = {
     "filter_min_open_interest": (0, 10000),
     "filter_min_hours_to_close": (0, 24),
     "filter_max_hours_to_close": (24, 8760),
+    "agreement_spread_threshold": (0.0, 0.2),
+    "agreement_uncertainty_factor": (0.5, 1.0),
 }
 
 # Keys whose default values are bool
