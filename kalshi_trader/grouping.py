@@ -104,6 +104,13 @@ def serialize_event_group(
         "market_count": market_count,
         "average_score": round(average_score, 4),
         "best_score": round(best_market.composite_score, 4),
+        "raw_best_score": round(
+            best_market.raw_composite_score
+            if best_market.raw_composite_score is not None
+            else best_market.composite_score,
+            4,
+        ),
+        "spread_penalty_multiplier": round(best_market.spread_penalty_multiplier, 4),
         "coverage_pct": round(coverage_fraction(best_market) * 100, 1),
         "yes_bid": market.yes_bid,
         "yes_ask": market.yes_ask,

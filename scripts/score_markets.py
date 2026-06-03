@@ -26,8 +26,14 @@ def _fmt(signal_value: float | None) -> str:
 
 def _print_debug_block(scored_market: ScoredMarket, rank: int) -> None:
     signal_coverage = coverage_fraction(scored_market) * 100
+    raw_composite_score = (
+        scored_market.raw_composite_score
+        if scored_market.raw_composite_score is not None
+        else scored_market.composite_score
+    )
     print(
         f"\n#{rank:>2}  {scored_market.market.ticker}  score={scored_market.composite_score:.3f}  "
+        f"raw={raw_composite_score:.3f}  spread×={scored_market.spread_penalty_multiplier:.2f}  "
         f"cov={signal_coverage:.0f}%  [{scored_market.market.title[:60]}]"
     )
     print(

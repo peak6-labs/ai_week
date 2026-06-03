@@ -9,6 +9,7 @@ from kalshi_trader.agents.market_scout import (
     serialize_event_group,
     serialize_event_groups,
 )
+from kalshi_trader.actionability import spread_penalty_multiplier
 from kalshi_trader.models import Market, ScoredMarket
 
 
@@ -38,7 +39,9 @@ def _scored(
     if full_coverage:
         return ScoredMarket(
             market=market, composite_score=composite_score,
-            volume_oi_ratio_score=0.5, relative_historical_volume_score=0.87,
+            volume_oi_ratio_score=0.5, raw_composite_score=composite_score,
+            spread_penalty_multiplier=spread_penalty_multiplier(market),
+            relative_historical_volume_score=0.87,
             volume_spike_short_term_score=0.95, oi_change_score=0.7,
             momentum_score=0.68, intraday_hl_score=0.9, weekly_hl_score=0.8,
             ofi_score=1.0, orderbook_skew_score=0.3,
@@ -46,7 +49,8 @@ def _scored(
     # Only volume_oi_ratio present (weight 0.10 of total 1.00)
     return ScoredMarket(
         market=market, composite_score=composite_score,
-        volume_oi_ratio_score=0.5,
+        volume_oi_ratio_score=0.5, raw_composite_score=composite_score,
+        spread_penalty_multiplier=spread_penalty_multiplier(market),
     )
 
 
@@ -67,6 +71,8 @@ def test_serialize_event_group_shape_and_values():
     assert row["market_count"] == 3
     assert row["average_score"] == 0.852
     assert row["best_score"] == 0.85
+    assert row["raw_best_score"] == 0.85
+    assert row["spread_penalty_multiplier"] == 1.0
     assert row["coverage_pct"] == 100.0
     # Liquidity read from the spread (cents).
     assert row["spread_cents"] == 2.0
@@ -89,6 +95,7 @@ def test_serialize_event_group_one_sided_book():
     row = serialize_event_group(0.5, 1, _scored(market=_market(yes_bid=0.0, yes_ask=80.0)))
     assert row["one_sided"] is True
     assert row["spread_cents"] == 80.0
+    assert row["spread_penalty_multiplier"] == 0.5
 
 
 def test_serialize_event_group_missing_signals_are_null():
