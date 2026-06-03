@@ -204,7 +204,7 @@ scout signals, which are correlated with each other):
   ticker, title. This is an orderbook-snapshot signal — it does not require
   trade history and is the highest-value signal we have. Dispatch it for every
   market in every batch, no volume gate.
-- `order-flow-signal` — only if `volume_24h > 5000` (reads live trade tape;
+- `order-flow-signal` — only if `volume_24h > 500` (reads live trade tape;
   returns empty on thin markets); args: ticker, title
 
 When dispatching the **cross-venue** agents (`polymarket-price-signal`,
