@@ -163,9 +163,11 @@ def _cmd_record_scored(args) -> None:
 async def _cmd_mark(args) -> None:
     from kalshi_trader.client import KalshiClient
 
-    open_recs = paper.open_recommendations()
+    max_age_minutes = getattr(args, "max_age_minutes", None)
+    open_recs = paper.open_recommendations(max_age_minutes=max_age_minutes)
     if not open_recs:
-        print("no open recommendations to mark")
+        scope = (f" within {max_age_minutes:g} min" if max_age_minutes is not None else "")
+        print(f"no open recommendations to mark{scope}")
         return
     client = KalshiClient()
     marked = 0
@@ -248,7 +250,11 @@ def main() -> None:
     rec_scored.add_argument("--min-sources", type=int, default=2,
                             help="Only record markets with at least this many signal sources")
 
-    sub.add_parser("mark", help="Mark all open recommendations to current market")
+    mark_parser = sub.add_parser("mark", help="Mark open recommendations to current market")
+    mark_parser.add_argument(
+        "--max-age-minutes", type=float, default=None, dest="max_age_minutes",
+        help="Only mark recommendations recorded within this many minutes "
+             "(for a low-priority pass that re-prices just young ideas).")
     report = sub.add_parser("report", help="Print the running scorecard")
     report.add_argument("--by-source", action="store_true", help="Break the scorecard down by signal source")
     report.add_argument("--by-disposition", action="store_true",

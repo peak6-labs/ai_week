@@ -143,3 +143,38 @@ def test_append_mark_preserves_explicit_checked_at(isolated_store) -> None:
             "would_profit": True, "resolved": False}
     paper.append_mark(rec_id, "KX-EXPL", mark)
     assert mark["checked_at"] == "2026-06-03T12:00:00+00:00"
+
+
+def test_open_recommendations_returns_all_open_by_default(isolated_store) -> None:
+    paper.record_recommendation(cycle_ts="c1", ticker="KX-OLD", side="yes", entry_cents=40,
+                                predicted_prob=0.6, edge_cents=8, n_sources=2, sources=["s"])
+    paper.record_recommendation(cycle_ts="c1", ticker="KX-NEW", side="yes", entry_cents=40,
+                                predicted_prob=0.6, edge_cents=8, n_sources=2, sources=["s"])
+    assert len(paper.open_recommendations()) == 2
+
+
+def test_open_recommendations_filters_by_max_age_minutes(isolated_store) -> None:
+    from datetime import datetime, timezone, timedelta
+    import json
+    now = datetime(2026, 6, 3, 12, 0, 0, tzinfo=timezone.utc)
+    rows = [
+        {"rec_id": "young", "recorded_at": (now - timedelta(minutes=30)).isoformat(),
+         "ticker": "KX-Y", "side": "yes", "entry_price_cents": 40.0, "status": "open"},
+        {"rec_id": "old", "recorded_at": (now - timedelta(minutes=200)).isoformat(),
+         "ticker": "KX-O", "side": "yes", "entry_price_cents": 40.0, "status": "open"},
+    ]
+    paper._RECS_FILE.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    recent = paper.open_recommendations(max_age_minutes=130, now=now)
+    assert [r["rec_id"] for r in recent] == ["young"]
+
+
+def test_open_recommendations_keeps_recs_with_unparseable_recorded_at(isolated_store) -> None:
+    from datetime import datetime, timezone
+    import json
+    now = datetime(2026, 6, 3, 12, 0, 0, tzinfo=timezone.utc)
+    paper._RECS_FILE.write_text(json.dumps(
+        {"rec_id": "no-ts", "recorded_at": None, "ticker": "KX-N", "side": "yes",
+         "entry_price_cents": 40.0, "status": "open"}) + "\n")
+    # No timestamp → cannot judge age → keep it (don't silently drop).
+    recent = paper.open_recommendations(max_age_minutes=130, now=now)
+    assert [r["rec_id"] for r in recent] == ["no-ts"]

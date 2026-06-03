@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from kalshi_trader.ideas_history import join_recommendations_and_marks
+from kalshi_trader.ideas_history import join_recommendations_and_marks, parse_iso_timestamp
 
 _PAPER_DIR = Path(__file__).resolve().parent.parent / "data" / "paper"
 _RECS_FILE = _PAPER_DIR / "recommendations.jsonl"
@@ -147,8 +147,31 @@ def load_recommendations() -> list[dict]:
     return _read_jsonl(_RECS_FILE)
 
 
-def open_recommendations() -> list[dict]:
-    return [r for r in load_recommendations() if r.get("status") == "open"]
+def open_recommendations(
+    max_age_minutes: float | None = None, now: datetime | None = None
+) -> list[dict]:
+    """Open recommendations, optionally limited to those recorded recently.
+
+    ``max_age_minutes`` lets a low-priority marking pass re-price only young
+    ideas (toward the 5/15/30/60/120-minute checkpoints) without re-fetching
+    every open recommendation each cycle. A recommendation whose ``recorded_at``
+    cannot be parsed is kept — age is unknown, so it is never silently dropped.
+    """
+    open_recs = [r for r in load_recommendations() if r.get("status") == "open"]
+    if max_age_minutes is None:
+        return open_recs
+
+    reference_time = now or datetime.now(tz=timezone.utc)
+    recent: list[dict] = []
+    for recommendation in open_recs:
+        recorded_at = parse_iso_timestamp(recommendation.get("recorded_at"))
+        if recorded_at is None:
+            recent.append(recommendation)  # unknown age — never silently drop
+            continue
+        age_minutes = (reference_time - recorded_at).total_seconds() / 60.0
+        if age_minutes <= max_age_minutes:
+            recent.append(recommendation)
+    return recent
 
 
 def append_mark(rec_id: str, ticker: str, mark: dict) -> dict:
