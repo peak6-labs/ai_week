@@ -725,8 +725,6 @@
 <nav id="tab-bar">
   <span class="app-title">Kalshi</span>
   <button class="tab-btn active" data-tab="monitor">Live Monitor</button>
-  <button class="tab-btn" data-tab="config">Config &amp; Weights</button>
-  <button class="tab-btn" data-tab="agents">Agents</button>
   <button class="tab-btn" data-tab="ideas">Trade Ideas</button>
   <button class="tab-btn" data-tab="history">Ideas History</button>
 </nav>
@@ -744,8 +742,12 @@
     <span class="stat-value" id="stat-balance">$0.00</span>
   </div>
   <div class="stat-group">
-    <span class="stat-label">Today P&amp;L</span>
+    <span class="stat-label">Unreal. P&amp;L</span>
     <span class="stat-value" id="stat-pnl">$0.00</span>
+  </div>
+  <div class="stat-group">
+    <span class="stat-label">Fees Paid</span>
+    <span class="stat-value" id="stat-fees">$0.00</span>
   </div>
   <div class="stat-group">
     <span class="stat-label">Exposure</span>
@@ -787,11 +789,14 @@
                 <th>Qty</th>
                 <th>Avg Price</th>
                 <th>Current</th>
-                <th>Unreal. P&amp;L</th>
+                <th>Cost</th>
+                <th>Cost+Fees</th>
+                <th>P&amp;L</th>
+                <th>Fees</th>
               </tr>
             </thead>
             <tbody id="positions-tbody">
-              <tr class="empty-row"><td colspan="6">No open positions</td></tr>
+              <tr class="empty-row"><td colspan="9">No open positions</td></tr>
             </tbody>
           </table>
         </div>
@@ -824,337 +829,6 @@
       <div class="panel-body" id="event-log-scroll">
         <div id="event-log-lines"></div>
       </div>
-    </div>
-  </div>
-
-  <!-- -------------------------------------------------------------------- -->
-  <!-- Tab 2: Config & Weights                                               -->
-  <!-- -------------------------------------------------------------------- -->
-  <div id="tab-config" class="tab-pane">
-
-    <!-- Section 1: Consensus -->
-    <div class="panel config-section">
-      <div class="config-section-title">Consensus</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="min_agents">
-          <label class="field-label">Min Agents <span class="field-key-tag">min_agents</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-min_agents" min="1" max="10" step="1" />
-          <span class="field-error" id="err-min_agents"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 2: Signal Weights & Uncertainty -->
-    <div class="panel config-section">
-      <div class="config-section-title">Signal Weights &amp; Uncertainty</div>
-      <div class="config-fields">
-        <!-- Weights -->
-        <div class="field-row" data-key="weight_noaa">
-          <label class="field-label">NOAA / Weather <span class="field-key-tag">weight_noaa</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_noaa" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_noaa">0.85</span>
-          </div>
-          <span class="field-error" id="err-weight_noaa"></span>
-        </div>
-        <div class="field-row" data-key="weight_polymarket_price">
-          <label class="field-label">Polymarket price gap <span class="field-key-tag">weight_polymarket_price</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_polymarket_price" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_polymarket_price">0.75</span>
-          </div>
-          <span class="field-error" id="err-weight_polymarket_price"></span>
-        </div>
-        <div class="field-row" data-key="weight_polymarket_whale">
-          <label class="field-label">Polymarket whale <span class="field-key-tag">weight_polymarket_whale</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_polymarket_whale" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_polymarket_whale">0.60</span>
-          </div>
-          <span class="field-error" id="err-weight_polymarket_whale"></span>
-        </div>
-        <div class="field-row" data-key="weight_x_grok">
-          <label class="field-label">X / Grok <span class="field-key-tag">weight_x_grok</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_x_grok" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_x_grok">0.60</span>
-          </div>
-          <span class="field-error" id="err-weight_x_grok"></span>
-        </div>
-        <div class="field-row" data-key="weight_market_maker">
-          <label class="field-label">Market maker (orderbook) <span class="field-key-tag">weight_market_maker</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_market_maker" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_market_maker">0.65</span>
-          </div>
-          <span class="field-error" id="err-weight_market_maker"></span>
-        </div>
-        <div class="field-row" data-key="weight_sportsbook">
-          <label class="field-label">Sportsbook odds <span class="field-key-tag">weight_sportsbook</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_sportsbook" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_sportsbook">0.85</span>
-          </div>
-          <span class="field-error" id="err-weight_sportsbook"></span>
-        </div>
-        <div class="field-row" data-key="weight_kalshi_bias">
-          <label class="field-label">Kalshi bias <span class="field-key-tag">weight_kalshi_bias</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_kalshi_bias" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_kalshi_bias">0.50</span>
-          </div>
-          <span class="field-error" id="err-weight_kalshi_bias"></span>
-        </div>
-        <div class="field-row" data-key="weight_microstructure">
-          <label class="field-label">Microstructure <span class="field-key-tag">weight_microstructure</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_microstructure" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_microstructure">0.35</span>
-          </div>
-          <span class="field-error" id="err-weight_microstructure"></span>
-        </div>
-        <div class="field-row" data-key="weight_order_flow">
-          <label class="field-label">Order flow <span class="field-key-tag">weight_order_flow</span></label>
-          <div class="slider-row">
-            <input type="range" class="cfg-slider cfg-input" id="cfg-weight_order_flow" min="0" max="1" step="0.01" />
-            <span class="slider-val" id="val-weight_order_flow">0.55</span>
-          </div>
-          <span class="field-error" id="err-weight_order_flow"></span>
-        </div>
-        <!-- Uncertainty inputs -->
-        <div class="field-row" data-key="uncertainty_noaa_temp">
-          <label class="field-label">NOAA temperature <span class="field-key-tag">uncertainty_noaa_temp</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_noaa_temp" min="0" max="0.5" step="0.001" />
-          <span class="field-error" id="err-uncertainty_noaa_temp"></span>
-        </div>
-        <div class="field-row" data-key="uncertainty_noaa_precip">
-          <label class="field-label">NOAA precipitation <span class="field-key-tag">uncertainty_noaa_precip</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_noaa_precip" min="0" max="0.5" step="0.001" />
-          <span class="field-error" id="err-uncertainty_noaa_precip"></span>
-        </div>
-        <div class="field-row" data-key="uncertainty_poly_price">
-          <label class="field-label">Polymarket price <span class="field-key-tag">uncertainty_poly_price</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_poly_price" min="0" max="0.5" step="0.001" />
-          <span class="field-error" id="err-uncertainty_poly_price"></span>
-        </div>
-        <div class="field-row" data-key="uncertainty_whale_single">
-          <label class="field-label">Polymarket whale (1 wallet) <span class="field-key-tag">uncertainty_whale_single</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_whale_single" min="0" max="0.5" step="0.001" />
-          <span class="field-error" id="err-uncertainty_whale_single"></span>
-        </div>
-        <div class="field-row" data-key="uncertainty_whale_multi">
-          <label class="field-label">Polymarket whale (2+ wallets) <span class="field-key-tag">uncertainty_whale_multi</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-uncertainty_whale_multi" min="0" max="0.5" step="0.001" />
-          <span class="field-error" id="err-uncertainty_whale_multi"></span>
-        </div>
-        <div class="field-row" data-key="x_grok_uncertainty_threshold">
-          <label class="field-label">Grok uncertainty cutoff <span class="field-key-tag">x_grok_uncertainty_threshold</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-x_grok_uncertainty_threshold" min="0" max="0.5" step="0.001" />
-          <span class="field-error" id="err-x_grok_uncertainty_threshold"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 3: Order Flow Agent -->
-    <div class="panel config-section">
-      <div class="config-section-title">Order Flow Agent</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="ofi_window_minutes">
-          <label class="field-label">OFI window (minutes) <span class="field-key-tag">ofi_window_minutes</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-ofi_window_minutes" min="1" max="1440" step="1" />
-          <span class="field-error" id="err-ofi_window_minutes"></span>
-        </div>
-        <div class="field-row" data-key="vpin_bucket_size_usd">
-          <label class="field-label">VPIN bucket size ($) <span class="field-key-tag">vpin_bucket_size_usd</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-vpin_bucket_size_usd" min="100" max="100000" step="100" />
-          <span class="field-error" id="err-vpin_bucket_size_usd"></span>
-        </div>
-        <div class="field-row" data-key="trade_count_window_minutes">
-          <label class="field-label">Trade count window (minutes) <span class="field-key-tag">trade_count_window_minutes</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-trade_count_window_minutes" min="1" max="1440" step="1" />
-          <span class="field-error" id="err-trade_count_window_minutes"></span>
-        </div>
-        <div class="field-row" data-key="ofi_prob_scale">
-          <label class="field-label">OFI &rarr; prob scale <span class="field-key-tag">ofi_prob_scale</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-ofi_prob_scale" min="0" max="1" step="0.01" />
-          <span class="field-error" id="err-ofi_prob_scale"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 4: Market Maker Agent -->
-    <div class="panel config-section">
-      <div class="config-section-title">Market Maker Agent</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="mm_snapshot_count">
-          <label class="field-label">Snapshot count <span class="field-key-tag">mm_snapshot_count</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-mm_snapshot_count" min="2" max="20" step="1" />
-          <span class="field-error" id="err-mm_snapshot_count"></span>
-        </div>
-        <div class="field-row" data-key="mm_snapshot_delay_seconds">
-          <label class="field-label">Snapshot delay (seconds) <span class="field-key-tag">mm_snapshot_delay_seconds</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-mm_snapshot_delay_seconds" min="0.5" max="30" step="0.5" />
-          <span class="field-error" id="err-mm_snapshot_delay_seconds"></span>
-        </div>
-        <div class="field-row" data-key="mm_imbalance_prob_scale">
-          <label class="field-label">Imbalance &rarr; prob scale <span class="field-key-tag">mm_imbalance_prob_scale</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-mm_imbalance_prob_scale" min="0" max="1" step="0.01" />
-          <span class="field-error" id="err-mm_imbalance_prob_scale"></span>
-        </div>
-        <div class="field-row" data-key="mm_spread_withdrawal_cents">
-          <label class="field-label">Spread withdrawal threshold (¢) <span class="field-key-tag">mm_spread_withdrawal_cents</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-mm_spread_withdrawal_cents" min="1" max="50" step="1" />
-          <span class="field-error" id="err-mm_spread_withdrawal_cents"></span>
-        </div>
-        <div class="field-row" data-key="mm_spread_trend_threshold">
-          <label class="field-label">Spread trend threshold <span class="field-key-tag">mm_spread_trend_threshold</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-mm_spread_trend_threshold" min="0" max="2" step="0.01" />
-          <span class="field-error" id="err-mm_spread_trend_threshold"></span>
-        </div>
-        <div class="field-row" data-key="mm_directional_imbalance_threshold">
-          <label class="field-label">Directional imbalance threshold <span class="field-key-tag">mm_directional_imbalance_threshold</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-mm_directional_imbalance_threshold" min="0" max="1" step="0.01" />
-          <span class="field-error" id="err-mm_directional_imbalance_threshold"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 5: Polymarket Agent -->
-    <div class="panel config-section">
-      <div class="config-section-title">Polymarket Agent</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="poly_min_gap_cents">
-          <label class="field-label">Min price gap to trade (¢) <span class="field-key-tag">poly_min_gap_cents</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_min_gap_cents" min="1" max="30" step="0.5" />
-          <span class="field-error" id="err-poly_min_gap_cents"></span>
-        </div>
-        <div class="field-row" data-key="poly_gap_scale">
-          <label class="field-label">Gap scale (confidence) <span class="field-key-tag">poly_gap_scale</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_gap_scale" min="0.01" max="1" step="0.01" />
-          <span class="field-error" id="err-poly_gap_scale"></span>
-        </div>
-        <div class="field-row" data-key="poly_whale_confidence_boost">
-          <label class="field-label">Whale confidence boost <span class="field-key-tag">poly_whale_confidence_boost</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_whale_confidence_boost" min="0" max="0.5" step="0.01" />
-          <span class="field-error" id="err-poly_whale_confidence_boost"></span>
-        </div>
-        <div class="field-row" data-key="poly_max_confidence">
-          <label class="field-label">Max confidence cap <span class="field-key-tag">poly_max_confidence</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_max_confidence" min="0.5" max="1" step="0.01" />
-          <span class="field-error" id="err-poly_max_confidence"></span>
-        </div>
-        <div class="field-row" data-key="poly_whale_min_size_usd">
-          <label class="field-label">Whale min trade size ($) <span class="field-key-tag">poly_whale_min_size_usd</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_whale_min_size_usd" min="10" max="100000" step="50" />
-          <span class="field-error" id="err-poly_whale_min_size_usd"></span>
-        </div>
-        <div class="field-row" data-key="poly_whale_lookback_seconds">
-          <label class="field-label">Whale lookback (seconds) <span class="field-key-tag">poly_whale_lookback_seconds</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_whale_lookback_seconds" min="60" max="86400" step="60" />
-          <span class="field-error" id="err-poly_whale_lookback_seconds"></span>
-        </div>
-        <div class="field-row" data-key="poly_match_min_score">
-          <label class="field-label">Market match min score <span class="field-key-tag">poly_match_min_score</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-poly_match_min_score" min="0" max="1" step="0.01" />
-          <span class="field-error" id="err-poly_match_min_score"></span>
-        </div>
-        <div class="field-row" data-key="polymarket_max_concurrent">
-          <label class="field-label">Max concurrent requests <span class="field-key-tag">polymarket_max_concurrent</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-polymarket_max_concurrent" min="1" max="20" step="1" />
-          <span class="field-error" id="err-polymarket_max_concurrent"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 6: Kalshi Bias Agent -->
-    <div class="panel config-section">
-      <div class="config-section-title">Kalshi Bias Agent</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="bias_political_adjustment">
-          <label class="field-label">Political adjustment (±) <span class="field-key-tag">bias_political_adjustment</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-bias_political_adjustment" min="0" max="0.3" step="0.001" />
-          <span class="field-error" id="err-bias_political_adjustment"></span>
-        </div>
-        <div class="field-row" data-key="bias_longshot_factor">
-          <label class="field-label">Longshot correction factor <span class="field-key-tag">bias_longshot_factor</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-bias_longshot_factor" min="0.1" max="1" step="0.01" />
-          <span class="field-error" id="err-bias_longshot_factor"></span>
-        </div>
-        <div class="field-row" data-key="bias_political_no_trade_zone">
-          <label class="field-label">Political no-trade zone <span class="field-key-tag">bias_political_no_trade_zone</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-bias_political_no_trade_zone" min="0" max="0.4" step="0.01" />
-          <span class="field-error" id="err-bias_political_no_trade_zone"></span>
-        </div>
-        <div class="field-row" data-key="bias_nonpolitical_no_trade_zone">
-          <label class="field-label">Non-political no-trade zone <span class="field-key-tag">bias_nonpolitical_no_trade_zone</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-bias_nonpolitical_no_trade_zone" min="0" max="0.5" step="0.01" />
-          <span class="field-error" id="err-bias_nonpolitical_no_trade_zone"></span>
-        </div>
-        <div class="field-row" data-key="bias_near_expiry_horizon">
-          <label class="field-label">Near-expiry horizon factor (&lt;12h) <span class="field-key-tag">bias_near_expiry_horizon</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-bias_near_expiry_horizon" min="0" max="1" step="0.01" />
-          <span class="field-error" id="err-bias_near_expiry_horizon"></span>
-        </div>
-        <div class="field-row" data-key="bias_mid_horizon">
-          <label class="field-label">Mid-horizon factor (&lt;48h) <span class="field-key-tag">bias_mid_horizon</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-bias_mid_horizon" min="0" max="1" step="0.01" />
-          <span class="field-error" id="err-bias_mid_horizon"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 7: Exit Strategy -->
-    <div class="panel config-section">
-      <div class="config-section-title">Exit Strategy</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="exit_take_profit_threshold">
-          <label class="field-label">Take-profit threshold <span class="field-key-tag">exit_take_profit_threshold</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-exit_take_profit_threshold" min="0.1" max="1" step="0.01" />
-          <span class="field-error" id="err-exit_take_profit_threshold"></span>
-        </div>
-        <div class="field-row" data-key="exit_stale_thesis_hours">
-          <label class="field-label">Stale thesis: max hours <span class="field-key-tag">exit_stale_thesis_hours</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-exit_stale_thesis_hours" min="1" max="168" step="1" />
-          <span class="field-error" id="err-exit_stale_thesis_hours"></span>
-        </div>
-        <div class="field-row" data-key="exit_stale_thesis_min_move">
-          <label class="field-label">Stale thesis: min price move <span class="field-key-tag">exit_stale_thesis_min_move</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-exit_stale_thesis_min_move" min="0.001" max="0.2" step="0.001" />
-          <span class="field-error" id="err-exit_stale_thesis_min_move"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 8: Market Filters -->
-    <div class="panel config-section">
-      <div class="config-section-title">Market Filters</div>
-      <div class="config-fields">
-        <div class="field-row" data-key="filter_min_open_interest">
-          <label class="field-label">Min open interest <span class="field-key-tag">filter_min_open_interest</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-filter_min_open_interest" min="0" max="10000" step="100" />
-          <span class="field-error" id="err-filter_min_open_interest"></span>
-        </div>
-        <div class="field-row" data-key="filter_min_hours_to_close">
-          <label class="field-label">Min hours to close <span class="field-key-tag">filter_min_hours_to_close</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-filter_min_hours_to_close" min="0" max="24" step="1" />
-          <span class="field-error" id="err-filter_min_hours_to_close"></span>
-        </div>
-        <div class="field-row" data-key="filter_max_hours_to_close">
-          <label class="field-label">Max hours to close <span class="field-key-tag">filter_max_hours_to_close</span></label>
-          <input type="number" class="field-input cfg-input" id="cfg-filter_max_hours_to_close" min="24" max="8760" step="24" />
-          <span class="field-error" id="err-filter_max_hours_to_close"></span>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /tab-config -->
-
-  <!-- -------------------------------------------------------------------- -->
-  <!-- Tab 3: Agents                                                         -->
-  <!-- -------------------------------------------------------------------- -->
-  <div id="tab-agents" class="tab-pane">
-    <div class="agents-grid" id="agents-grid">
-      <!-- Cards rendered by JS -->
     </div>
   </div>
 
@@ -1217,8 +891,8 @@
           <option value="recorded_desc">Newest first</option>
           <option value="edge_desc">Edge (high &rarr; low)</option>
           <option value="edge_asc">Edge (low &rarr; high)</option>
-          <option value="pnl_desc">Latest P&amp;L (high &rarr; low)</option>
-          <option value="pnl_asc">Latest P&amp;L (low &rarr; high)</option>
+          <option value="pnl_desc">Live P&amp;L (high &rarr; low)</option>
+          <option value="pnl_asc">Live P&amp;L (low &rarr; high)</option>
         </select>
       </div>
       <span class="history-count" id="history-count">—</span>
@@ -1238,13 +912,11 @@
               <th>Entry ¢</th>
               <th>Pred.</th>
               <th>Edge ¢</th>
-              <th>Latest P&amp;L ¢</th>
-              <th>Trend</th>
-              <th>Marks</th>
+              <th>Live P&amp;L ¢</th>
             </tr>
           </thead>
           <tbody id="history-tbody">
-            <tr class="empty-row"><td colspan="11">Loading…</td></tr>
+            <tr class="empty-row"><td colspan="9">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1254,43 +926,10 @@
 </div><!-- /main-content -->
 
 <!-- ====================================================================== -->
-<!-- Sticky Save Bar (Config tab)                                             -->
-<!-- ====================================================================== -->
-<div id="save-bar">
-  <button class="btn-primary" id="save-btn">Save Changes</button>
-  <button class="btn-secondary" id="reset-btn">Reset to Defaults</button>
-  <span id="saved-msg">&#10003; Saved — takes effect next cycle</span>
-</div>
-
-<!-- ====================================================================== -->
 <!-- JavaScript                                                               -->
 <!-- ====================================================================== -->
 <script>
 'use strict';
-
-// ---------------------------------------------------------------------------
-// Agent metadata (static)
-// ---------------------------------------------------------------------------
-// Keyed by the normalized status key the pipeline pushes (hyphens/"-signal"
-// stripped → underscores). Read-only status grid — the pipeline dispatches by
-// market rules, not per-agent toggles.
-const AGENT_META = {
-  market_scout:      { label: 'Market Scout',        sources: 'Scores the live board; emits microstructure + bias signals' },
-  microstructure:    { label: 'Microstructure',      sources: 'Signed momentum / OFI / book skew / range-position peaks' },
-  kalshi_bias:       { label: 'Kalshi Bias',         sources: 'Favorite-longshot + political-underconfidence calibration' },
-  sportsbook_odds:   { label: 'Sportsbook Odds',     sources: 'De-vigged DraftKings/FanDuel moneyline (ESPN)' },
-  polymarket_price:  { label: 'Polymarket Price',    sources: 'Polymarket vs Kalshi price gap' },
-  polymarket_whale:  { label: 'Polymarket Whale',    sources: 'Tracked profitable wallets positioned' },
-  order_flow:        { label: 'Order Flow',          sources: 'Kalshi trades: OFI, VPIN' },
-  market_maker:      { label: 'Market Maker',        sources: 'Order-book imbalance, spread dynamics' },
-  x:                 { label: 'X / Grok',            sources: 'X sentiment & news via Grok' },
-  weather:           { label: 'Weather',             sources: 'NOAA NWS temperature / precipitation forecasts' },
-};
-
-// Normalize a pushed status key ("kalshi-bias-signal") to a META key ("kalshi_bias").
-function normAgentKey(k) {
-  return String(k).replace(/-signal$/, '').replace(/-/g, '_');
-}
 
 // ---------------------------------------------------------------------------
 // Tab switching
@@ -1298,7 +937,6 @@ function normAgentKey(k) {
 let activeTab = 'monitor';
 const tabBtns = document.querySelectorAll('.tab-btn');
 const statusBar = document.getElementById('status-bar');
-const saveBar = document.getElementById('save-bar');
 
 tabBtns.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1306,26 +944,14 @@ tabBtns.forEach(btn => {
     if (tab === activeTab) return;
     activeTab = tab;
 
-    // Update active button
     tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
-    // Show/hide panes
     document.querySelectorAll('.tab-pane').forEach(p => {
       p.classList.toggle('active', p.id === 'tab-' + tab);
     });
 
-    // Status bar only visible on monitor
     statusBar.style.display = tab === 'monitor' ? 'flex' : 'none';
 
-    // Save bar only visible on config
-    saveBar.classList.toggle('visible', tab === 'config');
-
-    // Populate config on first visit
-    if (tab === 'config' && !configLoaded) {
-      loadConfig();
-    }
-
-    // Load ideas history when the tab is opened (refresh each visit)
     if (tab === 'history') {
       loadIdeasHistory();
     }
@@ -1390,6 +1016,8 @@ function updateStatusBar(state) {
   pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(pnl);
   pnlEl.className = 'stat-value ' + pnlClass(pnl);
 
+  const totalFees = (state.positions || []).reduce((sum, p) => sum + (p.fees_paid_dollars || 0), 0);
+  document.getElementById('stat-fees').textContent = fmt$(totalFees);
   document.getElementById('stat-exposure').textContent = fmt$(state.total_exposure_dollars);
   document.getElementById('stat-cycle').textContent = '#' + state.cycle_number;
   document.getElementById('stat-last-cycle').textContent = timeSince(state.last_cycle_at);
@@ -1402,11 +1030,12 @@ function updateStatusBar(state) {
 function renderPositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions || positions.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No open positions</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No open positions</td></tr>';
     return;
   }
   tbody.innerHTML = positions.map(p => {
-    const upnl = p.unrealized_pnl_dollars ?? 0;
+    const upnl = p.unrealized_pnl_dollars;
+    const fees = p.fees_paid_dollars ?? 0;
     const sideBadge = String(p.side || '').toUpperCase() === 'YES'
       ? '<span class="badge badge-yes">YES</span>'
       : '<span class="badge badge-no">NO</span>';
@@ -1414,13 +1043,24 @@ function renderPositions(positions) {
     const posTickerEl = posUrl
       ? `<a class="text-mono kalshi-link" href="${posUrl}" target="_blank" rel="noopener">${escHtml(p.ticker ?? '')}</a>`
       : `<span class="text-mono">${escHtml(p.ticker ?? '')}</span>`;
+    const currentDisplay = p.current_price_dollars !== null && p.current_price_dollars !== undefined
+      ? fmt$(p.current_price_dollars) : '—';
+    const upnlDisplay = upnl !== null && upnl !== undefined
+      ? `<span class="${pnlClass(upnl)}">${(upnl >= 0 ? '+' : '') + fmt$(upnl)}</span>`
+      : '<span style="color:var(--text-tertiary)">—</span>';
+    const feesDisplay = fees > 0
+      ? `<span style="color:var(--error)">${fmt$(fees)}</span>`
+      : `<span style="color:var(--text-tertiary)">${fmt$(fees)}</span>`;
     return `<tr>
       <td>${posTickerEl}</td>
       <td>${sideBadge}</td>
       <td>${p.quantity ?? ''}</td>
       <td>${fmt$(p.avg_price_dollars ?? 0)}</td>
-      <td>${fmt$(p.current_price_dollars ?? 0)}</td>
-      <td class="${pnlClass(upnl)}">${(upnl >= 0 ? '+' : '') + fmt$(upnl)}</td>
+      <td>${currentDisplay}</td>
+      <td>${fmt$(p.total_cost_dollars ?? 0)}</td>
+      <td>${fmt$(p.total_cost_with_fees_dollars ?? 0)}</td>
+      <td>${upnlDisplay}</td>
+      <td>${feesDisplay}</td>
     </tr>`;
   }).join('');
 }
@@ -1481,194 +1121,6 @@ function renderEventLog(lines) {
 }
 
 // ---------------------------------------------------------------------------
-// Agents tab
-// ---------------------------------------------------------------------------
-let agentsGridRendered = false;
-
-function renderAgentsGrid(agentStatuses, config) {
-  const grid = document.getElementById('agents-grid');
-
-  // Normalize pushed status keys (e.g. "kalshi-bias-signal" → "kalshi_bias").
-  const statuses = {};
-  for (const [k, v] of Object.entries(agentStatuses || {})) statuses[normAgentKey(k)] = v;
-
-  // Show the known signals in order, then any extra ones the pipeline reported.
-  const order = Object.keys(AGENT_META);
-  for (const k of Object.keys(statuses)) if (!order.includes(k)) order.push(k);
-
-  grid.innerHTML = order.map(key => {
-    const meta = AGENT_META[key] || { label: key, sources: '' };
-    const status = statuses[key];
-    if (!status && !AGENT_META[key]) return '';  // unknown + no data → skip
-    const s = status || { status: 'idle', last_run_at: null, last_signal_count: 0, last_output_summary: {} };
-    return `<div class="agent-card">
-      <div class="agent-card-header">
-        <div>
-          <div class="agent-name">${escHtml(meta.label)}</div>
-          <div class="agent-sources">${escHtml(meta.sources)}</div>
-        </div>
-      </div>
-      <div class="agent-card-body">
-        <div class="agent-meta-row">
-          ${renderStatusPill(s.status)}
-          <span class="agent-last-run">Last run: ${timeSince(s.last_run_at)}</span>
-          <span class="agent-last-run" style="margin-left:auto;">${s.last_signal_count} signal${s.last_signal_count !== 1 ? 's' : ''}</span>
-        </div>
-        <div class="agent-output-summary">
-          ${renderOutputSummary(s.last_output_summary)}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderStatusPill(status) {
-  const cls = status === 'running' ? 'badge-running' : status === 'error' ? 'badge-error' : 'badge-idle';
-  return `<span class="badge ${cls}">${status}</span>`;
-}
-
-function renderOutputSummary(summary) {
-  if (!summary || Object.keys(summary).length === 0) {
-    return '<span class="no-summary">No data yet</span>';
-  }
-  return Object.entries(summary).map(([k, v]) => {
-    return `<div class="kv-row"><span class="kv-key">${escHtml(String(k))}</span><span class="kv-val">${escHtml(String(v))}</span></div>`;
-  }).join('');
-}
-
-// ---------------------------------------------------------------------------
-// Config tab: load + populate
-// ---------------------------------------------------------------------------
-let configLoaded = false;
-let currentConfig = {};
-
-async function loadConfig() {
-  try {
-    const resp = await fetch('/api/config');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    currentConfig = await resp.json();
-    populateConfigForm(currentConfig);
-    configLoaded = true;
-  } catch (err) {
-    console.error('Failed to load config:', err);
-  }
-}
-
-function populateConfigForm(cfg) {
-  document.querySelectorAll('.cfg-input').forEach(el => {
-    const key = el.id.replace('cfg-', '');
-    const val = cfg[key];
-    if (val === undefined) return;
-
-    if (el.type === 'range') {
-      el.value = val;
-      const valEl = document.getElementById('val-' + key);
-      if (valEl) valEl.textContent = Number(val).toFixed(2);
-    } else if (el.tagName === 'SELECT') {
-      el.value = val;
-    } else {
-      el.value = val;
-    }
-  });
-}
-
-// Slider live update
-document.querySelectorAll('.cfg-slider').forEach(slider => {
-  slider.addEventListener('input', () => {
-    const key = slider.id.replace('cfg-', '');
-    const valEl = document.getElementById('val-' + key);
-    if (valEl) valEl.textContent = Number(slider.value).toFixed(2);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Config tab: save
-// ---------------------------------------------------------------------------
-const INT_KEYS = new Set([
-  'min_agents',
-  'ofi_window_minutes',
-  'trade_count_window_minutes',
-  'mm_snapshot_count',
-  'mm_spread_withdrawal_cents',
-  'poly_whale_lookback_seconds',
-  'polymarket_max_concurrent',
-  'filter_min_open_interest',
-  'filter_min_hours_to_close',
-  'filter_max_hours_to_close',
-  'agent_max_iterations',
-  'x_max_concurrent_searches',
-  'ws_reconnect_delay_seconds',
-  'ws_watchdog_timeout_seconds',
-  'exit_stale_thesis_hours',
-]);
-const STRING_KEYS = new Set(['specialist_model', 'coordinator_model']);
-
-function collectFormValues() {
-  const values = {};
-  document.querySelectorAll('.cfg-input').forEach(el => {
-    const key = el.id.replace('cfg-', '');
-    let val = el.value;
-
-    if (STRING_KEYS.has(key)) {
-      values[key] = String(val);
-    } else if (INT_KEYS.has(key)) {
-      values[key] = parseInt(val, 10);
-    } else {
-      values[key] = parseFloat(val);
-    }
-  });
-  return values;
-}
-
-function clearFieldErrors() {
-  document.querySelectorAll('.field-error').forEach(el => {
-    el.textContent = '';
-    el.classList.remove('visible');
-  });
-}
-
-function showFieldErrors(errors) {
-  for (const [key, msg] of Object.entries(errors)) {
-    const errEl = document.getElementById('err-' + key);
-    if (errEl) {
-      errEl.textContent = msg;
-      errEl.classList.add('visible');
-    }
-  }
-}
-
-document.getElementById('save-btn').addEventListener('click', async () => {
-  clearFieldErrors();
-  const values = collectFormValues();
-  try {
-    const resp = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
-    });
-    const data = await resp.json();
-    if (resp.status === 422 && data.errors) {
-      showFieldErrors(data.errors);
-      return;
-    }
-    if (data.ok) {
-      const msg = document.getElementById('saved-msg');
-      msg.classList.add('visible');
-      setTimeout(() => msg.classList.remove('visible'), 3000);
-      // Re-fetch to sync form
-      await loadConfig();
-    }
-  } catch (err) {
-    console.error('Save failed:', err);
-  }
-});
-
-document.getElementById('reset-btn').addEventListener('click', async () => {
-  clearFieldErrors();
-  await loadConfig();
-});
-
-// ---------------------------------------------------------------------------
 // Main poll loop
 // ---------------------------------------------------------------------------
 let lastState = null;
@@ -1683,18 +1135,14 @@ async function poll() {
     // Status bar always updates
     updateStatusBar(state);
 
-    // Tab-specific updates
     if (activeTab === 'monitor') {
       renderPositions(state.positions);
       renderIdeas(state.recent_ideas);
       renderEventLog(state.event_log);
-    } else if (activeTab === 'agents') {
-      renderAgentsGrid(state.agent_statuses || {}, currentConfig);
     } else if (activeTab === 'ideas') {
       renderPendingIdeas(state.pending_ideas || []);
       renderReviewedIdeas(state.reviewed_ideas || []);
     }
-    // Config tab doesn't auto-update from state (user is editing)
   } catch (err) {
     console.warn('Poll error:', err);
   }
@@ -1832,6 +1280,36 @@ function renderReviewedIdeas(ideas) {
 // ---------------------------------------------------------------------------
 let ideasHistory = [];
 
+let livePricesMap = {};
+let livePricesUpdatedAt = null;
+let liveHistoryPollTimer = null;
+
+async function fetchLivePricesForHistory() {
+  if (!ideasHistory || ideasHistory.length === 0) return;
+  const openIdeas = ideasHistory.filter(idea => idea.status !== 'resolved' && idea.ticker);
+  const uniqueTickers = [...new Set(openIdeas.slice(0, 40).map(idea => idea.ticker))];
+  if (uniqueTickers.length === 0) return;
+  try {
+    const resp = await fetch('/api/markets/prices?tickers=' + uniqueTickers.join(','));
+    if (!resp.ok) return;
+    livePricesMap = await resp.json();
+    livePricesUpdatedAt = new Date();
+    if (activeTab === 'history') renderIdeasHistory();
+  } catch (err) {
+    console.warn('Live prices fetch failed:', err);
+  }
+}
+
+function computeLivePnlCents(idea) {
+  const yesPrice = livePricesMap[idea.ticker];
+  if (yesPrice === null || yesPrice === undefined) return null;
+  const entryCents = idea.entry_price_cents;
+  if (entryCents === null || entryCents === undefined) return null;
+  const side = String(idea.side || '').toUpperCase();
+  const currentSideCents = side === 'YES' ? yesPrice : (100 - yesPrice);
+  return Math.round(currentSideCents - entryCents);
+}
+
 async function loadIdeasHistory() {
   const tbody = document.getElementById('history-tbody');
   try {
@@ -1840,21 +1318,14 @@ async function loadIdeasHistory() {
     const data = await resp.json();
     ideasHistory = data.ideas || [];
     renderIdeasHistory();
+    fetchLivePricesForHistory();
+    if (!liveHistoryPollTimer) {
+      liveHistoryPollTimer = setInterval(fetchLivePricesForHistory, 120000);
+    }
   } catch (err) {
     console.error('Failed to load ideas history:', err);
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Failed to load history</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Failed to load history</td></tr>';
   }
-}
-
-// The latest mark's pnl_cents, ignoring marks with no usable price.
-function latestPnlCents(idea) {
-  const marks = idea.marks || [];
-  for (let i = marks.length - 1; i >= 0; i--) {
-    if (marks[i].pnl_cents !== null && marks[i].pnl_cents !== undefined) {
-      return marks[i].pnl_cents;
-    }
-  }
-  return null;
 }
 
 function fmtInterval(elapsedSeconds) {
@@ -1864,43 +1335,6 @@ function fmtInterval(elapsedSeconds) {
   if (hours < 1) return '+' + Math.round(elapsedSeconds / 60) + 'm';
   if (hours < 48) return '+' + Math.round(hours) + 'h';
   return '+' + Math.round(hours / 24) + 'd';
-}
-
-// Compact bar sparkline of P&L over the timeline (green up / red down).
-function renderSparkline(marks) {
-  const points = (marks || []).filter(m => m.pnl_cents !== null && m.pnl_cents !== undefined);
-  if (points.length === 0) return '<span class="spark-empty">no marks</span>';
-  const values = points.map(m => m.pnl_cents);
-  const maxAbs = Math.max(1, ...values.map(v => Math.abs(v)));
-  const bars = points.map(m => {
-    const v = m.pnl_cents;
-    const heightPct = Math.max(8, Math.round((Math.abs(v) / maxAbs) * 100));
-    const cls = v > 0 ? 'pos' : v < 0 ? 'neg' : 'flat';
-    const title = `${fmtInterval(m.elapsed_seconds)}: ${v >= 0 ? '+' : ''}${v}¢${m.resolved ? ' (resolved)' : ''}`;
-    return `<div class="spark-bar ${cls}" style="height:${heightPct}%" title="${escHtml(title)}"></div>`;
-  }).join('');
-  return `<span class="sparkline">${bars}</span>`;
-}
-
-// Expandable detail: every mark as an interval point with value + P&L.
-function renderTimelineDetail(marks) {
-  if (!marks || marks.length === 0) return '<span class="spark-empty">No marks recorded yet</span>';
-  const points = marks.map(m => {
-    const interval = m.resolved ? '+resolved' : fmtInterval(m.elapsed_seconds);
-    const val = (m.current_value_cents === null || m.current_value_cents === undefined)
-      ? '—' : m.current_value_cents + '¢';
-    let pnlText = '—', pnlCls = 'pnl-zer';
-    if (m.pnl_cents !== null && m.pnl_cents !== undefined) {
-      pnlText = (m.pnl_cents >= 0 ? '+' : '') + m.pnl_cents + '¢';
-      pnlCls = pnlClass(m.pnl_cents);
-    }
-    return `<span class="timeline-point">
-      <span class="tp-interval">${escHtml(interval)}</span>
-      <span class="tp-val">${escHtml(val)}</span>
-      <span class="tp-val ${pnlCls}">${escHtml(pnlText)}</span>
-    </span>`;
-  }).join('');
-  return `<div class="history-timeline">${points}</div>`;
 }
 
 function renderIdeasHistory() {
@@ -1917,17 +1351,20 @@ function renderIdeasHistory() {
     switch (sortBy) {
       case 'edge_desc': return (b.edge_cents ?? -Infinity) - (a.edge_cents ?? -Infinity);
       case 'edge_asc':  return (a.edge_cents ?? Infinity) - (b.edge_cents ?? Infinity);
-      case 'pnl_desc':  return (latestPnlCents(b) ?? -Infinity) - (latestPnlCents(a) ?? -Infinity);
-      case 'pnl_asc':   return (latestPnlCents(a) ?? Infinity) - (latestPnlCents(b) ?? Infinity);
+      case 'pnl_desc':  return (computeLivePnlCents(b) ?? -Infinity) - (computeLivePnlCents(a) ?? -Infinity);
+      case 'pnl_asc':   return (computeLivePnlCents(a) ?? Infinity) - (computeLivePnlCents(b) ?? Infinity);
       default:          return String(b.recorded_at || '').localeCompare(String(a.recorded_at || ''));
     }
   });
 
+  const liveLabel = livePricesUpdatedAt
+    ? ' · prices ' + timeSince(livePricesUpdatedAt.toISOString()) + ' ago'
+    : '';
   document.getElementById('history-count').textContent =
-    `${rows.length} idea${rows.length !== 1 ? 's' : ''}`;
+    `${rows.length} idea${rows.length !== 1 ? 's' : ''}${liveLabel}`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No ideas match the filter</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No ideas match the filter</td></tr>';
     return;
   }
 
@@ -1941,10 +1378,9 @@ function renderIdeasHistory() {
     const statusBadge = `<span class="badge badge-${status === 'resolved' ? 'resolved' : 'open'}">${escHtml(status)}</span>`;
     const pred = (idea.predicted_prob !== null && idea.predicted_prob !== undefined)
       ? Math.round(idea.predicted_prob * 100) + '%' : '—';
-    const latestPnl = latestPnlCents(idea);
-    const pnlText = latestPnl === null ? '—' : (latestPnl >= 0 ? '+' : '') + latestPnl;
-    const pnlCls = latestPnl === null ? 'pnl-zer' : pnlClass(latestPnl);
-    const markCount = (idea.marks || []).length;
+    const livePnl = computeLivePnlCents(idea);
+    const pnlText = livePnl === null ? '—' : (livePnl >= 0 ? '+' : '') + livePnl;
+    const pnlCls = livePnl === null ? 'pnl-zer' : pnlClass(livePnl);
     const url = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
     const tickerEl = url
       ? `<a class="kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
@@ -1960,26 +1396,22 @@ function renderIdeasHistory() {
       <td>${escHtml(pred)}</td>
       <td>${idea.edge_cents ?? '—'}</td>
       <td class="${pnlCls}">${escHtml(pnlText)}</td>
-      <td>${renderSparkline(idea.marks)}</td>
-      <td class="text-xs">${markCount}</td>
     </tr>`;
 
     const sources = (idea.sources || []).map(s =>
       `<span class="signal-tag">${escHtml(String(s))}</span>`
     ).join('');
     const detailRow = `<tr class="history-detail-row hidden" data-detail="${index}">
-      <td colspan="11">
+      <td colspan="9">
         <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">
           Cycle ${escHtml(idea.cycle_ts ?? '—')} &middot; ${idea.n_sources ?? 0} sources &middot; ${escHtml(idea.category ?? '')}
         </div>
         ${sources ? `<div class="idea-signals" style="margin-bottom:10px;">${sources}</div>` : ''}
-        ${renderTimelineDetail(idea.marks)}
       </td>
     </tr>`;
     return mainRow + detailRow;
   }).join('');
 
-  // Toggle detail rows on click
   tbody.querySelectorAll('.history-main-row').forEach(row => {
     row.addEventListener('click', () => {
       const detail = tbody.querySelector(`.history-detail-row[data-detail="${row.dataset.index}"]`);

@@ -102,7 +102,7 @@ def map_position(position_raw: dict, market_lookup: dict[str, Market]) -> dict:
         # A NO contract's price is the complement of the YES price.
         current_price_cents = yes_price_cents if side == "yes" else (100.0 - yes_price_cents)
         current_market_value_dollars = quantity * current_price_cents / 100.0
-        unrealized_pnl_dollars = current_market_value_dollars - market_exposure_dollars
+        unrealized_pnl_dollars = current_market_value_dollars - market_exposure_dollars - fees_paid_dollars
 
     return {
         "ticker": ticker,
@@ -139,6 +139,7 @@ def summarize_positions(mapped_positions: list[dict]) -> dict:
     unrealized_pnl_dollars = sum(
         position["unrealized_pnl_dollars"] or 0.0 for position in held
     )
+    total_fees_paid_dollars = sum(position["fees_paid_dollars"] for position in held)
     exposure_by_category: dict[str, float] = {}
     for position in held:
         category = position["category"] or "unknown"
@@ -150,6 +151,7 @@ def summarize_positions(mapped_positions: list[dict]) -> dict:
         "exposure_limit_dollars": EXPOSURE_LIMIT_DOLLARS,
         "realized_pnl_dollars": round(realized_pnl_dollars, 2),
         "unrealized_pnl_dollars": round(unrealized_pnl_dollars, 2),
+        "total_fees_paid_dollars": round(total_fees_paid_dollars, 2),
         "open_positions_count": len(held),
         "exposure_by_category": exposure_by_category,
     }

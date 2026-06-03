@@ -47,8 +47,8 @@ def test_yes_position_side_avg_and_unrealized():
     assert mapped["quantity"] == 50.0
     assert mapped["avg_price_cents"] == 41.0
     assert mapped["current_price_cents"] == 47.0
-    # (0.47 - 0.41) * 50 = 3.00
-    assert mapped["unrealized_pnl_dollars"] == 3.00
+    # (0.47 - 0.41) * 50 - 0.15 fees = 2.85
+    assert mapped["unrealized_pnl_dollars"] == 2.85
     assert mapped["category"] == "climate and weather"
     assert mapped["kalshi_url"] == "https://kalshi.com/markets/kxhighny"
 

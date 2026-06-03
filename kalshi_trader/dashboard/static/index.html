@@ -198,7 +198,7 @@
     <div class="metric"><div class="label">Balance</div><div class="value" data-k="balance">—</div><div class="note">available cash</div></div>
     <div class="metric"><div class="label">Portfolio Value</div><div class="value" data-k="pv">—</div><div class="note">positions held</div></div>
     <div class="metric"><div class="label">Exposure</div><div class="value" data-k="exp">—</div><div class="note" id="exp-note">— / —</div><div class="bar"><i id="exp-bar"></i></div></div>
-    <div class="metric"><div class="label">Unrealized P&amp;L</div><div class="value" data-k="upnl">—</div><div class="note">open positions</div></div>
+    <div class="metric"><div class="label">Unrealized P&amp;L</div><div class="value" data-k="upnl">—</div><div class="note" id="upnl-note">open positions</div></div>
     <div class="metric"><div class="label">Realized P&amp;L</div><div class="value" data-k="rpnl">—</div><div class="note">lifetime, locked-in</div></div>
     <div class="metric"><div class="label">Positions</div><div class="value" data-k="npos">—</div><div class="note">markets held</div></div>
     <div class="metric"><div class="label">Open Orders</div><div class="value" data-k="nord">—</div><div class="note">resting</div></div>
@@ -251,10 +251,11 @@
               <th class="l" data-tip="Which outcome you're long — YES or NO.">Side</th>
               <th data-tip="Number of contracts held.">Qty</th>
               <th data-tip="Your average entry price per contract, in cents.">Avg¢</th>
-              <th data-tip="Current market price for your side, in cents.">Last¢</th>
-              <th data-tip="Unrealized profit/loss at the current price — on paper, not yet locked in.">Unreal P&amp;L</th>
+              <th data-tip="Current market price for your side, in cents. Fetched live every 10s.">Last¢</th>
+              <th data-tip="Unrealized profit/loss at the current price, net of exchange fees paid. On paper, not yet locked in.">Unreal P&amp;L</th>
+              <th data-tip="Exchange fees paid on fills for this position. Already factored into Unreal P&amp;L.">Fees</th>
             </tr></thead>
-            <tbody id="pos-body"><tr><td colspan="6"><div class="msg">loading…</div></td></tr></tbody>
+            <tbody id="pos-body"><tr><td colspan="7"><div class="msg">loading…</div></td></tr></tbody>
           </table>
         </div>
       </section>
@@ -364,6 +365,10 @@ function renderPortfolio(d) {
   setMetric("npos", fmtNum(d.open_positions_count), d.open_positions_count);
   document.querySelector('[data-k="upnl"]').className = "value " + pnlClass(d.unrealized_pnl_dollars);
   document.querySelector('[data-k="rpnl"]').className = "value " + pnlClass(d.realized_pnl_dollars);
+  const totalFees = d.total_fees_paid_dollars || 0;
+  document.getElementById("upnl-note").textContent = totalFees > 0
+    ? "net of " + fmtMoney(totalFees) + " fees"
+    : "open positions";
 
   const limit = d.exposure_limit_dollars || 0, used = d.total_exposure_dollars || 0;
   const pct = limit ? Math.min(100, used / limit * 100) : 0;
@@ -383,7 +388,8 @@ function renderPortfolio(d) {
       <td>${fmtCents(p.avg_price_cents)}</td>
       <td>${fmtCents(p.current_price_cents)}</td>
       <td class="${pnlClass(p.unrealized_pnl_dollars)}">${fmtSignedMoney(p.unrealized_pnl_dollars)}</td>
-    </tr>`).join("") : `<tr><td colspan="6"><div class="empty">no open positions</div></td></tr>`;
+      <td class="${(p.fees_paid_dollars || 0) > 0 ? 'neg' : 'dim'}">${fmtMoney(p.fees_paid_dollars)}</td>
+    </tr>`).join("") : `<tr><td colspan="7"><div class="empty">no open positions</div></td></tr>`;
 }
 
 function renderOrders(d) {
