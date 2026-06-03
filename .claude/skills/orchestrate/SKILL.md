@@ -196,15 +196,9 @@ scout signals, which are correlated with each other):
   briefing, floor speech, or press conference); args: ticker, title. Independent
   base-rate signal (GDELT TV captions) for a family that otherwise has no
   independent source.
-- `polls-signal` — for **general-election** markets for U.S. president, senate,
-  house, governor, or the generic ballot (category `elections` or those office
-  keywords in the title); args: ticker, title. Independent FiveThirtyEight
-  polling signal — prioritize it on these races (which dominate the board) the
-  way sportsbook is prioritized on sports. **Do NOT dispatch** for races 538 does
-  not poll: mayoral/municipal/local offices, party **primaries**, runoffs, or
-  caucuses, ballot measures/propositions, and **vote-share-threshold** markets
-  (e.g. "receive at least 30% of the vote", "first round") — 538 yields a
-  head-to-head win margin, not a vote-share, so the agent returns no signal there.
+- `polls-signal` — **disabled** (`agent_polls_enabled: false` in `runtime_config.json`).
+  Returns no data outside a U.S. general-election cycle. Re-enable in fall 2026
+  when 538 has live polling for federal races.
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
 - `market-maker-signal` — **every market in the deep-signal subset**; args:
   ticker, title. This is an orderbook-snapshot signal — it does not require

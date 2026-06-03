@@ -53,5 +53,6 @@
   "agent_order_flow_enabled": true,
   "agent_market_maker_enabled": true,
   "agent_kalshi_bias_enabled": true,
-  "agent_x_enabled": false
+  "agent_x_enabled": false,
+  "agent_polls_enabled": false
 }
