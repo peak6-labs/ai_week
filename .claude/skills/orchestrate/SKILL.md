@@ -132,6 +132,22 @@ Read `/tmp/rules_${TS}.json` ({ticker: {rules_primary, subtitle, ...}}). Carry
 each market's `rules_primary` forward — Step 2 passes it to the cross-venue
 agents, and Step 5 checks it.
 
+**Live-price the deep-signal subset.** The snapshot is the market *universe* only;
+its prices may be stale. Every market we evaluate deeply (and might recommend)
+must be priced from the live API, not the snapshot. Fetch live top-of-book for
+the **same subset tickers** now:
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/live_prices.py \
+  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/live_prices_${TS}.json
+```
+
+Read `/tmp/live_prices_${TS}.json` ({ticker: {yes_bid, yes_ask, last_price}}). In
+Step 3, **override each subset market's `yes_bid`/`yes_ask` with these live values**
+(a ticker mapping to nulls is illiquid/unquoted — drop it from the subset rather
+than score a stale price). This guarantees every scored-and-recommended idea
+carries a live entry price.
+
 If the file is empty or missing, log and stop:
 
 ```bash
@@ -225,6 +241,13 @@ the subset: start each market from its scout `signal_estimates`, and for the
 deep-signal subset additionally append the agent estimates you collected. Markets
 outside the subset simply carry their two deterministic scout signals — that's
 fine; they still get scored and (if 2+ sources) recorded for the backtest.
+
+**Apply the live prices.** For every subset market, replace its `yes_bid`/`yes_ask`
+with the live values from `/tmp/live_prices_${TS}.json` (Step 1) before writing
+the signals file. These feed the edge math (Step 4) and the candidate entry price
+(Step 6), so the recommended ideas are priced off the live market, never the
+snapshot. (Coverage-set markets outside the subset keep snapshot prices — they
+are recorded for calibration, not recommended.)
 
 Use the **Write** tool to create `/tmp/signals_<TS>.json` as an array of market
 objects:

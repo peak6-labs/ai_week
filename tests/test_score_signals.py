@@ -21,7 +21,7 @@ DEFAULT_CONFIG: dict = {}
 def test_yes_side_underpriced_is_worth_trading() -> None:
     # Fair probability 0.62 vs YES ask 0.40 → buy YES, large positive edge.
     result = score_signals.compute_edge_and_kelly(
-        combined_probability=0.62, yes_ask_cents=40.0, cfg=DEFAULT_CONFIG
+        combined_probability=0.62, yes_ask_cents=40.0, cfg=DEFAULT_CONFIG, yes_bid_cents=38.0
     )
     assert result["side"] == "yes"
     assert result["worth_trading"] is True
@@ -31,9 +31,10 @@ def test_yes_side_underpriced_is_worth_trading() -> None:
 def test_no_side_overpriced_is_worth_trading() -> None:
     # Fair probability 0.57 vs YES ask 0.70 → YES overpriced → buy NO, real edge.
     result = score_signals.compute_edge_and_kelly(
-        combined_probability=0.57, yes_ask_cents=70.0, cfg=DEFAULT_CONFIG
+        combined_probability=0.57, yes_ask_cents=70.0, cfg=DEFAULT_CONFIG, yes_bid_cents=68.0
     )
     assert result["side"] == "no"
+    assert result["entry_price_cents"] == 32.0
     assert result["worth_trading"] is True, "NO-side mispricing must be surfaced"
     assert result["kelly_fraction"] > 0.0, "NO-side Kelly must be sized, not zero"
 
@@ -41,7 +42,7 @@ def test_no_side_overpriced_is_worth_trading() -> None:
 def test_fairly_priced_market_is_not_worth_trading() -> None:
     # Fair probability essentially equals price → no edge either way.
     result = score_signals.compute_edge_and_kelly(
-        combined_probability=0.50, yes_ask_cents=50.0, cfg=DEFAULT_CONFIG
+        combined_probability=0.50, yes_ask_cents=50.0, cfg=DEFAULT_CONFIG, yes_bid_cents=48.0
     )
     assert result["worth_trading"] is False
     assert result["kelly_fraction"] == 0.0
@@ -161,7 +162,7 @@ def test_high_entry_price_leg_is_blocked() -> None:
     # NO leg entered at 93c (yes_ask=7 → NO price 93). Even with a nominal edge,
     # the >=90c payoff asymmetry (risk ~93 to make ~7) must block worth_trading.
     result = score_signals.compute_edge_and_kelly(
-        combined_probability=0.02, yes_ask_cents=7.0, cfg={})
+        combined_probability=0.02, yes_ask_cents=7.0, cfg={}, yes_bid_cents=6.0)
     assert result["side"] == "no"
     assert result["entry_price_cents"] > 90
     assert result["worth_trading"] is False
@@ -170,7 +171,7 @@ def test_high_entry_price_leg_is_blocked() -> None:
 def test_normal_entry_price_leg_still_tradable() -> None:
     # A 40c YES entry with strong edge is unaffected by the guardrail.
     result = score_signals.compute_edge_and_kelly(
-        combined_probability=0.62, yes_ask_cents=40.0, cfg={})
+        combined_probability=0.62, yes_ask_cents=40.0, cfg={}, yes_bid_cents=38.0)
     assert result["entry_price_cents"] <= 90
     assert result["worth_trading"] is True
 
@@ -179,7 +180,7 @@ def test_guardrail_threshold_is_configurable() -> None:
     # Lowering the cap to 30c blocks a 40c entry that would otherwise trade.
     result = score_signals.compute_edge_and_kelly(
         combined_probability=0.62, yes_ask_cents=40.0,
-        cfg={"max_entry_price_cents": 30.0})
+        cfg={"max_entry_price_cents": 30.0}, yes_bid_cents=38.0)
     assert result["worth_trading"] is False
 
 
@@ -187,6 +188,6 @@ def test_edge_bar_is_configurable() -> None:
     # Raising the bar to 15c blocks a ~12c-edge trade that clears the default 5c.
     result = score_signals.compute_edge_and_kelly(
         combined_probability=0.62, yes_ask_cents=48.0,
-        cfg={"min_edge_cents": 15.0})
+        cfg={"min_edge_cents": 15.0}, yes_bid_cents=46.0)
     assert result["fee_adjusted_edge"] < 15.0
     assert result["worth_trading"] is False

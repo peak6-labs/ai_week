@@ -47,6 +47,27 @@ def _slate_status(state: DashboardState) -> str:
     return "degraded" if state.last_scan_error else "ready"
 
 
+def _scan_metadata_payload(state: DashboardState) -> dict | None:
+    metadata = state.scored_slate_metadata
+    if metadata is None:
+        return None
+    return {
+        "live_prices_refreshed_at": (
+            metadata.live_prices_refreshed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            if metadata.live_prices_refreshed_at else None
+        ),
+        "shortlist_refreshed_at": (
+            metadata.shortlist_refreshed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            if metadata.shortlist_refreshed_at else None
+        ),
+        "filtered_ticker_count": metadata.filtered_ticker_count,
+        "live_priced_ticker_count": metadata.live_priced_ticker_count,
+        "dropped_unquoted_ticker_count": metadata.dropped_unquoted_ticker_count,
+        "degraded": metadata.degraded,
+        "degraded_reason": metadata.degraded_reason,
+    }
+
+
 async def _resolve_markets(state: DashboardState, tickers: list[str]) -> dict[str, Market]:
     """Build a ticker -> Market lookup, preferring the cached slate and fetching
     only the tickers it doesn't already cover (held positions / order markets)."""
@@ -91,6 +112,7 @@ async def health(request: Request) -> dict:
             "in_progress": state.scan_in_progress,
             "last_error": state.last_scan_error,
             "age_seconds": _age_seconds(state.scored_slate_generated_at),
+            "metadata": _scan_metadata_payload(state),
         },
     }
 
@@ -108,6 +130,7 @@ async def ideas(request: Request, top: int = 10) -> dict:
             if state.scored_slate_generated_at else None
         ),
         "age_seconds": _age_seconds(state.scored_slate_generated_at),
+        "metadata": _scan_metadata_payload(state),
         "ideas": [
             serialize_event_group(average_score, market_count, best_market)
             for average_score, market_count, best_market in grouped[:max(top, 0)]

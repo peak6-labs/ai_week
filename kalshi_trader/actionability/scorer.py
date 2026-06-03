@@ -138,6 +138,17 @@ class MarketScorer:
         scored.sort(key=lambda s: s.composite_score, reverse=True)
         return scored
 
+    def rescore(self, scored: list[ScoredMarket]) -> list[ScoredMarket]:
+        """Recompute composite and spread-adjusted scores after price updates."""
+        for scored_market in scored:
+            raw_composite_score = self._composite(self._scores_dict(scored_market))
+            spread_multiplier = spread_penalty_multiplier(scored_market.market)
+            scored_market.raw_composite_score = raw_composite_score
+            scored_market.spread_penalty_multiplier = spread_multiplier
+            scored_market.composite_score = raw_composite_score * spread_multiplier
+        scored.sort(key=lambda scored_market: scored_market.composite_score, reverse=True)
+        return scored
+
     @staticmethod
     def _scores_dict(scored_market: ScoredMarket) -> dict[str, float | None]:
         return {
