@@ -802,57 +802,36 @@
   <!-- Tab 1: Live Monitor                                                    -->
   <!-- -------------------------------------------------------------------- -->
   <div id="tab-monitor" class="tab-pane active">
-    <div class="two-col">
-      <!-- Open Positions -->
-      <div class="panel">
-        <div class="panel-header">Open Positions</div>
-        <div class="panel-body" style="padding:0">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Side</th>
-                <th>Qty</th>
-                <th>Avg Price</th>
-                <th>Bid ¢</th>
-                <th>Ask ¢</th>
-                <th>Current</th>
-                <th>Cost</th>
-                <th>Cost+Fees</th>
-                <th>P&amp;L</th>
-                <th>Fees</th>
-              </tr>
-            </thead>
-            <tbody id="positions-tbody">
-              <tr class="empty-row"><td colspan="11">No open positions</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
 
-      <!-- Recent Trade Ideas -->
-      <div class="panel">
-        <div class="panel-header">Recent Trade Ideas</div>
-        <div class="panel-body" style="padding:0">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Side</th>
-                <th>Conf.</th>
-                <th>Outcome</th>
-              </tr>
-            </thead>
-            <tbody id="ideas-tbody">
-              <tr class="empty-row"><td colspan="4">No recent ideas</td></tr>
-            </tbody>
-          </table>
-        </div>
+    <!-- Open Positions — full width -->
+    <div class="panel" style="margin-bottom:12px;overflow-x:auto">
+      <div class="panel-header">Open Positions</div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Avg Price</th>
+              <th>Bid ¢</th>
+              <th>Ask ¢</th>
+              <th>Current</th>
+              <th>Cost</th>
+              <th>Cost+Fees</th>
+              <th>P&amp;L</th>
+              <th>Fees</th>
+            </tr>
+          </thead>
+          <tbody id="positions-tbody">
+            <tr class="empty-row"><td colspan="11">No open positions</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Resting Orders -->
-    <div class="panel" style="margin-bottom:12px">
+    <!-- Resting Orders — full width -->
+    <div class="panel" style="margin-bottom:12px;overflow-x:auto">
       <div class="panel-header">Resting Orders</div>
       <div class="panel-body" style="padding:0">
         <table class="data-table">
@@ -876,13 +855,34 @@
       </div>
     </div>
 
-    <!-- Event Log -->
-    <div class="panel" id="event-log-panel">
-      <div class="panel-header">Event Log</div>
-      <div class="panel-body" id="event-log-scroll">
-        <div id="event-log-lines"></div>
+    <!-- Recent Trade Ideas + Event Log side by side -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">Recent Trade Ideas</div>
+        <div class="panel-body" style="padding:0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Side</th>
+                <th>Conf.</th>
+                <th>Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="ideas-tbody">
+              <tr class="empty-row"><td colspan="4">No recent ideas</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <div class="panel" id="event-log-panel">
+        <div class="panel-header">Event Log</div>
+        <div class="panel-body" id="event-log-scroll">
+          <div id="event-log-lines"></div>
+        </div>
+      </div>
+    </div><!-- /two-col -->
   </div>
 
   <!-- -------------------------------------------------------------------- -->
