@@ -99,16 +99,15 @@ x), so we only spend those on a prioritized **deep-signal subset**.
 
 - **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
   scoring and, if it reaches 2+ sources, gets recorded for the backtest.
-- **Deep-signal subset (≤ ~40)** = the rows most worth an external lookup.
-  Prefer breadth: include **every** market that has a *category-specialized
-  independent* signal available — all weather/climate (NOAA), all sports
-  (sportsbook), all mentions (GDELT), all elections (FiveThirtyEight polls) —
-  plus high-volume markets (`volume_24h > 5000`, for polymarket/whale/order-flow)
-  and the top rows by `average_score`. These independent signals are the whole
-  point of widening; the cheap category scripts should hit as much of the board
-  as the ~40 cap and rate limits allow. (Scaling external signals to **all** ~200
-  markets is planned via a batched signal-runner; until that lands, widen toward
-  ~40 here.) Only this subset gets Step 2's agent dispatch.
+- **Deep-signal subset (≤ ~20)** = the highest-priority rows for external agent
+  dispatch. Select by this priority order until you hit 20:
+  1. All weather/climate markets (NOAA is independent and cheap)
+  2. All sports markets (sportsbook odds are independent and sharp)
+  3. All mentions markets (GDELT base-rate)
+  4. Top rows by `average_score` to fill remaining slots
+  Keep the cap at 20 — market_maker now runs on every market in the subset, so
+  each batch of 3 already spawns 6+ parallel agents. Wider subsets slow the cycle
+  without proportionally more signal. Only this subset gets Step 2's agent dispatch.
 
 For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
 as the tradeable `ticker`.
@@ -160,12 +159,13 @@ If the file is empty or missing, log and stop:
 
 ## Step 2 — Dispatch signal agents in parallel
 
-Process the **deep-signal subset** (≤ ~40) in **batches of 5 markets**. For each
+Process the **deep-signal subset** (≤ ~20) in **batches of 3 markets**. For each
 batch, spawn all applicable signal agents **in a single message** (multiple
 `Agent` tool calls) so they run concurrently. Wait for the whole batch before
-starting the next. Batching is what keeps concurrent API load bounded while still
-covering a wide subset — never fan out the whole board in one message. The rest
-of the coverage set rides on its deterministic scout signals.
+starting the next. Batching is what keeps concurrent API load bounded — now that
+`market-maker-signal` runs on every market, each batch already spawns 6+ parallel
+agents. Keep batches small so each one completes quickly. The rest of the coverage
+set rides on its deterministic scout signals.
 
 Log before each batch:
 
