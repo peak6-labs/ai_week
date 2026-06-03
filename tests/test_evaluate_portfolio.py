@@ -45,7 +45,15 @@ def _raw_position(ticker: str, position_fp: str, market_exposure_dollars: str) -
 
 
 def _market_prices(ticker: str, yes_bid: float, yes_ask: float) -> dict:
-    return {"ticker": ticker, "yes_bid": yes_bid, "yes_ask": yes_ask, "last_price": (yes_bid + yes_ask) / 2}
+    return {
+        "ticker": ticker,
+        "yes_bid": yes_bid,
+        "yes_ask": yes_ask,
+        "last_price": (yes_bid + yes_ask) / 2,
+        "title": f"Test market {ticker}",
+        "close_time": "2026-06-10T12:00:00Z",
+        "volume_24h": 500,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -163,3 +171,35 @@ async def test_out_writes_json_file(tmp_path):
     data = json.loads(Path(out_path).read_text())
     assert "evaluated_at" in data
     assert "exits" in data
+
+
+@pytest.mark.asyncio
+async def test_clean_position_has_enriched_fields():
+    """Clean positions include rich market data needed for AI position review."""
+    # 10 YES contracts, cost=$5, midpoint=50c => no trigger
+    raw = _raw_position("KXTEST-7", "10.00", "5.00")
+    market = {
+        "ticker": "KXTEST-7",
+        "yes_bid": 48.0,
+        "yes_ask": 52.0,
+        "last_price": 50.0,
+        "title": "Will X happen by Dec?",
+        "close_time": "2026-12-01T21:00:00Z",
+        "volume_24h": 1500,
+    }
+    client = _make_client([raw], [market])
+
+    with patch("scripts.evaluate_portfolio.KalshiClient", return_value=client):
+        results = await evaluate_portfolio.run(dry_run=False, out=None)
+
+    assert len(results["clean_positions"]) == 1
+    clean = results["clean_positions"][0]
+    assert clean["quantity"] == 10.0
+    assert clean["avg_price_cents"] == 50.0        # $5.00 / 10 * 100
+    assert clean["current_price_cents"] == 50.0    # midpoint of 48+52, YES side
+    assert clean["midpoint_yes_price_cents"] == 50.0
+    assert clean["market_exposure_dollars"] == 5.0
+    assert clean["unrealized_pnl_dollars"] == 0.0  # 10*50/100 - 5.0 = 0
+    assert clean["title"] == "Will X happen by Dec?"
+    assert clean["close_time"] == "2026-12-01T21:00:00Z"
+    assert clean["volume_24h"] == 1500

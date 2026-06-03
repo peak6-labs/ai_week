@@ -38,7 +38,11 @@ _PRICE_BATCH = 100  # max tickers per /markets request
 async def _fetch_live_prices(client: KalshiClient, tickers: list[str]) -> dict[str, dict]:
     """Fetch live yes_bid/yes_ask for each ticker in one batched /markets call."""
     prices: dict[str, dict] = {
-        ticker: {"yes_bid": None, "yes_ask": None} for ticker in tickers
+        ticker: {
+            "yes_bid": None, "yes_ask": None,
+            "title": None, "close_time": None, "volume_24h": None,
+        }
+        for ticker in tickers
     }
     for start in range(0, len(tickers), _PRICE_BATCH):
         chunk = tickers[start : start + _PRICE_BATCH]
@@ -49,6 +53,9 @@ async def _fetch_live_prices(client: KalshiClient, tickers: list[str]) -> dict[s
                 prices[ticker] = {
                     "yes_bid": market.get("yes_bid"),
                     "yes_ask": market.get("yes_ask"),
+                    "title": market.get("title"),
+                    "close_time": market.get("close_time"),
+                    "volume_24h": market.get("volume_24h"),
                 }
     return prices
 
@@ -119,7 +126,29 @@ async def run(dry_run: bool, out: str | None) -> dict:
                     break
 
             if exit_signal is None:
-                clean_positions.append({"ticker": ticker, "side": side, "description": "within bounds"})
+                market_info = live_prices.get(ticker, {})
+                average_price_cents = (
+                    round(market_exposure_dollars / quantity * 100.0, 2) if quantity > 0 else None
+                )
+                unrealized_pnl_dollars = round(
+                    quantity * current_price_cents / 100.0 - market_exposure_dollars, 2
+                )
+                clean_positions.append({
+                    "ticker": ticker,
+                    "side": side,
+                    "quantity": quantity,
+                    "avg_price_cents": average_price_cents,
+                    "current_price_cents": round(current_price_cents, 2),
+                    "midpoint_yes_price_cents": round(midpoint_yes_price_cents, 2),
+                    "market_exposure_dollars": round(market_exposure_dollars, 2),
+                    "unrealized_pnl_dollars": unrealized_pnl_dollars,
+                    "title": market_info.get("title"),
+                    "close_time": (
+                        str(market_info.get("close_time")) if market_info.get("close_time") else None
+                    ),
+                    "volume_24h": market_info.get("volume_24h"),
+                    "description": "within bounds",
+                })
                 continue
 
             yes_price = max(1, min(99, round(exit_signal.exit_price_cents)))
