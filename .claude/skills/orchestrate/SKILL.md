@@ -101,6 +101,19 @@ the tradeable `ticker`.
 (calibration) signals, computed during the scan with no extra calls. Keep these;
 Step 2 only needs to add the signals that require live lookups or judgment.
 
+**Fetch settlement rules for the selected markets** (the snapshot omits them).
+The rule can differ from what the title implies — this matters for cross-venue
+matching and for trusting a signal:
+
+```bash
+KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
+  --tickers TICKER1 TICKER2 ... > /tmp/rules_${TS}.json
+```
+
+Read `/tmp/rules_${TS}.json` ({ticker: {rules_primary, subtitle, ...}}). Carry
+each market's `rules_primary` forward — Step 2 passes it to the cross-venue
+agents, and Step 5 checks it.
+
 If the file is empty or missing, log and stop:
 
 ```bash
@@ -143,6 +156,12 @@ scout signals, which are correlated with each other):
 - `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
 - `order-flow-signal` / `market-maker-signal` — only if `volume_24h > 5000`
   (sparse trade history makes them empty on thin markets); args: ticker, title
+
+When dispatching the **cross-venue** agents (`polymarket-price-signal`,
+`sportsbook-odds-signal`), include the market's `rules_primary` in the prompt and
+tell the agent to only return a signal if the external contract resolves on the
+**same** criterion — this guards against "looks identical, settles differently"
+mismatches.
 
 Each agent returns a JSON array of `SignalEstimate` objects. An empty array `[]`
 means **no signal** — record it as absent. Never fabricate a signal value to
@@ -232,14 +251,21 @@ PYTHONPATH=. .venv/bin/python scripts/persist_cycle.py \
 
 ## Step 5 — Adversarial challenge
 
-For each surviving market, answer these four questions before letting it onto the
+For each surviving market, answer these five questions before letting it onto the
 candidate slate:
 
-1. **Bear case** — what specific mechanism makes the signal wrong?
-2. **Source independence** — are the agreeing signals from orthogonal data
+1. **Settlement rule** — read the market's `rules_primary` (from `/tmp/rules_${TS}.json`).
+   Does it actually resolve on what the title implies, and does any cross-venue
+   signal (polymarket/sportsbook) reference the *same* criterion? If the rule has
+   a twist the signals didn't account for (specific date, threshold, source of
+   truth), drop the market. **Microstructure + kalshi_bias are price-derived and
+   correlated** — a slate resting only on those two is weak; prefer markets where
+   an independent signal (sportsbook/polymarket) agrees.
+2. **Bear case** — what specific mechanism makes the signal wrong?
+3. **Source independence** — are the agreeing signals from orthogonal data
    sources, or do they share a common input?
-3. **Base rate** — does the historical base rate support this direction?
-4. **Fresh-eyes test** — would you act on this with no prior conviction?
+4. **Base rate** — does the historical base rate support this direction?
+5. **Fresh-eyes test** — would you act on this with no prior conviction?
 
 Log each decision:
 
