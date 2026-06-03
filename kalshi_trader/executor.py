@@ -34,7 +34,7 @@ class TradeExecutor:
             action=idea.action.value,
             side=idea.side.value,
             count=count,
-            order_type="market",
+            order_type="limit",
             yes_price=yes_price,
         )
         order_data = order_response.get("order", {})
