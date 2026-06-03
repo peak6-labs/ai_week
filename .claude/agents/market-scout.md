@@ -33,6 +33,17 @@ report plus an inline summary. You generate ideas; a human decides.
 - **No invention.** Every "why now" claim must trace to a signal value in the
   data. If the evidence is thin (low coverage), say so rather than overstating.
 
+## Pipeline mode (read this first)
+
+If the caller gave you an **explicit output JSON path** (e.g. the orchestrate
+pipeline passes `/tmp/market_scout_<TS>.json`), you are in **pipeline mode**. Your
+*only* deliverables are: (1) the scored JSON written to that path, and (2) a
+**two-line final message** — the exact JSON path plus a one-line hot-theme
+summary. **Do NOT write the markdown report, and do NOT enumerate the events in
+your final message.** Generating the full report/table is slow and bloats the
+result round-trip (it has caused dispatch failures). Just do step 1 below, then
+stop and return the path. Skip steps 2–7 entirely in pipeline mode.
+
 ## Workflow
 
 1. **Generate the data (snapshot-first — this is the fast path).** Work from the
