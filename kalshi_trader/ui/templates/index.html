@@ -621,6 +621,93 @@
     }
 
     /* ------------------------------------------------------------------ */
+    /* Ideas History tab (Tab 5)                                           */
+    /* ------------------------------------------------------------------ */
+    #tab-history .history-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    #tab-history .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #tab-history .control-group label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+    #tab-history select {
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #tab-history .history-count {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-left: auto;
+    }
+    .disp-worth_trading   { background: var(--accent);  color: #fff; }
+    .disp-approved        { background: var(--success); color: #fff; }
+    .disp-insufficient_edge { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .disp-candidate       { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .badge-open     { background: var(--warning); color: #fff; }
+    .badge-resolved { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .history-sources {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      max-width: 220px;
+    }
+    /* Inline sparkline of value/pnl over the marks timeline */
+    .sparkline {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 28px;
+    }
+    .spark-bar {
+      width: 5px;
+      min-height: 1px;
+      border-radius: 1px;
+      background: var(--text-tertiary);
+    }
+    .spark-bar.pos { background: var(--success); }
+    .spark-bar.neg { background: var(--error); }
+    .spark-bar.flat { background: var(--text-tertiary); }
+    .spark-empty { color: var(--text-tertiary); font-style: italic; font-size: 11px; }
+    .history-timeline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 10.5px;
+    }
+    .timeline-point {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3px 5px;
+      border-radius: 4px;
+      background: var(--bg-tertiary);
+      line-height: 1.3;
+    }
+    .timeline-point .tp-interval { color: var(--text-secondary); }
+    .timeline-point .tp-val { font-weight: 700; }
+    .history-detail-row td {
+      background: var(--bg-primary);
+      padding: 12px 16px;
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Utility                                                              */
     /* ------------------------------------------------------------------ */
     .text-mono { font-family: "SF Mono", "Fira Code", monospace; }
@@ -641,6 +728,7 @@
   <button class="tab-btn" data-tab="config">Config &amp; Weights</button>
   <button class="tab-btn" data-tab="agents">Agents</button>
   <button class="tab-btn" data-tab="ideas">Trade Ideas</button>
+  <button class="tab-btn" data-tab="history">Ideas History</button>
 </nav>
 
 <!-- ====================================================================== -->
@@ -1109,6 +1197,60 @@
     </div>
   </div>
 
+  <!-- -------------------------------------------------------------------- -->
+  <!-- Tab 5: Ideas History                                                  -->
+  <!-- -------------------------------------------------------------------- -->
+  <div id="tab-history" class="tab-pane">
+    <div class="history-controls">
+      <div class="control-group">
+        <label for="history-disposition-filter">Disposition</label>
+        <select id="history-disposition-filter">
+          <option value="all">All</option>
+          <option value="approved">Approved</option>
+          <option value="worth_trading">Worth trading</option>
+          <option value="insufficient_edge">Insufficient edge</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="history-sort">Sort by</label>
+        <select id="history-sort">
+          <option value="recorded_desc">Newest first</option>
+          <option value="edge_desc">Edge (high &rarr; low)</option>
+          <option value="edge_asc">Edge (low &rarr; high)</option>
+          <option value="pnl_desc">Latest P&amp;L (high &rarr; low)</option>
+          <option value="pnl_asc">Latest P&amp;L (low &rarr; high)</option>
+        </select>
+      </div>
+      <span class="history-count" id="history-count">—</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">All Trade Ideas &amp; Their Price/P&amp;L Timeline</div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Recorded</th>
+              <th>Ticker</th>
+              <th>Side</th>
+              <th>Disp.</th>
+              <th>Status</th>
+              <th>Entry ¢</th>
+              <th>Pred.</th>
+              <th>Edge ¢</th>
+              <th>Latest P&amp;L ¢</th>
+              <th>Trend</th>
+              <th>Marks</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr class="empty-row"><td colspan="11">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /main-content -->
 
 <!-- ====================================================================== -->
@@ -1181,6 +1323,11 @@ tabBtns.forEach(btn => {
     // Populate config on first visit
     if (tab === 'config' && !configLoaded) {
       loadConfig();
+    }
+
+    // Load ideas history when the tab is opened (refresh each visit)
+    if (tab === 'history') {
+      loadIdeasHistory();
     }
   });
 });
@@ -1679,6 +1826,170 @@ function renderReviewedIdeas(ideas) {
     </tr>`;
   }).join('');
 }
+
+// ---------------------------------------------------------------------------
+// Ideas History tab
+// ---------------------------------------------------------------------------
+let ideasHistory = [];
+
+async function loadIdeasHistory() {
+  const tbody = document.getElementById('history-tbody');
+  try {
+    const resp = await fetch('/api/ideas/history');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    ideasHistory = data.ideas || [];
+    renderIdeasHistory();
+  } catch (err) {
+    console.error('Failed to load ideas history:', err);
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Failed to load history</td></tr>';
+  }
+}
+
+// The latest mark's pnl_cents, ignoring marks with no usable price.
+function latestPnlCents(idea) {
+  const marks = idea.marks || [];
+  for (let i = marks.length - 1; i >= 0; i--) {
+    if (marks[i].pnl_cents !== null && marks[i].pnl_cents !== undefined) {
+      return marks[i].pnl_cents;
+    }
+  }
+  return null;
+}
+
+function fmtInterval(elapsedSeconds) {
+  if (elapsedSeconds === null || elapsedSeconds === undefined) return '+?';
+  if (elapsedSeconds < 0) return '+0h';
+  const hours = elapsedSeconds / 3600;
+  if (hours < 1) return '+' + Math.round(elapsedSeconds / 60) + 'm';
+  if (hours < 48) return '+' + Math.round(hours) + 'h';
+  return '+' + Math.round(hours / 24) + 'd';
+}
+
+// Compact bar sparkline of P&L over the timeline (green up / red down).
+function renderSparkline(marks) {
+  const points = (marks || []).filter(m => m.pnl_cents !== null && m.pnl_cents !== undefined);
+  if (points.length === 0) return '<span class="spark-empty">no marks</span>';
+  const values = points.map(m => m.pnl_cents);
+  const maxAbs = Math.max(1, ...values.map(v => Math.abs(v)));
+  const bars = points.map(m => {
+    const v = m.pnl_cents;
+    const heightPct = Math.max(8, Math.round((Math.abs(v) / maxAbs) * 100));
+    const cls = v > 0 ? 'pos' : v < 0 ? 'neg' : 'flat';
+    const title = `${fmtInterval(m.elapsed_seconds)}: ${v >= 0 ? '+' : ''}${v}¢${m.resolved ? ' (resolved)' : ''}`;
+    return `<div class="spark-bar ${cls}" style="height:${heightPct}%" title="${escHtml(title)}"></div>`;
+  }).join('');
+  return `<span class="sparkline">${bars}</span>`;
+}
+
+// Expandable detail: every mark as an interval point with value + P&L.
+function renderTimelineDetail(marks) {
+  if (!marks || marks.length === 0) return '<span class="spark-empty">No marks recorded yet</span>';
+  const points = marks.map(m => {
+    const interval = m.resolved ? '+resolved' : fmtInterval(m.elapsed_seconds);
+    const val = (m.current_value_cents === null || m.current_value_cents === undefined)
+      ? '—' : m.current_value_cents + '¢';
+    let pnlText = '—', pnlCls = 'pnl-zer';
+    if (m.pnl_cents !== null && m.pnl_cents !== undefined) {
+      pnlText = (m.pnl_cents >= 0 ? '+' : '') + m.pnl_cents + '¢';
+      pnlCls = pnlClass(m.pnl_cents);
+    }
+    return `<span class="timeline-point">
+      <span class="tp-interval">${escHtml(interval)}</span>
+      <span class="tp-val">${escHtml(val)}</span>
+      <span class="tp-val ${pnlCls}">${escHtml(pnlText)}</span>
+    </span>`;
+  }).join('');
+  return `<div class="history-timeline">${points}</div>`;
+}
+
+function renderIdeasHistory() {
+  const tbody = document.getElementById('history-tbody');
+  const dispFilter = document.getElementById('history-disposition-filter').value;
+  const sortBy = document.getElementById('history-sort').value;
+
+  let rows = ideasHistory.slice();
+  if (dispFilter !== 'all') {
+    rows = rows.filter(idea => idea.disposition === dispFilter);
+  }
+
+  rows.sort((a, b) => {
+    switch (sortBy) {
+      case 'edge_desc': return (b.edge_cents ?? -Infinity) - (a.edge_cents ?? -Infinity);
+      case 'edge_asc':  return (a.edge_cents ?? Infinity) - (b.edge_cents ?? Infinity);
+      case 'pnl_desc':  return (latestPnlCents(b) ?? -Infinity) - (latestPnlCents(a) ?? -Infinity);
+      case 'pnl_asc':   return (latestPnlCents(a) ?? Infinity) - (latestPnlCents(b) ?? Infinity);
+      default:          return String(b.recorded_at || '').localeCompare(String(a.recorded_at || ''));
+    }
+  });
+
+  document.getElementById('history-count').textContent =
+    `${rows.length} idea${rows.length !== 1 ? 's' : ''}`;
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No ideas match the filter</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((idea, index) => {
+    const sideBadge = String(idea.side || '').toUpperCase() === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    const disp = idea.disposition || 'candidate';
+    const dispBadge = `<span class="badge disp-${escHtml(disp)}">${escHtml(disp.replace(/_/g, ' '))}</span>`;
+    const status = idea.status || 'open';
+    const statusBadge = `<span class="badge badge-${status === 'resolved' ? 'resolved' : 'open'}">${escHtml(status)}</span>`;
+    const pred = (idea.predicted_prob !== null && idea.predicted_prob !== undefined)
+      ? Math.round(idea.predicted_prob * 100) + '%' : '—';
+    const latestPnl = latestPnlCents(idea);
+    const pnlText = latestPnl === null ? '—' : (latestPnl >= 0 ? '+' : '') + latestPnl;
+    const pnlCls = latestPnl === null ? 'pnl-zer' : pnlClass(latestPnl);
+    const markCount = (idea.marks || []).length;
+    const url = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
+    const tickerEl = url
+      ? `<a class="kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
+      : `<span class="text-mono">${escHtml(idea.ticker ?? '')}</span>`;
+
+    const mainRow = `<tr class="history-main-row" data-index="${index}" style="cursor:pointer">
+      <td class="text-xs">${escHtml(timeSince(idea.recorded_at))}</td>
+      <td class="text-mono">${tickerEl}</td>
+      <td>${sideBadge}</td>
+      <td>${dispBadge}</td>
+      <td>${statusBadge}</td>
+      <td>${idea.entry_price_cents ?? '—'}</td>
+      <td>${escHtml(pred)}</td>
+      <td>${idea.edge_cents ?? '—'}</td>
+      <td class="${pnlCls}">${escHtml(pnlText)}</td>
+      <td>${renderSparkline(idea.marks)}</td>
+      <td class="text-xs">${markCount}</td>
+    </tr>`;
+
+    const sources = (idea.sources || []).map(s =>
+      `<span class="signal-tag">${escHtml(String(s))}</span>`
+    ).join('');
+    const detailRow = `<tr class="history-detail-row hidden" data-detail="${index}">
+      <td colspan="11">
+        <div style="margin-bottom:8px;font-size:11px;color:var(--text-secondary);">
+          Cycle ${escHtml(idea.cycle_ts ?? '—')} &middot; ${idea.n_sources ?? 0} sources &middot; ${escHtml(idea.category ?? '')}
+        </div>
+        ${sources ? `<div class="idea-signals" style="margin-bottom:10px;">${sources}</div>` : ''}
+        ${renderTimelineDetail(idea.marks)}
+      </td>
+    </tr>`;
+    return mainRow + detailRow;
+  }).join('');
+
+  // Toggle detail rows on click
+  tbody.querySelectorAll('.history-main-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const detail = tbody.querySelector(`.history-detail-row[data-detail="${row.dataset.index}"]`);
+      if (detail) detail.classList.toggle('hidden');
+    });
+  });
+}
+
+document.getElementById('history-disposition-filter').addEventListener('change', renderIdeasHistory);
+document.getElementById('history-sort').addEventListener('change', renderIdeasHistory);
 
 // ---------------------------------------------------------------------------
 // Utility: HTML escaping

@@ -192,6 +192,25 @@ def create_app(
             pass
         return JSONResponse({"ok": True})
 
+    @app.get("/api/ideas/history")
+    async def get_ideas_history() -> JSONResponse:
+        """Return every recorded recommendation joined with its marks timeline.
+
+        Read-only view of the paper-trade store: each idea carries its record-time
+        fields (ticker, side, disposition, prices, edge, sources, status) plus an
+        ordered ``marks`` list of (checked_at, current_value_cents, pnl_cents,
+        resolved, elapsed_seconds) snapshots so the UI can plot how each idea
+        moved over the intervals after it was presented. Never executes anything.
+        """
+        from kalshi_trader import paper
+
+        try:
+            ideas = paper.recommendations_with_marks()
+        except Exception as exc:  # never let a malformed store break the page
+            logger.warning("ideas history read failed: %s", exc)
+            ideas = []
+        return JSONResponse({"ideas": ideas})
+
     @app.post("/api/ideas")
     async def post_ideas(request: Request) -> JSONResponse:
         """Accept a list of idea dicts and append them to pending_ideas."""

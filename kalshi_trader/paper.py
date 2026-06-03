@@ -171,6 +171,59 @@ def _latest_marks() -> dict[str, dict]:
     return latest
 
 
+def recommendations_with_marks() -> list[dict]:
+    """Join every recommendation with its full ordered timeline of marks.
+
+    Returns one dict per recommendation (newest first by ``recorded_at``),
+    each carrying the original recommendation fields plus a ``marks`` list:
+    the chronologically-ordered mark snapshots for that ``rec_id``, each with an
+    ``elapsed_seconds`` field giving the time between the recommendation's
+    ``recorded_at`` and the mark's ``checked_at`` so the UI can show intervals
+    (e.g. +0h / +7h / +resolved). Read-only; never executes anything.
+    """
+    recommendations = load_recommendations()
+
+    marks_by_rec_id: dict[str, list[dict]] = {}
+    for mark in _read_jsonl(_MARKS_FILE):
+        marks_by_rec_id.setdefault(mark.get("rec_id"), []).append(mark)
+
+    joined: list[dict] = []
+    for recommendation in recommendations:
+        rec_id = recommendation.get("rec_id")
+        recorded_at = _parse_iso(recommendation.get("recorded_at"))
+
+        timeline: list[dict] = []
+        for mark in marks_by_rec_id.get(rec_id, []):
+            checked_at = _parse_iso(mark.get("checked_at"))
+            elapsed_seconds: float | None = None
+            if recorded_at is not None and checked_at is not None:
+                elapsed_seconds = (checked_at - recorded_at).total_seconds()
+            timeline.append({
+                "checked_at": mark.get("checked_at"),
+                "current_value_cents": mark.get("current_value_cents"),
+                "pnl_cents": mark.get("pnl_cents"),
+                "would_profit": mark.get("would_profit"),
+                "resolved": mark.get("resolved"),
+                "elapsed_seconds": elapsed_seconds,
+            })
+        timeline.sort(key=lambda mark: mark["checked_at"] or "")
+
+        joined.append({**recommendation, "marks": timeline})
+
+    joined.sort(key=lambda recommendation: recommendation.get("recorded_at") or "", reverse=True)
+    return joined
+
+
+def _parse_iso(value) -> datetime | None:
+    """Parse an ISO timestamp string into an aware datetime; None on failure."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
 def _scorecard(marks: list[dict]) -> dict:
     scored = [m for m in marks if m.get("pnl_cents") is not None]
     if not scored:
