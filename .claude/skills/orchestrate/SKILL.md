@@ -199,7 +199,7 @@ scout signals, which are correlated with each other):
 - `polls-signal` — **disabled** (`agent_polls_enabled: false` in `runtime_config.json`).
   Returns no data outside a U.S. general-election cycle. Re-enable in fall 2026
   when 538 has live polling for federal races.
-- `x-signal` — only if `category` is politics, elections, sports, crypto, or current events; args: ticker, title, category
+- `x-signal` — **disabled** (`agent_x_enabled: false` in `runtime_config.json`). Do not dispatch.
 - `market-maker-signal` — **every market in the deep-signal subset**; args:
   ticker, title. This is an orderbook-snapshot signal — it does not require
   trade history and is the highest-value signal we have. Dispatch it for every
