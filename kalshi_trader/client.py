@@ -132,9 +132,19 @@ class KalshiClient:
     async def get_positions(self) -> dict:
         return await self.get("/portfolio/positions")
 
-    async def get_fills(self, ticker: str | None = None) -> dict:
-        params = {"ticker": ticker} if ticker else {}
-        return await self.get("/portfolio/fills", params=params or None)
+    async def get_fills(
+        self,
+        ticker: str | None = None,
+        cursor: str | None = None,
+        limit: int = 1000,
+    ) -> dict:
+        """Fetch portfolio fills. Returns the raw response dict with 'fills' and 'cursor' keys."""
+        params: dict[str, Any] = {"limit": limit}
+        if ticker:
+            params["ticker"] = ticker
+        if cursor:
+            params["cursor"] = cursor
+        return await self.get("/portfolio/fills", params=params)
 
     async def get_orders(self, status: str = "resting") -> dict:
         """Read the account's orders (default: resting/open orders). Read-only."""

@@ -58,8 +58,13 @@ class ReadOnlyKalshiClient:
     async def get_orders(self, status: str = "resting") -> dict:
         return await self._wrapped_client.get_orders(status=status)
 
-    async def get_fills(self, ticker: str | None = None) -> dict:
-        return await self._wrapped_client.get_fills(ticker)
+    async def get_fills(
+        self,
+        ticker: str | None = None,
+        cursor: str | None = None,
+        limit: int = 1000,
+    ) -> dict:
+        return await self._wrapped_client.get_fills(ticker=ticker, cursor=cursor, limit=limit)
 
     async def get_markets(self, status: str = "open", cursor: str = "",
                           limit: int = 1000, **kwargs) -> dict:
