@@ -127,37 +127,37 @@ class MarketScanner:
         return self._parse_market(market_response["market"]), orderbook_response.get("orderbook", {})
 
     async def enrich_categories(self, markets: list[Market]) -> None:
-        """Fetch category for each market from the events endpoint and set it in-place.
+        """Set category on each market using a single bulk /series fetch.
 
-        The /markets endpoint returns empty category fields in prod; the /events
-        endpoint has the correct category. Fetches unique event_tickers in parallel
-        and normalises to lowercase to match SCORED_CATEGORIES.
+        The /markets endpoint returns empty category fields in prod. Rather than
+        making one /events/{ticker} call per unique event (potentially 100k+
+        requests), we fetch all series in one call and map series_ticker →
+        category. Each market's series_ticker is already populated by
+        _parse_market.
         """
-        event_tickers = list({market.event_ticker for market in markets if market.event_ticker})
-        if not event_tickers:
+        _log.info("Fetching categories via /series (single bulk call)...")
+        try:
+            series_list = await with_retry(self._client.get_series)
+        except Exception as caught_exception:
+            _log.warning("Series fetch failed, categories will be empty: %s", caught_exception)
             return
 
-        _log.info("Fetching categories for %d unique events...", len(event_tickers))
-        concurrency_semaphore = asyncio.Semaphore(20)
+        series_category_map: dict[str, str] = {
+            s["ticker"]: (s.get("category") or "").lower()
+            for s in series_list
+            if s.get("ticker")
+        }
+        _log.info("Series fetch complete: %d series loaded", len(series_category_map))
 
-        async def _fetch(event_ticker: str) -> tuple[str, str]:
-            async with concurrency_semaphore:
-                try:
-                    response = await with_retry(self._client.get, f"/events/{event_ticker}", {})
-                    category = response.get("event", {}).get("category", "") or ""
-                    return event_ticker, category.lower()
-                except Exception:
-                    return event_ticker, "unknown"
-
-        pairs = await asyncio.gather(*[_fetch(event_ticker) for event_ticker in event_tickers])
-        category_map = dict(pairs)
-
+        enriched = 0
         for market in markets:
-            category = category_map.get(market.event_ticker, "")
+            series_ticker = market.series_ticker or market.ticker.split("-")[0]
+            category = series_category_map.get(series_ticker, "")
             if category:
                 market.category = category
+                enriched += 1
 
-        _log.info("Category enrichment complete")
+        _log.info("Category enrichment complete: %d/%d markets enriched", enriched, len(markets))
 
     async def _fetch_live_prices(self, tickers: list[str]) -> tuple[dict[str, dict[str, float | None]], list[str]]:
         quotes: dict[str, dict[str, float | None]] = {}

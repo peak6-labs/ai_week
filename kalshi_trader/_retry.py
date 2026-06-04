@@ -1,15 +1,16 @@
 from __future__ import annotations
 import asyncio
+import logging
+
+_log = logging.getLogger("kalshi_trader")
 
 
-async def with_retry(coroutine_function, *args, attempts: int = 4,
-                     raise_on_exhaust: bool = False, **kwargs):
+async def with_retry(coroutine_function, *args, attempts: int = 6, **kwargs):
     """Call coroutine_function(*args, **kwargs), retrying on HTTP 429 with exponential backoff.
 
-    On a persistent 429 across all attempts this returns ``{}`` by default — read
-    paths tolerate "no data". Write paths (order placement) should pass
-    ``raise_on_exhaust=True`` so an undelivered request surfaces as an error rather
-    than a silent empty dict that looks like a successful no-op.
+    Raises the last 429 exception if all attempts are exhausted - never silently
+    returns an empty dict, which would cause callers to misread the end-of-data
+    sentinel (empty cursor) and stop pagination early.
     """
     last_exception: Exception | None = None
     for attempt in range(attempts):
@@ -18,10 +19,13 @@ async def with_retry(coroutine_function, *args, attempts: int = 4,
         except Exception as caught_exception:
             status = getattr(getattr(caught_exception, "response", None), "status_code", None)
             if status == 429:
+                delay = 2 ** attempt
+                _log.warning(
+                    "Rate limited (429); backing off %ds (attempt %d/%d)",
+                    delay, attempt + 1, attempts,
+                )
                 last_exception = caught_exception
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(delay)
             else:
                 raise
-    if raise_on_exhaust and last_exception is not None:
-        raise last_exception
-    return {}
+    raise last_exception  # type: ignore[misc]

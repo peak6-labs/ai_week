@@ -43,12 +43,15 @@ def _build_position_dict(
     # Side-relative current price: what we'd receive selling this position now
     current_price_cents = float(bid) if side == "yes" else (100.0 - float(ask))
     midpoint_yes_price_cents = (float(bid) + float(ask)) / 2.0
-    return {
+    result = {
         "market_exposure_dollars": position_meta["market_exposure_dollars"],
         "quantity": position_meta["quantity"],
         "current_price_cents": current_price_cents,
         "midpoint_yes_price_cents": midpoint_yes_price_cents,
     }
+    if position_meta.get("fair_value_cents") is not None:
+        result["fair_value_cents"] = position_meta["fair_value_cents"]
+    return result
 
 
 def _select_yes_price(
@@ -148,6 +151,18 @@ async def run(dry_run: bool) -> None:
             nonlocal ws_client, ws_task, subscribed_tickers
 
             new_positions = await _fetch_open_positions(kalshi_client)
+
+            # Enrich each position with fair value from the recommendations table
+            if new_positions:
+                try:
+                    fair_values = await _db.get_fair_values_from_recommendations(list(new_positions))
+                    for ticker, meta in new_positions.items():
+                        prob = fair_values.get(ticker)
+                        if prob is not None:
+                            meta["fair_value_cents"] = round(prob * 100.0, 2)
+                except Exception as fair_value_exception:
+                    log.debug("Fair value lookup failed: %s", fair_value_exception)
+
             position_metadata.clear()
             position_metadata.update(new_positions)
 

@@ -301,6 +301,30 @@ async def upsert_scored_markets(rows: list[dict]) -> int:
     return written
 
 
+async def get_fair_values_from_recommendations(tickers: list[str]) -> dict[str, float | None]:
+    """Return the most recent predicted_prob (0-1) per ticker from the recommendations table.
+
+    This is the probability used when the trade idea was generated — the source
+    of truth for the edge calculation at entry time.
+    """
+    if not tickers:
+        return {}
+    client = await _get_client()
+    resp = await (
+        client.table("recommendations")
+        .select("ticker,predicted_prob")
+        .in_("ticker", tickers)
+        .order("cycle_ts", desc=True)
+        .execute()
+    )
+    result: dict[str, float | None] = {}
+    for row in (resp.data or []):
+        ticker = row["ticker"]
+        if ticker not in result:
+            result[ticker] = row.get("predicted_prob")
+    return result
+
+
 async def get_latest_fair_values(tickers: list[str]) -> dict[str, float | None]:
     """Return the most recent combined_probability (0-1) per ticker from scored_markets."""
     if not tickers:

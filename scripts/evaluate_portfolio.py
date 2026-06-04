@@ -60,6 +60,16 @@ async def _fetch_live_prices(client: KalshiClient, tickers: list[str]) -> dict[s
     return prices
 
 
+async def _fetch_tickers_with_resting_exits(client: KalshiClient) -> set[str]:
+    """Return the set of tickers that already have a resting sell order."""
+    response = await client.get_orders(status="resting")
+    return {
+        order["ticker"]
+        for order in (response.get("orders") or [])
+        if order.get("action") == "sell"
+    }
+
+
 async def run(dry_run: bool, out: str | None) -> dict:
     """Evaluate all open positions and exit triggered ones. Returns results dict."""
     async with KalshiClient() as client:
@@ -84,7 +94,10 @@ async def run(dry_run: bool, out: str | None) -> dict:
             return results
 
         tickers = [position_raw.get("ticker", "") for position_raw in raw_positions if position_raw.get("ticker")]
-        live_prices = await _fetch_live_prices(client, tickers)
+        live_prices, tickers_with_resting_exit = await asyncio.gather(
+            _fetch_live_prices(client, tickers),
+            _fetch_tickers_with_resting_exits(client),
+        )
 
         exits: list[dict] = []
         clean_positions: list[dict] = []
@@ -156,6 +169,12 @@ async def run(dry_run: bool, out: str | None) -> dict:
             order_status = None
 
             if not dry_run:
+                if ticker in tickers_with_resting_exit:
+                    print(
+                        f"SKIP {ticker}: resting exit order already exists",
+                        file=sys.stderr,
+                    )
+                    continue
                 try:
                     order_response = await client.create_order(
                         ticker=ticker,

@@ -37,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, ".")
 
 import kalshi_trader.config  # noqa: F401 — loads .env
+from kalshi_trader import db, paper
 from kalshi_trader.client import KalshiClient
 
 SESSION_TRADE_CAP = 10
@@ -149,6 +150,47 @@ def _build_record(
     }
 
 
+async def _record_executed_trade(record: dict, cycle_ts: str) -> None:
+    """Write an executed night-mode trade to the local paper store and Supabase.
+
+    Wrapped in try/except so a Supabase failure never stops the pipeline.
+    """
+    sources = record.get("signal_sources") or []
+    entry_cents = float(record.get("market_price", 0))
+    confidence = float(record.get("confidence", 0))
+    try:
+        rec_id = paper.record_recommendation(
+            cycle_ts=cycle_ts,
+            ticker=record["ticker"],
+            side=record["side"],
+            entry_cents=entry_cents,
+            predicted_prob=confidence,
+            edge_cents=float(record.get("edge_cents", 0)),
+            n_sources=len(sources),
+            sources=sources,
+            category=record.get("category", ""),
+            suggested_size_dollars=FLAT_TRADE_SIZE_DOLLARS,
+            disposition="executed",
+        )
+        await db.insert_recommendation({
+            "rec_id": rec_id,
+            "cycle_ts": cycle_ts,
+            "ticker": record["ticker"],
+            "side": record["side"],
+            "entry_price_cents": entry_cents,
+            "predicted_prob": confidence,
+            "edge_cents": float(record.get("edge_cents", 0)),
+            "n_sources": len(sources),
+            "sources": sources,
+            "category": record.get("category", ""),
+            "suggested_size_dollars": FLAT_TRADE_SIZE_DOLLARS,
+            "disposition": "executed",
+            "recorded_at": record.get("logged_at"),
+        })
+    except Exception as write_exception:
+        print(f"WARN: recommendation write failed for {record['ticker']}: {write_exception}", file=sys.stderr)
+
+
 async def run(
     candidates: list[dict],
     session_file: str,
@@ -221,6 +263,7 @@ async def run(
 
         if not dry_run:
             _save_session(session_file, session)
+            await _record_executed_trade(record, cycle_ts)
 
         _append_jsonl(log_dir, date_str, record)
         results.append(record)

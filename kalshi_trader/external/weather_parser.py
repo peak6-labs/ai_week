@@ -202,12 +202,14 @@ def parse_title(ticker: str, title: str) -> dict | None:
             return None
 
     # Date — month/day from the title, plus an explicit 4-digit year if present
-    # (otherwise assume the current year).
+    # (otherwise assume the current year). The day group uses (?!\d) so that
+    # "June 2026" does NOT match day=20 by grabbing the first two digits of the
+    # year — monthly-contract titles would otherwise silently get target_date=Jun 20.
     target_date = None
     m = re.search(
         r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
         r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
-        r"[\s.]*(\d{1,2})",
+        r"[\s.]*(\d{1,2})(?!\d)",
         t,
     )
     if m:
