@@ -91,10 +91,10 @@ raw_composite = Σ (signal_value × weight)  /  Σ weight
 
 For example, if a market has no candle history yet (all candle signals are `None`), the raw composite is computed solely from `volume_oi_ratio` and any live signals available. Once the cache warms up the full set of weights applies.
 
-The ranking score then applies a **spread liquidity penalty**:
+The ranking score then applies two soft multipliers — a **spread liquidity penalty** and a **settlement-proximity preference**:
 
 ```
-rank_score = raw_composite × spread_penalty_multiplier
+rank_score = raw_composite × spread_penalty_multiplier × settlement_proximity_multiplier
 ```
 
 | YES bid/ask spread | Multiplier |
@@ -106,7 +106,18 @@ rank_score = raw_composite × spread_penalty_multiplier
 | ≤ 20¢ | 0.70 |
 | > 20¢ | 0.55 |
 
-`ScoredMarket.composite_score` stores the spread-adjusted rank score. The JSON output also includes `raw_best_score` and `spread_penalty_multiplier` so analysts can see the original signal strength and the liquidity adjustment separately.
+The **settlement-proximity multiplier** favors markets that resolve soon over ones that settle a long time from now (capital turns over faster and the thesis is exposed to fewer unforeseen developments). It is a soft down-rank only — it never zeroes a market out, so every open market still appears, just lower:
+
+| Time to close | Multiplier |
+|---------------|-----------:|
+| ≤ 24h | 1.00 |
+| ≤ 3 days | 0.90 |
+| ≤ 7 days | 0.78 |
+| ≤ 30 days | 0.60 |
+| ≤ 90 days | 0.42 |
+| > 90 days | 0.28 |
+
+`ScoredMarket.composite_score` stores the fully-adjusted rank score. The JSON output also includes `raw_best_score`, `spread_penalty_multiplier`, `settlement_proximity_multiplier`, and `hours_to_close` so analysts can see the original signal strength and each adjustment separately. Because this multiplier folds into the event `average_score`, the orchestrator's "top rows by score" deep-signal subset selection inherits the same preference for sooner-settling markets.
 
 ---
 

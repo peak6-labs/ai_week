@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -17,6 +17,7 @@ from kalshi_trader.actionability import (
     oi_change_score,
     orderbook_skew_score,
     relative_historical_volume_score,
+    settlement_proximity_multiplier,
     spread_penalty_multiplier,
     volume_oi_ratio_score,
     volume_spike_short_term_score,
@@ -33,12 +34,17 @@ def _market(
     open_interest: int = 2000,
     yes_bid: float = 40.0,
     yes_ask: float = 44.0,
+    close_time: datetime | None = None,
 ) -> Market:
+    # Default to a close an hour out so the settlement-proximity multiplier is
+    # 1.0 and does not perturb tests that assert on the composite score.
+    if close_time is None:
+        close_time = datetime.now(timezone.utc) + timedelta(hours=1)
     return Market(
         ticker=ticker, event_ticker="EV", series_ticker="SRS",
         title="Test", yes_bid=yes_bid, yes_ask=yes_ask, last_price=42.0,
         volume_24h=volume_24h, open_interest=open_interest,
-        category="sports", close_time=datetime(2026, 7, 1), status="open",
+        category="sports", close_time=close_time, status="open",
     )
 
 
@@ -104,6 +110,37 @@ def test_spread_penalty_multiplier_softly_penalizes_wide_spreads():
 def test_spread_penalty_multiplier_one_sided_book():
     assert spread_penalty_multiplier(_market(yes_bid=0.0, yes_ask=80.0)) == pytest.approx(0.50)
     assert spread_penalty_multiplier(_market(yes_bid=20.0, yes_ask=0.0)) == pytest.approx(0.50)
+
+
+# ---------------------------------------------------------------------------
+# settlement_proximity_multiplier
+# ---------------------------------------------------------------------------
+
+def _market_closing_in(hours: float) -> Market:
+    return _market(close_time=datetime.now(timezone.utc) + timedelta(hours=hours))
+
+
+def test_settlement_proximity_multiplier_favors_sooner_settlement():
+    # Each band returns a fixed multiplier; closer settlement scores higher.
+    assert settlement_proximity_multiplier(_market_closing_in(12)) == pytest.approx(1.00)
+    assert settlement_proximity_multiplier(_market_closing_in(48)) == pytest.approx(0.90)
+    assert settlement_proximity_multiplier(_market_closing_in(120)) == pytest.approx(0.78)
+    assert settlement_proximity_multiplier(_market_closing_in(24 * 14)) == pytest.approx(0.60)
+    assert settlement_proximity_multiplier(_market_closing_in(24 * 60)) == pytest.approx(0.42)
+    assert settlement_proximity_multiplier(_market_closing_in(24 * 180)) == pytest.approx(0.28)
+
+
+def test_settlement_proximity_multiplier_is_monotonic_non_increasing():
+    horizons_hours = [12, 48, 120, 24 * 14, 24 * 60, 24 * 180]
+    multipliers = [settlement_proximity_multiplier(_market_closing_in(h)) for h in horizons_hours]
+    assert multipliers == sorted(multipliers, reverse=True)
+
+
+def test_settlement_proximity_multiplier_treats_naive_close_time_as_utc():
+    # A timezone-naive close_time must be interpreted as UTC, not raise.
+    naive_far_future = (datetime.now(timezone.utc) + timedelta(days=120)).replace(tzinfo=None)
+    assert naive_far_future.tzinfo is None
+    assert settlement_proximity_multiplier(_market(close_time=naive_far_future)) == pytest.approx(0.28)
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +375,32 @@ def test_score_all_applies_spread_penalty_but_preserves_raw_score():
     assert wide.spread_penalty_multiplier == pytest.approx(0.55)
     assert wide.composite_score == pytest.approx(0.55)
     assert result[0].market.ticker == "TIGHT"
+
+
+def test_score_all_applies_settlement_proximity_but_preserves_raw_score():
+    # Identical signals/spread; only the settlement horizon differs. The sooner
+    # market must outrank the later one, and raw_composite_score stays untouched.
+    soon = _market("SOON", volume_24h=500, open_interest=500, yes_bid=40.0, yes_ask=42.0,
+                   close_time=datetime.now(timezone.utc) + timedelta(hours=12))
+    later = _market("LATER", volume_24h=500, open_interest=500, yes_bid=40.0, yes_ask=42.0,
+                    close_time=datetime.now(timezone.utc) + timedelta(days=120))
+    store = _store()
+    daily_candles = [_candle(timestamp_seconds=i, volume=100.0) for i in range(30)]
+    for ticker in ("SOON", "LATER"):
+        store.update_daily(ticker, daily_candles)
+    scorer = MarketScorer()
+    result = scorer.score_all([soon, later], store)
+
+    soon_scored = next(scored_market for scored_market in result if scored_market.market.ticker == "SOON")
+    later_scored = next(scored_market for scored_market in result if scored_market.market.ticker == "LATER")
+
+    assert soon_scored.raw_composite_score == pytest.approx(1.0)
+    assert later_scored.raw_composite_score == pytest.approx(1.0)
+    assert soon_scored.settlement_proximity_multiplier == pytest.approx(1.0)
+    assert later_scored.settlement_proximity_multiplier == pytest.approx(0.28)
+    assert soon_scored.composite_score == pytest.approx(1.0)
+    assert later_scored.composite_score == pytest.approx(0.28)
+    assert result[0].market.ticker == "SOON"
 
 
 def test_score_all_empty_input():
