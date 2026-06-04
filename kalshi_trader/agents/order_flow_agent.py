@@ -257,7 +257,7 @@ class OrderFlowAgent:
             source="order_flow",
             probability=round(prob, 4),
             uncertainty=round(uncertainty, 4),
-            weight=0.70,
+            weight=0.25,
             data_issued_at=datetime.now(tz=timezone.utc),
             metadata={
                 "ticker": ticker,

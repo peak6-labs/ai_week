@@ -241,3 +241,51 @@ async def test_get_observed_extreme_falls_back_to_second_station_candidate():
     assert result["station_id"] == "ATL"
     assert result["realized_extreme"] == pytest.approx(57.2, abs=0.05)
     await client.close()
+
+
+# ---------------------------------------------------------------------------
+# get_station_coordinates (forecast-at-the-settlement-station input)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_station_coordinates_reads_geojson_lon_lat():
+    # GeoJSON geometry is [lon, lat]; the method must return (lat, lon).
+    station = {"geometry": {"type": "Point", "coordinates": [-118.3866, 33.9382]}, "properties": {}}
+    client = NOAAClient()
+    with patch.object(client, "_get", new=AsyncMock(side_effect=[station])):
+        result = await client.get_station_coordinates("LAX")
+    assert result == (33.9382, -118.3866)
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_get_station_coordinates_falls_back_to_second_candidate():
+    # First candidate (KLAX) 404s; the bare code (LAX) resolves with geometry.
+    station = {"geometry": {"coordinates": [-118.3866, 33.9382]}}
+    get_mock = AsyncMock(side_effect=[Exception("404"), station])
+    client = NOAAClient()
+    with patch.object(client, "_get", new=get_mock):
+        result = await client.get_station_coordinates("LAX")
+    assert result == (33.9382, -118.3866)
+    assert get_mock.await_count == 2
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_get_station_coordinates_none_when_no_geometry():
+    no_geometry = {"properties": {"timeZone": "America/Los_Angeles"}}
+    client = NOAAClient()
+    # Both candidates return the same geometry-less payload → None.
+    with patch.object(client, "_get", new=AsyncMock(side_effect=[no_geometry, no_geometry])):
+        result = await client.get_station_coordinates("LAX")
+    assert result is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_get_station_coordinates_none_when_all_candidates_fail():
+    client = NOAAClient()
+    with patch.object(client, "_get", new=AsyncMock(side_effect=Exception("404"))):
+        result = await client.get_station_coordinates("ZZZ")
+    assert result is None
+    await client.close()

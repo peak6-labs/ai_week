@@ -47,7 +47,7 @@ stop and return the path. Skip steps 2–7 entirely in pipeline mode.
 ## Workflow
 
 1. **Generate the data (snapshot-first — this is the fast path).** Work from the
-   repo root (`/Users/scorley/code`). The slow part of a full-board scan is
+   repo root. The slow part of a full-board scan is
    pulling the entire ~480-page market list from the API (minutes). The actual
    signal data — candles, trades, orderbooks — is always fetched live and is
    cheap, and the top markets get live orderbook bid/ask enrichment at score

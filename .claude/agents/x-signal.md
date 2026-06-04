@@ -6,7 +6,6 @@ description: >-
   sports, crypto, and current events.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -32,11 +31,11 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root (your project checkout):
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "x-signal: searching X/social for TICKER (CATEGORY)"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "x-signal: searching X/social for TICKER (CATEGORY)"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.x \
      --ticker TICKER \
      --category CATEGORY \
@@ -49,11 +48,11 @@ You need the caller to supply:
 2. **Check the output.**
    - If the array is empty (`[]`):
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "x-signal: TICKER → no signal (inconclusive sentiment)" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "x-signal: TICKER → no signal (inconclusive sentiment)" warning
      ```
    - If non-empty: log sentiment direction, strength, and key drivers.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "x-signal: TICKER → <direction> sentiment, prob=<p>"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "x-signal: TICKER → <direction> sentiment, prob=<p>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the

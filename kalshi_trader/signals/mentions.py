@@ -17,7 +17,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from kalshi_trader.config import X_GROK_SIGNAL_WEIGHT
+from kalshi_trader.config import (
+    MENTIONS_REQUIRE_CORPUS_BACKED,
+    MENTIONS_SATURATION_HIGH,
+    MENTIONS_SATURATION_LOW,
+    X_GROK_SIGNAL_WEIGHT,
+)
 from kalshi_trader.external.congress_gov import DISRUPTED_STATUSES, STATUS_SCHEDULED
 from kalshi_trader.external.mentions_parser import latest_mention_point, parse_point_datetime
 from kalshi_trader.models import SignalEstimate
@@ -338,6 +343,20 @@ def build_mentions_base_signal(
         data_quality = "stale"
         independent = False
 
+    # Suppression gate. The 2026-06-04 backtest (455 settled markets) showed a
+    # GDELT-only read has NEGATIVE skill in every probability band — national-TV-
+    # news frequency measures the wrong thing for a single event ("trump" 99% yet
+    # unsaid; "airball" 1% yet said). So a GDELT-only read is treated as a non-
+    # tradeable prior (require corpus-backing). The saturation band (>=HIGH/<=LOW)
+    # is the narrower fallback gate, applied even when require-corpus is disabled.
+    # Either way we flag it non-informative (uncertainty>=0.99) so the scorer drops
+    # it rather than manufacturing a fake edge. Corpus-backed reads are exempt: the
+    # rate is attributed to the speaker, so it is real evidence.
+    saturated = probability >= MENTIONS_SATURATION_HIGH or probability <= MENTIONS_SATURATION_LOW
+    suppressed = (not corpus_backed) and (MENTIONS_REQUIRE_CORPUS_BACKED or saturated)
+    if suppressed:
+        uncertainty = 0.99
+
     station_label = "+".join(stations) if stations else "CSPAN"
     speaker_clause = f"{speaker} saying " if speaker else ""
     if corpus_backed:
@@ -378,6 +397,9 @@ def build_mentions_base_signal(
         # GDELT-only estimates share lineage with any other GDELT-derived signal,
         # so they must not corroborate one another.
         "independent": independent,
+        # True when a GDELT-only read was suppressed (require-corpus or saturation);
+        # the scorer then drops it via uncertainty>=0.99. Surfaced so reports flag it.
+        "suppressed": suppressed,
     }
     if "window_fraction" in gdelt_base_rate:
         metadata["window_fraction"] = round(float(gdelt_base_rate["window_fraction"]), 4)
@@ -396,3 +418,36 @@ def build_mentions_base_signal(
         data_issued_at=datetime.now(tz=timezone.utc),
         metadata=metadata,
     )
+
+
+def build_mentions_signal(
+    ticker: str,
+    phrase: str,
+    station: str,
+    base_rate: dict,
+    *,
+    speaker: str | None = None,
+) -> SignalEstimate:
+    """Compatibility shim: wraps ``build_mentions_base_signal`` for the CLI pipeline.
+
+    The CLI (``kalshi_trader.pipelines.mentions``) calls this single-station
+    variant, which normalises ``station`` into the list form that
+    ``build_mentions_base_signal`` expects.  Raises ``ValueError`` when the
+    underlying builder returns ``None`` (no coverage, no corpus), matching the
+    pipeline's assumption that a result is always returned when ``period_count > 0``.
+    """
+    estimate = build_mentions_base_signal(
+        ticker=ticker,
+        phrase=phrase,
+        stations=[station],
+        gdelt_base_rate=base_rate,
+        corpus=None,
+        speaker=speaker,
+        speaker_key=None,
+    )
+    if estimate is None:
+        raise ValueError(
+            f"build_mentions_base_signal returned None for ticker={ticker!r}, "
+            f"phrase={phrase!r} — period_count={base_rate.get('period_count')}"
+        )
+    return estimate

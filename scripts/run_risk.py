@@ -26,7 +26,7 @@ def main() -> None:
 
     # Build PortfolioState
     from kalshi_trader.models import Position
-    from datetime import datetime, timezone
+    from datetime import datetime, timezone, timedelta
     positions = []
     if args.positions_file:
         for p in json.loads(Path(args.positions_file).read_text()):
@@ -60,7 +60,18 @@ def main() -> None:
             signal_sources=idea_data.get("signal_sources", []),
             category=idea_data.get("category", ""),
         )
-        decision = rm.check_trade(idea, portfolio)
+        # Settlement-proximity gate, fail-closed: an idea without hours_to_close
+        # cannot be confirmed safe, so it is rejected rather than silently skipping
+        # the MIN_HOURS_BEFORE_SETTLEMENT check.
+        hours_to_close = idea_data.get("hours_to_close")
+        if hours_to_close is None:
+            results.append({
+                **idea_data, "approved": False, "approved_size_dollars": 0.0,
+                "rejection_reason": "missing hours_to_close (settlement gate fail-closed)",
+            })
+            continue
+        close_time = datetime.now(tz=timezone.utc) + timedelta(hours=float(hours_to_close))
+        decision = rm.check_trade(idea, portfolio, close_time=close_time)
         results.append({
             **idea_data,
             "approved": decision.approved,

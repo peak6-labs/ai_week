@@ -219,7 +219,7 @@ async def test_build_order_flow_signal_yes_direction():
     result = await agent._build_order_flow_signal("TICKER", vpin_result, ofi_result)
     assert result["source"] == "order_flow"
     assert result["probability"] > 0.5
-    assert result["weight"] == pytest.approx(0.70)
+    assert result["weight"] == pytest.approx(0.25)
     assert result["metadata"]["ofi_direction"] == "YES"
     assert result["metadata"]["data_quality"] == "fresh"
     assert "data_issued_at" in result

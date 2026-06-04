@@ -14,6 +14,7 @@ from kalshi_trader.actionability.signals import (
     orderbook_skew_score,
     live_top_of_book,
     relative_historical_volume_score,
+    settlement_proximity_multiplier,
     spread_penalty_multiplier,
     volume_oi_ratio_score,
     volume_spike_short_term_score,
@@ -79,13 +80,15 @@ class MarketScorer:
         }
         raw_composite_score = self._composite(scores)
         spread_multiplier = spread_penalty_multiplier(market)
+        proximity_multiplier = settlement_proximity_multiplier(market)
 
         return ScoredMarket(
             market=market,
-            composite_score=raw_composite_score * spread_multiplier,
+            composite_score=raw_composite_score * spread_multiplier * proximity_multiplier,
             volume_oi_ratio_score=scores["volume_oi_ratio"],  # type: ignore[arg-type]
             raw_composite_score=raw_composite_score,
             spread_penalty_multiplier=spread_multiplier,
+            settlement_proximity_multiplier=proximity_multiplier,
             relative_historical_volume_score=scores["relative_historical_volume"],
             volume_spike_short_term_score=scores["volume_spike_short_term"],
             oi_change_score=scores["oi_change"],
@@ -127,9 +130,13 @@ class MarketScorer:
                 orderbook_hits += 1
             raw_composite_score = self._composite(self._scores_dict(scored_market))
             spread_multiplier = spread_penalty_multiplier(scored_market.market)
+            proximity_multiplier = settlement_proximity_multiplier(scored_market.market)
             scored_market.raw_composite_score = raw_composite_score
             scored_market.spread_penalty_multiplier = spread_multiplier
-            scored_market.composite_score = raw_composite_score * spread_multiplier
+            scored_market.settlement_proximity_multiplier = proximity_multiplier
+            scored_market.composite_score = (
+                raw_composite_score * spread_multiplier * proximity_multiplier
+            )
         _log.debug(
             "live enrichment: %d/%d trade hits, %d/%d orderbook hits",
             trade_hits, len(scored), orderbook_hits, len(scored),
@@ -143,9 +150,13 @@ class MarketScorer:
         for scored_market in scored:
             raw_composite_score = self._composite(self._scores_dict(scored_market))
             spread_multiplier = spread_penalty_multiplier(scored_market.market)
+            proximity_multiplier = settlement_proximity_multiplier(scored_market.market)
             scored_market.raw_composite_score = raw_composite_score
             scored_market.spread_penalty_multiplier = spread_multiplier
-            scored_market.composite_score = raw_composite_score * spread_multiplier
+            scored_market.settlement_proximity_multiplier = proximity_multiplier
+            scored_market.composite_score = (
+                raw_composite_score * spread_multiplier * proximity_multiplier
+            )
         scored.sort(key=lambda scored_market: scored_market.composite_score, reverse=True)
         return scored
 

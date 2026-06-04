@@ -6,7 +6,6 @@ description: >-
   markets compressed toward 50%). Use for all markets.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -37,11 +36,11 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root (your project checkout):
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: checking calibration bias for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: checking calibration bias for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.kalshi_bias \
      --ticker TICKER \
      --title "TITLE" \
@@ -55,16 +54,16 @@ You need the caller to supply:
 2. **Check the output.**
    - If the call fails because the module does not exist:
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: pipeline CLI not yet implemented" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: pipeline CLI not yet implemented" warning
      ```
      Return `[]`.
    - If the array is empty (`[]`):
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: TICKER → no bias detected at current price" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: TICKER → no bias detected at current price" warning
      ```
    - If non-empty: log bias type, direction, and estimated mispricing.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: TICKER → <bias-type> bias, <direction>, ~<N>¢ mispricing"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "kalshi-bias-signal: TICKER → <bias-type> bias, <direction>, ~<N>¢ mispricing"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error

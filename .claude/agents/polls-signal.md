@@ -7,7 +7,6 @@ description: >-
   election outcomes.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -37,12 +36,12 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Add
+1. **Run the pipeline CLI.** From the repo root (your project checkout). Add
    `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it:
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polls-signal: fetching 538 polling for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "polls-signal: fetching 538 polling for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.polls \
      --ticker TICKER \
      --title "TITLE" \
@@ -58,11 +57,11 @@ You need the caller to supply:
      runoffs, ballot measures, and vote-share-threshold markets) — it is **not**
      an error, so log it at info level.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polls-signal: TICKER → no 538 signal (race type not covered by FiveThirtyEight)"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "polls-signal: TICKER → no 538 signal (race type not covered by FiveThirtyEight)"
      ```
    - If non-empty: log the result and print the raw JSON.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polls-signal: TICKER → prob=<p> ±<u>"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "polls-signal: TICKER → prob=<p> ±<u>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the

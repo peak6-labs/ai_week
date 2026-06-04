@@ -45,7 +45,7 @@ def main() -> None:
                     print(json.dumps([]))
                     return
             timeline = await client.get_mention_timeline(
-                parsed["phrase"], station=parsed["station"]
+                parsed["phrase"], stations=parsed["station"]
             )
             base_rate = base_rate_from_points(timeline["points"])
             if base_rate["period_count"] == 0:

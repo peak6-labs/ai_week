@@ -23,10 +23,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from kalshi_trader._retry import with_retry
+
 CONTRACT_TERMS_PATH = Path(__file__).with_name("series_contract_terms.json")
 
 # Fields lifted from the series object into each cache entry.
 _SERIES_FIELDS = ("settlement_sources", "contract_terms_url", "contract_url")
+
+# Cap on concurrent /series fetches during a batch miss. A cold first cycle can
+# miss dozens of series at once; fanning them all out unbounded gets 429'd, so we
+# bound the gather like scanner.py does and let with_retry ride out rate limits.
+_FETCH_CONCURRENCY = 6
 
 
 def load_contract_terms(path: Path | str = CONTRACT_TERMS_PATH) -> dict[str, dict]:
@@ -91,24 +98,37 @@ async def get_or_fetch_many(
 ) -> dict[str, dict]:
     """Return settlement terms for a set of series, batching the misses.
 
-    Dedups the input, fetches only the series not already cached (concurrently),
+    Dedups the input, fetches only the series not already cached — concurrently
+    but **bounded** by a semaphore, with each fetch wrapped in ``with_retry`` so a
+    rate-limited (429) series backs off and retries instead of being dropped —
     writes the cache once, and returns ``{series_ticker: entry}`` for every
-    requested series that resolved. A series whose fetch raised is simply
-    omitted (and left uncached) so one bad lookup never sinks the batch.
+    requested series that resolved. A series whose fetch raised (a non-429 error)
+    is simply omitted and left uncached so one bad lookup never sinks the batch;
+    a series that 429'd through every retry returns ``with_retry``'s empty fallback
+    and is likewise left uncached (rate-limited, not yet fetched) rather than
+    poisoning the cache with an empty entry.
     """
     distinct_tickers = {series_ticker.upper() for series_ticker in series_tickers}
     cache = load_contract_terms(path)
     missing_tickers = [ticker for ticker in distinct_tickers if ticker not in cache]
 
     if missing_tickers:
+        concurrency_semaphore = asyncio.Semaphore(_FETCH_CONCURRENCY)
+
+        async def _bounded_fetch(series_ticker: str) -> dict[str, Any]:
+            async with concurrency_semaphore:
+                return await with_retry(_fetch_entry, series_ticker, client)
+
         fetched = await asyncio.gather(
-            *(_fetch_entry(ticker, client) for ticker in missing_tickers),
+            *(_bounded_fetch(ticker) for ticker in missing_tickers),
             return_exceptions=True,
         )
         for ticker, result in zip(missing_tickers, fetched):
-            if isinstance(result, Exception):
-                continue
-            cache[ticker] = result
+            # Skip non-429 failures (Exception) and the empty dict with_retry
+            # returns after exhausting 429 retries — only cache a real entry
+            # (one that carries the fetched_at stamp _extract_entry adds).
+            if isinstance(result, dict) and "fetched_at" in result:
+                cache[ticker] = result
         save_contract_terms(cache, path)
 
     return {ticker: cache[ticker] for ticker in distinct_tickers if ticker in cache}

@@ -172,6 +172,8 @@ async def run(dry_run: bool, out: str | None) -> dict:
                         f"EXITED {ticker} {side.upper()} qty={int(quantity)} "
                         f"price={yes_price}¢ ({exit_signal.description}) order={order_id}"
                     )
+                    # Space consecutive placements to stay under the 429 rate limit.
+                    await asyncio.sleep(kalshi_trader.config.INTER_ORDER_DELAY_SECONDS)
                 except Exception as caught_exception:
                     errors.append({"ticker": ticker, "error": str(caught_exception)})
                     print(f"ERROR {ticker}: {caught_exception}", file=sys.stderr)
@@ -213,12 +215,17 @@ def _write_out(results: dict, out: str | None) -> None:
 
 def _main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate positions and exit triggered ones")
+    parser.add_argument("--execute", action="store_true",
+                        help="Actually place exit orders. DEFAULT IS DRY-RUN (place nothing). "
+                        "Even with --execute, the client still requires KALSHI_ALLOW_ORDERS=1.")
     parser.add_argument("--dry-run", action="store_true",
-                        help="Compute triggers but place no orders")
+                        help="Force dry-run (the default); kept for clarity/back-compat.")
     parser.add_argument("--out", default=None,
                         help="Write results JSON to this path (for orchestrator)")
     args = parser.parse_args()
-    asyncio.run(run(dry_run=args.dry_run, out=args.out))
+    # Dry-run unless execution is explicitly requested; --dry-run also forces it.
+    dry_run = args.dry_run or not args.execute
+    asyncio.run(run(dry_run=dry_run, out=args.out))
 
 
 if __name__ == "__main__":

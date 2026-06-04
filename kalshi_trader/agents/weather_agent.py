@@ -9,6 +9,7 @@ from kalshi_trader.external.weather_parser import parse_title, parse_discussion
 from kalshi_trader.external.weather_authorities import get_authorities, is_independent_authority
 from kalshi_trader.external.weather_settlement import resolve_settlement_station
 from kalshi_trader.external.x_client import XClient
+from kalshi_trader.station_coords import resolve_station_coordinates, station_label_for_series
 from kalshi_trader.agents.base import BaseAgent
 from kalshi_trader.agents.parsing import parse_signal_estimates, estimate_to_dict
 from kalshi_trader.signals.weather import (
@@ -163,6 +164,12 @@ class WeatherAgent:
         self._noaa = NOAAClient()
         self._open_meteo = OpenMeteoClient()
         self._x = XClient()
+        # Per-run forecast point: when the series resolves to an NWS settlement
+        # station, the ensemble/NOAA forecasts are taken at the station's coords
+        # (set in ``run``) instead of the LLM-passed city centroid. Defaults make
+        # the handlers safe even if ``run`` did not resolve a station.
+        self._forecast_override_coords: tuple[float, float] | None = None
+        self._forecast_point: str = "centroid"
         system_prompt = (_PROMPTS_DIR / "weather.md").read_text()
         self._agent = BaseAgent(
             tools=_SCHEMAS,
@@ -183,6 +190,19 @@ class WeatherAgent:
     async def run(
         self, ticker: str, title: str, settlement_context: str | None = None
     ) -> list[SignalEstimate]:
+        # Resolve the contract's settlement-station coordinates once per run so the
+        # ensemble/NOAA forecasts are taken at the station the contract settles on
+        # (e.g. LAX) rather than the LLM-passed city centroid (downtown LA), which
+        # had been manufacturing spurious edges. Falls back to the centroid when no
+        # NWS station resolves (AccuWeather series, no cached terms, fetch failure).
+        try:
+            self._forecast_override_coords = await resolve_station_coordinates(ticker, self._noaa)
+        except Exception:
+            self._forecast_override_coords = None
+        self._forecast_point = (
+            station_label_for_series(ticker) if self._forecast_override_coords else "centroid"
+        )
+
         prompt = f"Analyze this Kalshi weather market:\nticker: {ticker}\ntitle: {title}"
         if settlement_context:
             # The block carries the "measure-the-same-thing" instruction, so the
@@ -195,9 +215,19 @@ class WeatherAgent:
     def _parse_estimates(self, raw: str) -> list[SignalEstimate]:
         return parse_signal_estimates(raw)
 
+    def _stamp_forecast_point(self, estimate_dict: dict) -> dict:
+        """Record where the forecast was taken (``station:KXXX`` vs ``centroid``)
+        in the signal's metadata, so the deliverable can flag station-resolved
+        rows and the centroid fallbacks are auditable."""
+        metadata = estimate_dict.get("metadata")
+        if isinstance(metadata, dict):
+            metadata["forecast_point"] = getattr(self, "_forecast_point", "centroid")
+        return estimate_dict
+
     async def _get_noaa_forecast(self, lat: float, lon: float, date: str) -> dict:
+        forecast_lat, forecast_lon = getattr(self, "_forecast_override_coords", None) or (lat, lon)
         target = date_type.fromisoformat(date)
-        result = await self._noaa.get_forecast(lat, lon, target)
+        result = await self._noaa.get_forecast(forecast_lat, forecast_lon, target)
         generated_at = result["generated_at"]
         if generated_at.tzinfo is None:
             generated_at = generated_at.replace(tzinfo=timezone.utc)
@@ -232,13 +262,14 @@ class WeatherAgent:
         estimate = build_weather_signal(
             ticker, metric, threshold, operator, forecast, discussion, threshold_high
         )
-        return estimate_to_dict(estimate)
+        return self._stamp_forecast_point(estimate_to_dict(estimate))
 
     async def _get_ensemble_forecast(
         self, lat: float, lon: float, date: str, metric: str
     ) -> dict:
+        forecast_lat, forecast_lon = getattr(self, "_forecast_override_coords", None) or (lat, lon)
         target = date_type.fromisoformat(date)
-        return await self._open_meteo.get_ensemble_members(lat, lon, target, metric)
+        return await self._open_meteo.get_ensemble_members(forecast_lat, forecast_lon, target, metric)
 
     async def _build_ensemble_signal(
         self,
@@ -259,7 +290,7 @@ class WeatherAgent:
             ticker, metric, threshold, operator, ensemble, threshold_high,
             observation, lock_fraction,
         )
-        return estimate_to_dict(estimate)
+        return self._stamp_forecast_point(estimate_to_dict(estimate))
 
     async def _get_observed_extreme(
         self,

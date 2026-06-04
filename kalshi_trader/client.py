@@ -5,6 +5,8 @@ import functools
 from typing import Any
 import requests
 from kalshi_auth import KalshiClient as _SyncKalshiClient
+from kalshi_trader import config
+from kalshi_trader._retry import with_retry
 from kalshi_trader.schema import normalize_market, normalize_orderbook
 
 # Dedicated pool so candle batch requests aren't capped at the process default
@@ -105,7 +107,15 @@ class KalshiClient:
         if cursor:
             params["cursor"] = cursor
         params.update(kwargs)
-        return await self.get("/events", params=params)
+        response = await self.get("/events", params=params)
+        # Mirror get_markets: the prod /events payload nests raw markets (with
+        # dollar-string price fields) under each event when with_nested_markets
+        # is set. Normalize them so callers read canonical cent fields
+        # (yes_bid/yes_ask/...) instead of the raw *_dollars keys.
+        for event in response.get("events") or []:
+            for market in event.get("markets") or []:
+                normalize_market(market)
+        return response
 
     async def get_markets(self, status: str = "open", cursor: str = "",
                           limit: int = 1000, **kwargs) -> dict:
@@ -153,16 +163,27 @@ class KalshiClient:
     async def create_order(self, ticker: str, action: str, side: str,
                            count: int, order_type: str = "market",
                            yes_price: int | None = None) -> dict:
+        # Order kill-switch: a scan/analysis cycle must never place a live order.
+        # The operator opts in explicitly via KALSHI_ALLOW_ORDERS=1.
+        if not config.KALSHI_ALLOW_ORDERS:
+            raise PermissionError(
+                "Order placement is disabled — set KALSHI_ALLOW_ORDERS=1 to enable. "
+                f"(refused buy/sell on {ticker})"
+            )
         body: dict[str, Any] = {
             "ticker": ticker, "action": action, "side": side,
             "count": count, "type": order_type,
         }
         if yes_price is not None:
             body["yes_price"] = yes_price
-        return await self.post("/portfolio/orders", body)
+        # Retry 429s with backoff; raise (don't return {}) if the order never lands.
+        return await with_retry(self.post, "/portfolio/orders", body, raise_on_exhaust=True)
 
     async def cancel_order(self, order_id: str) -> dict:
-        return await self.delete(f"/portfolio/orders/{order_id}")
+        # Cancels reduce exposure, so they are NOT gated by the order kill-switch.
+        return await with_retry(
+            self.delete, f"/portfolio/orders/{order_id}", raise_on_exhaust=True
+        )
 
     async def get_market_candlesticks_batch(
         self,

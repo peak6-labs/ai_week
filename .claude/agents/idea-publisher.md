@@ -23,7 +23,7 @@ the trading dashboard UI so a human can review them.
   not filter, modify, or add ideas.
 - **UI must be running.** If the POST fails with a connection error, report that
   the UI server is not running and instruct the user to start it with
-  `python run_ui.py` from `/Users/scorley/code`.
+  `python run_ui.py` from the repo root.
 
 ## Inputs required
 
@@ -43,11 +43,11 @@ the trading dashboard UI so a human can review them.
 3. **POST to the UI.** Log first, then post (replace `IDEAS_FILE` with the actual path):
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "IdeaPublisher: posting <N> ideas to dashboard for review"
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "IdeaPublisher: posting <N> ideas to dashboard for review"
    ```
 
    ```bash
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python -c "
+   PYTHONPATH=. .venv/bin/python -c "
    import json, urllib.request, sys
    ideas = json.load(open('IDEAS_FILE'))
    data = json.dumps(ideas).encode()
