@@ -1,215 +1,91 @@
-"""Tests for ExitMonitor — detects when to close open positions."""
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock
+# tests/test_exit_monitor.py
+import importlib.util
+import os
+import sys
 
 import pytest
 
-from kalshi_trader.exit_monitor import ExitMonitor, TradeEntry
-from kalshi_trader.models import Market, Side
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from kalshi_trader.orderbook import OrderBookState
+
+spec = importlib.util.spec_from_file_location(
+    "exit_monitor", os.path.join(os.path.dirname(__file__), "..", "scripts", "exit_monitor.py")
+)
+exit_monitor = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(exit_monitor)
+
+_build_position_dict = exit_monitor._build_position_dict
+_select_yes_price = exit_monitor._select_yes_price
+
+TICKER = "KXTEST-1"
 
 
-def _make_kalshi_market(ticker="BTC-1", title="Will Bitcoin close above $100k?",
-                         yes_bid=58.0, yes_ask=62.0, hours_to_close=12):
-    return Market(
-        ticker=ticker,
-        event_ticker="BTC",
-        series_ticker="BTC",
-        title=title,
-        yes_bid=yes_bid,
-        yes_ask=yes_ask,
-        last_price=60.0,
-        volume_24h=5000,
-        open_interest=2000,
-        category="crypto",
-        close_time=datetime.now(tz=timezone.utc) + timedelta(hours=hours_to_close),
-        status="open",
-    )
+def _make_orderbook(bid: int, ask: int, ticker: str = TICKER) -> OrderBookState:
+    state = OrderBookState()
+    state.apply_delta(ticker, "yes", bid, 10)
+    state.apply_delta(ticker, "no", ask, 10)
+    return state
 
 
-def _make_poly_market(question="Will Bitcoin close above $100k?", volume_24hr="8000"):
-    return {
-        "conditionId": "0xcond1",
-        "question": question,
-        "volume24hr": volume_24hr,
-        "active": True,
-        "closed": False,
-        "outcomePrices": "[0.60, 0.40]",
-        "updatedAt": "2026-06-01T12:00:00Z",
-        "volume": "100000",
-    }
+def _make_meta(side: str = "yes", quantity: float = 10.0, exposure: float = 5.0) -> dict:
+    return {"side": side, "quantity": quantity, "market_exposure_dollars": exposure}
 
 
-def _make_trade_entry(
-    ticker="BTC-1",
-    side=Side.YES,
-    entry_price_prob=0.50,   # entered at 50¢
-    entry_gap=0.15,           # 15¢ gap at entry
-    hours_ago=1.0,
-    entry_volume_24h=4000.0,
-    condition_id="0xcond1",
-):
-    return TradeEntry(
-        ticker=ticker,
-        condition_id=condition_id,
-        side=side,
-        entry_price_prob=entry_price_prob,
-        entry_gap=entry_gap,
-        entry_time=datetime.now(tz=timezone.utc) - timedelta(hours=hours_ago),
-        entry_volume_24h=entry_volume_24h,
-    )
+class TestBuildPositionDict:
+    def test_yes_position_uses_bid_as_current_price(self):
+        state = _make_orderbook(bid=47, ask=53)
+        result = _build_position_dict(_make_meta(side="yes"), state, TICKER)
+        assert result is not None
+        assert result["current_price_cents"] == 47.0
+
+    def test_no_position_uses_100_minus_ask_as_current_price(self):
+        state = _make_orderbook(bid=47, ask=53)
+        result = _build_position_dict(_make_meta(side="no"), state, TICKER)
+        assert result is not None
+        assert result["current_price_cents"] == 47.0  # 100 - 53
+
+    def test_midpoint_is_average_of_bid_and_ask(self):
+        state = _make_orderbook(bid=47, ask=53)
+        result = _build_position_dict(_make_meta(), state, TICKER)
+        assert result["midpoint_yes_price_cents"] == 50.0
+
+    def test_returns_none_when_no_bid(self):
+        state = OrderBookState()
+        state.apply_delta(TICKER, "no", 53, 10)
+        assert _build_position_dict(_make_meta(), state, TICKER) is None
+
+    def test_returns_none_when_no_ask(self):
+        state = OrderBookState()
+        state.apply_delta(TICKER, "yes", 47, 10)
+        assert _build_position_dict(_make_meta(), state, TICKER) is None
+
+    def test_passes_through_exposure_and_quantity(self):
+        state = _make_orderbook(bid=47, ask=53)
+        result = _build_position_dict(_make_meta(exposure=5.0, quantity=10.0), state, TICKER)
+        assert result["market_exposure_dollars"] == 5.0
+        assert result["quantity"] == 10.0
 
 
-def _make_monitor(poly_markets=None):
-    from kalshi_trader.external.polymarket import PolymarketClient
-    client = PolymarketClient()
-    client.get_markets = AsyncMock(return_value=poly_markets or [_make_poly_market()])
-    return ExitMonitor(poly_client=client)
+class TestSelectYesPrice:
+    def test_yes_stop_loss_uses_bid(self):
+        state = _make_orderbook(bid=47, ask=53)
+        assert _select_yes_price("stop_loss", "yes", state, TICKER) == 47
 
+    def test_yes_profit_target_uses_ask(self):
+        state = _make_orderbook(bid=47, ask=53)
+        assert _select_yes_price("profit_target", "yes", state, TICKER) == 53
 
-# --- take_profit ---
+    def test_no_stop_loss_uses_ask(self):
+        # NO aggressive sell crosses YES ask side
+        state = _make_orderbook(bid=47, ask=53)
+        assert _select_yes_price("stop_loss", "no", state, TICKER) == 53
 
-@pytest.mark.asyncio
-async def test_take_profit_triggered_when_price_converged():
-    """Price moved 90% of entry gap (above 85% threshold) → take_profit."""
-    # Entry: 50¢ prob, gap 15¢. Target = 50 + 15*0.85 = 62.75¢ prob.
-    # Current Kalshi: bid=64, ask=68 → midpoint 66¢ → 0.66 (above target).
-    monitor = _make_monitor()
-    trade = _make_trade_entry(entry_price_prob=0.50, entry_gap=0.15)
-    markets = [_make_kalshi_market(yes_bid=64.0, yes_ask=68.0)]
+    def test_no_profit_target_uses_bid(self):
+        # NO passive sell rests at 100 - YES bid
+        state = _make_orderbook(bid=47, ask=53)
+        assert _select_yes_price("profit_target", "no", state, TICKER) == 47
 
-    exits = await monitor.check_exits([trade], markets)
-    assert len(exits) == 1
-    assert exits[0][1] == "take_profit"
-
-
-@pytest.mark.asyncio
-async def test_no_exit_when_price_not_converged_enough():
-    """Price moved only 50% of gap — below 85% threshold."""
-    # Entry: 50¢, gap 15¢. Target = 62.75¢. Current = 57.5¢ (50% of gap).
-    monitor = _make_monitor()
-    trade = _make_trade_entry(entry_price_prob=0.50, entry_gap=0.15, hours_ago=1.0)
-    markets = [_make_kalshi_market(yes_bid=56.0, yes_ask=59.0)]  # mid=57.5¢
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits == []
-
-
-# --- stale_thesis ---
-
-@pytest.mark.asyncio
-async def test_stale_thesis_triggered_after_24h_no_move():
-    """Position held 30h with <2% price change → stale."""
-    monitor = _make_monitor()
-    trade = _make_trade_entry(
-        entry_price_prob=0.50, entry_gap=0.15, hours_ago=30.0
-    )
-    # Current price 51¢ → abs change 1¢ < 2¢ threshold
-    markets = [_make_kalshi_market(yes_bid=50.0, yes_ask=52.0)]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert len(exits) == 1
-    assert exits[0][1] == "stale_thesis"
-
-
-@pytest.mark.asyncio
-async def test_stale_thesis_not_triggered_within_24h():
-    monitor = _make_monitor()
-    trade = _make_trade_entry(entry_price_prob=0.50, entry_gap=0.15, hours_ago=20.0)
-    markets = [_make_kalshi_market(yes_bid=50.0, yes_ask=52.0)]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits == []
-
-
-# --- volume_spike ---
-
-@pytest.mark.asyncio
-async def test_volume_spike_triggers_exit():
-    """Polymarket volume 3× the entry baseline → exit."""
-    poly_markets = [_make_poly_market(volume_24hr="12001")]  # >2× 4000 baseline
-    monitor = _make_monitor(poly_markets=poly_markets)
-    # Price hasn't moved enough for take_profit; not stale yet
-    trade = _make_trade_entry(
-        entry_price_prob=0.50, entry_gap=0.15, hours_ago=2.0,
-        entry_volume_24h=4000.0
-    )
-    markets = [_make_kalshi_market(yes_bid=55.0, yes_ask=57.0)]  # mid=56 (not at take_profit)
-
-    exits = await monitor.check_exits([trade], markets)
-    assert len(exits) == 1
-    assert exits[0][1] == "volume_spike"
-
-
-@pytest.mark.asyncio
-async def test_volume_spike_not_triggered_within_normal_range():
-    poly_markets = [_make_poly_market(volume_24hr="5000")]  # 1.25× baseline — not a spike
-    monitor = _make_monitor(poly_markets=poly_markets)
-    trade = _make_trade_entry(
-        entry_price_prob=0.50, entry_gap=0.15, hours_ago=2.0,
-        entry_volume_24h=4000.0
-    )
-    markets = [_make_kalshi_market(yes_bid=55.0, yes_ask=57.0)]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits == []
-
-
-@pytest.mark.asyncio
-async def test_volume_spike_skipped_when_no_entry_baseline():
-    """If entry_volume_24h == 0, skip volume spike check entirely."""
-    poly_markets = [_make_poly_market(volume_24hr="99999")]
-    monitor = _make_monitor(poly_markets=poly_markets)
-    trade = _make_trade_entry(
-        entry_price_prob=0.50, entry_gap=0.15, hours_ago=2.0,
-        entry_volume_24h=0.0  # no baseline stored
-    )
-    markets = [_make_kalshi_market(yes_bid=55.0, yes_ask=57.0)]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits == []
-
-
-# --- Ordering: take_profit wins over stale ---
-
-@pytest.mark.asyncio
-async def test_take_profit_wins_over_stale_thesis():
-    """When both conditions are met, report take_profit (first check wins)."""
-    monitor = _make_monitor()
-    trade = _make_trade_entry(
-        entry_price_prob=0.50, entry_gap=0.15, hours_ago=30.0
-    )
-    # Price at 66¢ → both take_profit (>62.75¢) AND stale would be true
-    markets = [_make_kalshi_market(yes_bid=64.0, yes_ask=68.0)]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits[0][1] == "take_profit"
-
-
-# --- Edge cases ---
-
-@pytest.mark.asyncio
-async def test_unknown_ticker_skipped():
-    """If the ticker isn't in the kalshi_markets list, skip it silently."""
-    monitor = _make_monitor()
-    trade = _make_trade_entry(ticker="UNKNOWN-99")
-    markets = [_make_kalshi_market(ticker="BTC-1")]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits == []
-
-
-@pytest.mark.asyncio
-async def test_empty_open_trades_returns_empty():
-    monitor = _make_monitor()
-    exits = await monitor.check_exits([], [_make_kalshi_market()])
-    assert exits == []
-
-
-@pytest.mark.asyncio
-async def test_no_exit_side_is_preserved_in_result():
-    monitor = _make_monitor()
-    trade = _make_trade_entry(entry_price_prob=0.50, entry_gap=0.15)
-    markets = [_make_kalshi_market(yes_bid=64.0, yes_ask=68.0)]
-
-    exits = await monitor.check_exits([trade], markets)
-    assert exits[0][0].ticker == "BTC-1"
+    def test_returns_none_when_no_data(self):
+        state = OrderBookState()
+        assert _select_yes_price("stop_loss", "yes", state, TICKER) is None
