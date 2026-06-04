@@ -32,12 +32,12 @@ from kalshi_trader.models import SignalEstimate
 SOURCE_MENTIONS_BASE = "mentions_base"
 
 # Corpus-backed tier: enough speaker-attributed documents to trust the attribution.
-WEIGHT_CORPUS_BACKED = 0.55
+WEIGHT_CORPUS_BACKED = 0.95
 UNCERTAINTY_CORPUS_BACKED = 0.18
 # GDELT-only fallback tier: a working signal off TV coverage alone, but it cannot
 # attribute the phrase to the speaker, so it carries less weight, more uncertainty,
 # and is flagged non-independent of any other GDELT-derived estimate.
-WEIGHT_GDELT_ONLY = 0.40
+WEIGHT_GDELT_ONLY = 0.85
 UNCERTAINTY_GDELT_ONLY = 0.22
 
 # Evidence-weight shrinkage when fusing corpus with GDELT.
@@ -52,7 +52,7 @@ MIN_EFFECTIVE_FOR_SIGNAL = 4.0
 SOURCE_MENTIONS_LIVE = "mentions_live"
 PROBABILITY_MENTIONS_LIVE = 0.92   # caption ASR errors + no speaker attribution
 UNCERTAINTY_MENTIONS_LIVE = 0.08
-WEIGHT_MENTIONS_LIVE = 0.85
+WEIGHT_MENTIONS_LIVE = 0.95
 
 
 def build_mentions_live_signal(
