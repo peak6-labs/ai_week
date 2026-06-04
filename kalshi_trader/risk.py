@@ -58,8 +58,8 @@ class RiskManager:
         if edge < 0.05:
             return RiskDecision(False, 0, f"insufficient edge: {edge:.3f} < 0.05")
 
-        # Half-Kelly sizing
-        size = self._half_kelly_size(
+        # Kelly sizing (fraction set by config.KELLY_FRACTION — quarter-Kelly default)
+        size = self._kelly_stake_size(
             probability=idea.confidence, market_prob=market_prob,
             balance=portfolio.balance_dollars, category=idea.category,
         )
@@ -114,7 +114,7 @@ class RiskManager:
         if self._consecutive_wins[category] >= 3:
             self._consecutive_losses[category] = 0
 
-    def _half_kelly_size(
+    def _kelly_stake_size(
         self, probability: float, market_prob: float, balance: float, category: str
     ) -> float:
         complement_probability = 1.0 - probability
@@ -122,7 +122,8 @@ class RiskManager:
         if yes_net_odds <= 0:
             return 0.0
         full_kelly_fraction = (probability * yes_net_odds - complement_probability) / yes_net_odds
-        half_kelly_fraction = max(full_kelly_fraction / 2.0, 0.0)
+        # Stake a fixed fraction of the full-Kelly optimum (quarter-Kelly by default).
+        staked_kelly_fraction = max(full_kelly_fraction * config.KELLY_FRACTION, 0.0)
         if self._consecutive_losses.get(category, 0) >= 3:
-            half_kelly_fraction *= 0.5
-        return half_kelly_fraction * balance
+            staked_kelly_fraction *= 0.5
+        return staked_kelly_fraction * balance

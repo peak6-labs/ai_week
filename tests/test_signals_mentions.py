@@ -99,6 +99,10 @@ def _gdelt(fraction, period_count=30, **extra):
 
 
 def test_gdelt_only_fallback_tier():
+    # Calibration fix (audit B1, 2026-06-04 backtest): a GDELT-only read is now a
+    # non-tradeable prior under the default require-corpus regime — it is suppressed
+    # (uncertainty>=0.99) so the scorer drops it, rather than emitting at 0.22. The
+    # probability/weight/lineage fields are unchanged; only it is flagged suppressed.
     sig = build_mentions_base_signal(
         "KXMENTION-POWELL-RECESSION", "recession", ["CSPAN"],
         gdelt_base_rate=_gdelt(0.7), corpus=None, speaker="Jerome Powell",
@@ -108,8 +112,8 @@ def test_gdelt_only_fallback_tier():
     assert sig.source == "mentions_base"
     assert sig.probability == pytest.approx(0.7)
     assert sig.weight == pytest.approx(WEIGHT_GDELT_ONLY)
-    assert sig.uncertainty == pytest.approx(0.22)
-    assert sig.metadata["data_quality"] == "stale"
+    assert sig.uncertainty >= 0.99  # suppressed (was 0.22 before the calibration fix)
+    assert sig.metadata["suppressed"] is True
     assert sig.metadata["independent"] is False
     assert sig.metadata["speaker_key"] == "powell"
     assert sig.data_issued_at.tzinfo is not None

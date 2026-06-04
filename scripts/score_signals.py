@@ -34,6 +34,14 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Single-source the Kelly staking fraction from config so this script's displayed
+# kelly_fraction matches RiskManager's actual sizing. Fall back if run without
+# PYTHONPATH=. (the package then isn't importable).
+try:
+    from kalshi_trader.config import KELLY_FRACTION as _KELLY_FRACTION
+except Exception:
+    _KELLY_FRACTION = 0.25
+
 
 def load_config(path: str) -> dict:
     p = Path(path)
@@ -329,7 +337,7 @@ def compute_edge_and_kelly(
         yes_net_odds = (1.0 / side_price) - 1.0
         complement_probability = 1.0 - side_probability
         full_kelly_fraction = (side_probability * yes_net_odds - complement_probability) / yes_net_odds
-        kelly = max(0.0, full_kelly_fraction * 0.5)  # half-Kelly
+        kelly = max(0.0, full_kelly_fraction * _KELLY_FRACTION)  # config-driven (quarter-Kelly)
 
     # Configurable edge bar (default 5¢) so it can be tuned from the paper loop
     # without a code change (#25).

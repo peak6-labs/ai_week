@@ -9,6 +9,28 @@ rate.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
+
+_SMART_CHAR_FOLD = str.maketrans({
+    "‘": "'", "’": "'", "“": '"', "”": '"',
+    "–": "-", "—": "-", "…": " ",
+})
+
+
+def normalize_for_match(text: str | None) -> str:
+    """Fold a string to a canonical form for substring phrase matching.
+
+    Folds smart quotes/dashes to ASCII, lowercases, replaces every run of
+    non-alphanumeric characters with a single space, and trims. The result is the
+    ``norm_text`` stored alongside each transcript and the form a search phrase is
+    reduced to before ``phrase in norm_text`` counting — so punctuation and casing
+    never cause a missed match. Used by ``kalshi_trader.mentions.store``.
+    """
+    if not text:
+        return ""
+    folded = text.translate(_SMART_CHAR_FOLD).lower()
+    return re.sub(r"[^a-z0-9]+", " ", folded).strip()
+
 
 # Venue keyword → TV station whose Internet-Archive caption stream covers it.
 # CSPAN carries House/Senate hearings and floor proceedings; the White House
@@ -211,3 +233,33 @@ def base_rate_from_points(points: list[dict]) -> dict:
         "mean_match_percent": sum(values) / period_count,
         "max_match_percent": max(values),
     }
+
+
+def latest_mention_point(points: list[dict]) -> dict | None:
+    """Return the chronologically most-recent point with a non-zero value, or None.
+
+    Selects by parsed timestamp rather than list position — GDELT usually returns
+    points in order, but we must not depend on it (an out-of-order feed would
+    otherwise stamp a live signal with the wrong, older clip time).
+    """
+    matching_points = [point for point in points if float(point.get("value", 0.0) or 0.0) > 0.0]
+    if not matching_points:
+        return None
+    epoch = datetime.min.replace(tzinfo=timezone.utc)
+    return max(matching_points, key=lambda point: parse_point_datetime(point.get("date", "")) or epoch)
+
+
+def parse_point_datetime(date_string: str) -> "datetime | None":
+    """Parse a GDELT point date string into a UTC datetime, or None.
+
+    Accepts both compact ``YYYYMMDDHHMMSS`` and ISO-ish ``YYYYMMDDTHHMMSSZ`` (the
+    TV API returns the latter), by reducing to the leading 14 digits before parsing.
+    """
+    from datetime import datetime, timezone
+    digits = "".join(character for character in (date_string or "") if character.isdigit())
+    if len(digits) < 14:
+        return None
+    try:
+        return datetime.strptime(digits[:14], "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
