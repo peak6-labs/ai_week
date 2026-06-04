@@ -236,8 +236,10 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                 parsed: list[dict] = []
                 for raw_position in held_raws:
                     qty_fp = float(raw_position.get("position_fp", "0") or 0)
-                    side = "YES" if qty_fp > 0 else "NO"
                     qty = abs(qty_fp)
+                    if int(qty) == 0:
+                        continue
+                    side = "YES" if qty_fp > 0 else "NO"
                     exposure = float(raw_position.get("market_exposure_dollars", "0") or 0)
                     fees = float(raw_position.get("fees_paid_dollars", "0") or 0)
                     realized = float(raw_position.get("realized_pnl_dollars", "0") or 0)
