@@ -6,8 +6,7 @@ Rules applied per candidate (in order):
   2. Love island filter:   category contains "love island" → skip (always excluded)
   3. Edge gate:            confidence - market_price/100 < 0.05 → skip
   4. Unquoted guard:       market_price <= 0 or >= 100 → skip
-  5. Weather settlement:   category in {"climate and weather", "weather"}
-                           AND hours_to_close < 2 → skip
+  5. Settlement proximity: hours_to_close < 2 → skip (all categories)
   6. Execute:              buy $10 flat limit order
 
 Safety guarantee: Step 0.5 (evaluate_portfolio.py) always runs BEFORE this script
@@ -43,8 +42,7 @@ SESSION_TRADE_CAP = 10
 SESSION_DOLLAR_CAP = 100.0
 FLAT_TRADE_SIZE_DOLLARS = 10.0
 EDGE_MINIMUM = 0.05
-WEATHER_SETTLEMENT_HOURS = 2.0
-WEATHER_CATEGORIES = {"climate and weather", "weather"}
+SETTLEMENT_PROXIMITY_HOURS = 2.0
 LOVE_ISLAND_CATEGORY = "love island"
 
 
@@ -76,7 +74,7 @@ def apply_rules(candidate: dict, session: dict) -> str | None:
     """Return rejection_reason if candidate should not be executed, else None.
 
     Pure function — no I/O. Checks rules in priority order:
-    session cap → unquoted → edge → weather settlement.
+    session cap → love island → edge → unquoted → settlement proximity.
     """
     if (
         session["trades_placed"] >= SESSION_TRADE_CAP
@@ -99,12 +97,8 @@ def apply_rules(candidate: dict, session: dict) -> str | None:
         return "edge_insufficient"
 
     hours_to_close = candidate.get("hours_to_close")
-    if (
-        category in WEATHER_CATEGORIES
-        and hours_to_close is not None
-        and float(hours_to_close) < WEATHER_SETTLEMENT_HOURS
-    ):
-        return "weather_settlement_proximity"
+    if hours_to_close is not None and float(hours_to_close) < SETTLEMENT_PROXIMITY_HOURS:
+        return "settlement_proximity"
 
     return None
 

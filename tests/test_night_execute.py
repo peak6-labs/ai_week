@@ -103,7 +103,7 @@ def test_apply_rules_rejects_unquoted_100_price():
 
 def test_apply_rules_rejects_weather_under_2h():
     candidate = _candidate(category="climate and weather", hours_to_close=1.5)
-    assert apply_rules(candidate, _session()) == "weather_settlement_proximity"
+    assert apply_rules(candidate, _session()) == "settlement_proximity"
 
 
 def test_apply_rules_passes_weather_over_2h():
@@ -111,8 +111,8 @@ def test_apply_rules_passes_weather_over_2h():
     assert apply_rules(candidate, _session()) is None
 
 
-def test_apply_rules_passes_weather_no_hours():
-    """Weather market with no hours_to_close — skip the gate rather than reject."""
+def test_apply_rules_passes_no_hours():
+    """No hours_to_close — skip the gate rather than reject."""
     candidate = _candidate(category="climate and weather", hours_to_close=None)
     assert apply_rules(candidate, _session()) is None
 
@@ -123,14 +123,15 @@ def test_apply_rules_rejects_love_island_under_2h():
     assert apply_rules(candidate, _session()) == "love_island_excluded"
 
 
-def test_apply_rules_passes_politics_under_2h():
+def test_apply_rules_rejects_politics_under_2h():
+    """All categories blocked under 2h — not just weather."""
     candidate = _candidate(category="politics", hours_to_close=0.1)
-    assert apply_rules(candidate, _session()) is None
+    assert apply_rules(candidate, _session()) == "settlement_proximity"
 
 
-def test_apply_rules_passes_sports_at_zero_hours():
+def test_apply_rules_rejects_sports_under_2h():
     candidate = _candidate(category="sports", hours_to_close=0.0)
-    assert apply_rules(candidate, _session()) is None
+    assert apply_rules(candidate, _session()) == "settlement_proximity"
 
 
 def test_apply_rules_rejects_love_island():
