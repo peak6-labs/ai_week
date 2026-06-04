@@ -63,7 +63,9 @@ For each open position not in `_pending_exits`:
   - `profit_target` → limit sell at current YES **ask** (passive maker, fee-efficient)
   - `stop_loss` → limit sell at current YES **bid** (aggressive, guarantee fill)
 - Place limit sell order via `KalshiClient.create_order()`
-- Log: ticker, reason, price, description
+- **Event log**: fire-and-forget HTTP POST to `http://localhost:8000/api/state` to inject a log line (e.g. `"stop_loss fired: TICKER at 12¢ — down 35% from cost basis"`). Silently swallowed if the server is not running.
+- **Supabase**: call `db.close_position(ticker, closing_trade_id, realized_pnl_dollars, exit_reason)` so the exit appears in the Closed Positions panel. Only meaningful once positions are opened through this system; no-ops gracefully if no open position row exists.
+- Log to stdout: ticker, reason, limit price, signal description
 
 ### Position refresh (every 30s)
 - Re-fetch open positions from REST API
@@ -73,6 +75,8 @@ For each open position not in `_pending_exits`:
 ## Double-Exit Prevention
 
 `_pending_exits: set[str]` — a ticker is added when an exit is triggered and removed when the 30s refresh confirms the position is gone from the API. The exit check loop skips any ticker in this set.
+
+**Resting order check on startup and refresh**: Before placing any exit order, the monitor calls `GET /portfolio/orders?status=resting` and pre-populates `_pending_exits` with any ticker that already has a resting sell order. This prevents duplicate orders on restart (e.g. monitor crashes and comes back while a previous exit order is still resting) and handles the case where an exit was placed manually while the monitor was offline.
 
 ## Invocation
 
@@ -91,6 +95,5 @@ python scripts/exit_monitor.py --dry-run   # log signals, skip order placement
 ## Out of Scope
 
 - AI position review (Step 0.75)
-- UI integration (the monitor logs to stdout only)
 - Partial exits or position sizing adjustments
 - Trailing stops
