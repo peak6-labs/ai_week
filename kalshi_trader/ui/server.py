@@ -90,6 +90,61 @@ def compute_closed_positions(
     return result
 
 
+def merge_with_settled_positions(
+    fills_based: list[dict],
+    settled_api_positions: list[dict],
+    fills_cache: dict[str, list[dict]],
+) -> list[dict]:
+    """Merge fills-based closed positions with the authoritative settled positions API.
+
+    Settlement fills are often missing from /portfolio/fills, so fills-based
+    detection alone misses positions that settled via market resolution. This
+    function adds any settled positions not already covered by fills, using the
+    API's realized_pnl_dollars as the authoritative figure, and enriches with
+    entry price from fills where available.
+    """
+    fills_based_tickers = {row["ticker"] for row in fills_based}
+    merged = list(fills_based)
+
+    for position in settled_api_positions:
+        ticker = position.get("ticker", "")
+        if not ticker or ticker in fills_based_tickers:
+            continue
+        position_fp = float(position.get("position_fp", "0") or "0")
+        if abs(position_fp) >= 1:
+            continue
+        realized_pnl = float(position.get("realized_pnl_dollars", "0") or "0")
+        closed_at = position.get("last_updated_ts", "")
+
+        ticker_fills = fills_cache.get(ticker, [])
+        buy_fills = [f for f in ticker_fills if f.get("action") == "buy"]
+        sell_fills = [f for f in ticker_fills if f.get("action") == "sell"]
+
+        side_raw = (buy_fills[0].get("side") or "yes").lower() if buy_fills else "yes"
+        side = "YES" if side_raw == "yes" else "NO"
+        use_no_price = side == "NO"
+
+        contracts = sum(f.get("count", 0) for f in buy_fills) or None
+        entry_price_cents = _avco_price(buy_fills, use_no_price) if buy_fills else None
+        exit_price_cents = _avco_price(sell_fills, use_no_price) if sell_fills else None
+        opened_at = min(f.get("created_time", "") for f in buy_fills) if buy_fills else ""
+
+        merged.append({
+            "ticker": ticker,
+            "side": side,
+            "contracts": int(contracts) if contracts else None,
+            "entry_price_cents": entry_price_cents,
+            "exit_price_cents": exit_price_cents,
+            "opened_at": opened_at,
+            "closed_at": closed_at,
+            "gross_realized_pnl_dollars": round(realized_pnl, 4),
+            "realized_pnl_dollars": round(realized_pnl, 4),
+        })
+
+    merged.sort(key=lambda row: row["closed_at"] or "", reverse=True)
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # Kalshi account poller — runs independently of the trading loop
 # ---------------------------------------------------------------------------
@@ -341,8 +396,15 @@ async def _poll_fills(trading_state: TradingState) -> None:
                         open_tickers = {
                             p["ticker"] for p in trading_state.positions if p.get("ticker")
                         }
-                        trading_state.closed_positions = compute_closed_positions(
-                            fills_cache, open_tickers
+                        fills_based = compute_closed_positions(fills_cache, open_tickers)
+
+                        settled_resp = await client.get(
+                            "/portfolio/positions",
+                            {"settlement_status": "settled", "limit": 200},
+                        )
+                        settled_positions = settled_resp.get("market_positions") or []
+                        trading_state.closed_positions = merge_with_settled_positions(
+                            fills_based, settled_positions, fills_cache
                         )
 
                     except asyncio.CancelledError:
