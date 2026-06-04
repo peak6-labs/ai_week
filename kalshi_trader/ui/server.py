@@ -107,7 +107,12 @@ async def _fetch_yes_price_data(client: Any, ticker: str, concurrency_semaphore:
             yes_bid = float(market_data.get("yes_bid", 0) or 0)
             yes_ask = float(market_data.get("yes_ask", 0) or 0)
             if yes_bid > 0 or yes_ask > 0:
-                return {"bid": yes_bid, "ask": yes_ask, "mid": (yes_bid + yes_ask) / 2.0}
+                # Skip bid/ask mid when spread is the Kalshi default "no real market"
+                # quote (bid ≤ 1¢, ask ≥ 99¢) — the 50¢ mid is meaningless there.
+                if not (yes_bid <= 1 and yes_ask >= 99):
+                    return {"bid": yes_bid, "ask": yes_ask, "mid": (yes_bid + yes_ask) / 2.0}
+                last = market_data.get("last_price")
+                return {"bid": yes_bid, "ask": yes_ask, "mid": float(last) if last is not None else None}
             last = market_data.get("last_price")
             if last is not None:
                 return {"bid": None, "ask": None, "mid": float(last)}
