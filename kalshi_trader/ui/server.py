@@ -268,19 +268,51 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
             await asyncio.sleep(10)
 
 
-async def _poll_closed_positions(trading_state: TradingState) -> None:
-    """Poll Supabase every 60 s for recently closed positions."""
-    from kalshi_trader import db as _db
+async def _poll_fills(trading_state: TradingState) -> None:
+    """Rebuild closed positions from Kalshi fills every 5 minutes.
 
-    await asyncio.sleep(5)
-    while True:
-        try:
-            trading_state.closed_positions = await _db.get_closed_positions(limit=50)
-        except asyncio.CancelledError:
-            raise
-        except Exception as caught_exception:
-            logger.debug("Closed positions poll failed: %s", caught_exception)
-        await asyncio.sleep(60)
+    Fetches all portfolio fills via paginated GET /portfolio/fills, groups them
+    by ticker, and calls compute_closed_positions() to derive the closed
+    positions list. Replaces the Supabase-based _poll_closed_positions poller.
+    """
+    from kalshi_trader.client import KalshiClient
+    from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+
+    await asyncio.sleep(4)
+    trading_state.log("Fills poller started")
+
+    async with KalshiClient() as raw_client:
+        client = ReadOnlyKalshiClient(raw_client)
+        while True:
+            try:
+                fills_cache: dict[str, list[dict]] = {}
+                cursor: str | None = None
+
+                while True:
+                    response = await client.get_fills(cursor=cursor)
+                    page_fills = response.get("fills") or []
+                    for fill in page_fills:
+                        ticker = fill.get("ticker", "")
+                        if ticker:
+                            fills_cache.setdefault(ticker, []).append(fill)
+                    next_cursor = response.get("cursor")
+                    if not next_cursor or not page_fills:
+                        break
+                    cursor = next_cursor
+
+                open_tickers = {
+                    p["ticker"] for p in trading_state.positions if p.get("ticker")
+                }
+                trading_state.closed_positions = compute_closed_positions(
+                    fills_cache, open_tickers
+                )
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as caught_exception:
+                logger.warning("Fills poll failed: %s", caught_exception)
+
+            await asyncio.sleep(300)  # 5 minutes
 
 
 # ---------------------------------------------------------------------------
@@ -316,7 +348,7 @@ def create_app(
     @app.on_event("startup")
     async def _start_account_poller() -> None:
         asyncio.create_task(_poll_kalshi_account(trading_state))
-        asyncio.create_task(_poll_closed_positions(trading_state))
+        asyncio.create_task(_poll_fills(trading_state))
 
     # ------------------------------------------------------------------
     # Routes
