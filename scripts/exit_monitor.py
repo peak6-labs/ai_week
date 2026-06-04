@@ -195,6 +195,16 @@ async def run(dry_run: bool) -> None:
                     log.warning("Position refresh failed: %s", refresh_exc)
                 last_refresh_time = now
 
+            # Detect silent WebSocket task death and log loudly
+            if ws_task is not None and ws_task.done():
+                exc = ws_task.exception() if not ws_task.cancelled() else None
+                log.error(
+                    "WebSocket task died unexpectedly (exc=%s) — "
+                    "prices are stale, exit checks suspended until next refresh",
+                    exc,
+                )
+                ws_task = None  # cleared so _refresh() will restart it
+
             for ticker, meta in list(position_metadata.items()):
                 if ticker in pending_exits:
                     continue
