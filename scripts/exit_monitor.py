@@ -295,12 +295,29 @@ if __name__ == "__main__":
         action="store_true",
         help="Log exit signals but do not place orders or write to Supabase",
     )
+    parser.add_argument(
+        "--log-file",
+        default="logs/exit_monitor.log",
+        help="Path to log file (default: logs/exit_monitor.log)",
+    )
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    log_format = "%(asctime)s  %(levelname)-7s  %(name)s — %(message)s"
+    log_datefmt = "%Y-%m-%d %H:%M:%S"
 
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setFormatter(logging.Formatter(log_format, datefmt=log_datefmt))
+    root_logger.addHandler(stdout_handler)
+
+    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), args.log_file) \
+        if not os.path.isabs(args.log_file) else args.log_file
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(logging.Formatter(log_format, datefmt=log_datefmt))
+    root_logger.addHandler(file_handler)
+
+    log.info("Logging to %s", log_path)
     asyncio.run(run(dry_run=args.dry_run))
