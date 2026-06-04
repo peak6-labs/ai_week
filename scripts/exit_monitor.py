@@ -21,6 +21,7 @@ from kalshi_trader.external.kalshi_ws import KalshiWebSocketClient
 from kalshi_trader.orderbook import OrderBookState
 from kalshi_trader.portfolio_checks import EXIT_CHECKS
 from kalshi_trader import db as _db
+from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
 
 log = logging.getLogger("exit_monitor")
 
@@ -85,7 +86,7 @@ async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
     raw_positions = response.get("market_positions") or []
     positions: dict[str, dict] = {}
     for raw in raw_positions:
-        qty = float(raw.get("position_fp", "0") or 0)
+        qty = parse_fixed_point(raw.get("position_fp"))
         if qty == 0:
             continue
         ticker = raw.get("ticker", "")
@@ -94,8 +95,8 @@ async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
         positions[ticker] = {
             "ticker": ticker,
             "side": "yes" if qty > 0 else "no",
-            "quantity": abs(qty),
-            "market_exposure_dollars": float(raw.get("market_exposure_dollars", "0") or 0),
+            "quantity": int(round(abs(qty))),
+            "market_exposure_dollars": parse_fixed_point(raw.get("market_exposure_dollars")),
         }
     return positions
 
