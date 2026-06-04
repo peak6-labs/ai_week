@@ -207,3 +207,59 @@ async def test_resolve_quantity_amount_dollars():
 async def test_resolve_quantity_missing_raises():
     with pytest.raises(SystemExit):
         await place_order.resolve_quantity("KXFOO", None, "buy", None)
+
+
+@pytest.mark.asyncio
+async def test_cancel_orders_cancels_all_for_ticker():
+    from unittest.mock import call
+    mock_client = MagicMock()
+    mock_client.get_orders = AsyncMock(return_value={"orders": [
+        {"order_id": "ord1", "ticker": "KXFOO"},
+        {"order_id": "ord2", "ticker": "KXFOO"},
+        {"order_id": "ord3", "ticker": "KXBAR"},  # different ticker, should be skipped
+    ]})
+    mock_client.cancel_order = AsyncMock(return_value={})
+    count = await place_order.cancel_orders("KXFOO", mock_client, dry_run=False)
+    assert count == 2
+    mock_client.cancel_order.assert_has_calls([call("ord1"), call("ord2")], any_order=True)
+
+
+@pytest.mark.asyncio
+async def test_cancel_orders_dry_run_returns_count_without_cancelling():
+    mock_client = MagicMock()
+    mock_client.get_orders = AsyncMock(return_value={"orders": [
+        {"order_id": "ord1", "ticker": "KXFOO"},
+    ]})
+    mock_client.cancel_order = AsyncMock()
+    count = await place_order.cancel_orders("KXFOO", mock_client, dry_run=True)
+    assert count == 1
+    mock_client.cancel_order.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_place_order_op_places_limit_order():
+    mock_client = MagicMock()
+    mock_client.create_order = AsyncMock(return_value={
+        "order": {"order_id": "ord_xyz", "status": "resting", "yes_price_dollars": "0.6400"}
+    })
+    result = await place_order.place_order_op(
+        ticker="KXFOO", action="sell", side="yes", count=20,
+        yes_price=64, client=mock_client, dry_run=False,
+    )
+    assert result["order_id"] == "ord_xyz"
+    mock_client.create_order.assert_called_once_with(
+        ticker="KXFOO", action="sell", side="yes",
+        count=20, order_type="limit", yes_price=64,
+    )
+
+
+@pytest.mark.asyncio
+async def test_place_order_op_dry_run_skips_api():
+    mock_client = MagicMock()
+    mock_client.create_order = AsyncMock()
+    result = await place_order.place_order_op(
+        ticker="KXFOO", action="sell", side="yes", count=20,
+        yes_price=64, client=mock_client, dry_run=True,
+    )
+    assert result["dry_run"] is True
+    mock_client.create_order.assert_not_called()

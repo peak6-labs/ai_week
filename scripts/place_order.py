@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, ".")
 
 import kalshi_trader.config  # noqa: F401 — loads .env
+from kalshi_trader.client import KalshiClient
 from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
 
 
@@ -163,3 +164,70 @@ async def resolve_quantity(
         file=sys.stderr,
     )
     sys.exit(1)
+
+
+async def cancel_orders(ticker: str, client, dry_run: bool = False) -> int:
+    """Cancel all resting orders for ticker. Returns count of cancelled orders."""
+    orders_response = await client.get_orders(status="resting")
+    resting_orders = [
+        order for order in orders_response.get("orders", [])
+        if order.get("ticker") == ticker
+    ]
+    if dry_run:
+        print(f"[DRY-RUN] Would cancel {len(resting_orders)} resting order(s) for {ticker}")
+        return len(resting_orders)
+    for order in resting_orders:
+        await client.cancel_order(order["order_id"])
+    print(f"Cancelled {len(resting_orders)} order(s) for {ticker}")
+    return len(resting_orders)
+
+
+async def place_order_op(
+    ticker: str,
+    action: str,
+    side: str,
+    count: int,
+    yes_price: int,
+    client,
+    dry_run: bool = False,
+) -> dict:
+    """Place a single limit order. Returns result dict."""
+    if dry_run:
+        print(
+            f"[DRY-RUN] Would {action.upper()} {side.upper()} {count} contracts of "
+            f"{ticker} at yes_price={yes_price}¢"
+        )
+        return {"ticker": ticker, "action": action, "side": side,
+                "count": count, "yes_price": yes_price, "dry_run": True}
+
+    order_response = await client.create_order(
+        ticker=ticker, action=action, side=side,
+        count=count, order_type="limit", yes_price=yes_price,
+    )
+    order_data = order_response.get("order", {})
+    order_id = order_data.get("order_id", "")
+    status = order_data.get("status", "unknown")
+    print(
+        f"EXECUTED {ticker} {action.upper()} {side.upper()} "
+        f"qty={count} yes_price={yes_price}¢ "
+        f"order_id={order_id} status={status}"
+    )
+    return {"ticker": ticker, "action": action, "side": side,
+            "count": count, "yes_price": yes_price,
+            "order_id": order_id, "status": status, "dry_run": False}
+
+
+async def cancel_and_replace(
+    ticker: str,
+    action: str,
+    side: str,
+    count: int,
+    yes_price: int,
+    client,
+    dry_run: bool = False,
+) -> dict:
+    """Cancel all resting orders for ticker, then place a new limit order."""
+    await cancel_orders(ticker, client, dry_run=dry_run)
+    if not dry_run:
+        await asyncio.sleep(0.5)
+    return await place_order_op(ticker, action, side, count, yes_price, client, dry_run=dry_run)
