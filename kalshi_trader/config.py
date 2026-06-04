@@ -20,6 +20,11 @@ _load_dotenv()
 KALSHI_ENV = os.environ.get("KALSHI_ENV", "demo").lower()
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# Order kill-switch: no code path may place a live order unless this is set.
+# Defaults OFF so a scan/analysis cycle can never silently place orders — the
+# operator opts in explicitly (KALSHI_ALLOW_ORDERS=1) when they intend to trade.
+KALSHI_ALLOW_ORDERS = os.environ.get("KALSHI_ALLOW_ORDERS", "false").lower() in ("1", "true", "yes")
+
 # Must match kalshi_auth.py BASE_URLS exactly
 _BASE_URLS = {
     "demo": "https://demo-api.kalshi.co/trade-api/v2",
@@ -42,6 +47,11 @@ MAX_PER_CATEGORY_EXPOSURE_DOLLARS = 75
 MAX_OPEN_POSITIONS = 10
 DAILY_LOSS_LIMIT_DOLLARS = 50
 MIN_HOURS_BEFORE_SETTLEMENT = 2
+# Staking fraction applied to the full-Kelly optimum inside RiskManager. Quarter-
+# Kelly by default — conservative given how noisy the signal probabilities are.
+KELLY_FRACTION = 0.25
+# Minimum spacing between consecutive order placements, to avoid 429 rate limits.
+INTER_ORDER_DELAY_SECONDS = 1.0
 
 # Agent models
 SPECIALIST_MODEL = "claude-sonnet-4-6"
@@ -64,6 +74,23 @@ WHALE_SCORER_V2: bool = os.environ.get("WHALE_SCORER_V2", "true").lower() not in
 # GovInfo (CREC/CHRG transcripts). Absent ⇒ those clients return [] and the system
 # degrades gracefully (no schedule veto, no CREC corpus).
 DATA_GOV_API_KEY = os.environ.get("DATA_GOV_API_KEY", "")
+
+# Mentions saturation gate: a GDELT-only base rate at/above HIGH or at/below LOW
+# measures how ubiquitous a word is on TV, not whether a specific speaker says it
+# in a single event — non-discriminative. Such GDELT-only reads are suppressed
+# (marked non-informative) so they cannot manufacture a tradeable edge. Seeded
+# from the mentions backtest calibration; tune from the paper loop.
+MENTIONS_SATURATION_HIGH = 0.85
+MENTIONS_SATURATION_LOW = 0.15
+# The mentions backtest (2026-06-04, 455 settled markets) showed GDELT-only reads
+# have NEGATIVE skill in every probability band — Brier 0.40 > naive 0.25, hit-rate
+# 0.51 < an always-"yes" baseline of 0.55, and inverted calibration ("trump" 99%→
+# unsaid; "airball" 1%→said). National-TV-news frequency measures the wrong thing
+# for a single event. So a GDELT-only read is a non-tradeable prior: only a
+# corpus-backed (speaker-attributed) read emits a tradeable edge. Set False only if
+# a future backtest shows GDELT-only earns its weight. See
+# thoughts/shared/research/2026-06-04-mentions-signal-effectiveness.md.
+MENTIONS_REQUIRE_CORPUS_BACKED = True
 
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"

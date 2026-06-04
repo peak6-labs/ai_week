@@ -15,7 +15,7 @@ from kalshi_trader.models import SignalEstimate
 
 # Hardcoded constants — config_manager.py is a shared file we must not modify, so
 # these are not wired into runtime_config.json. Tune via the paper-trade loop.
-WEIGHT_FIVETHIRTYEIGHT = 0.75
+WEIGHT_FIVETHIRTYEIGHT = 0.25
 UNCERTAINTY_FIVETHIRTYEIGHT = 0.10
 # Forecast-error std on the polling margin, in percentage points. ~5–6 pts is a
 # common standing-poll-to-outcome error; 6.0 is deliberately conservative.

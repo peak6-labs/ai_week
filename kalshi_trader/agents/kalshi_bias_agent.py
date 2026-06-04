@@ -268,7 +268,7 @@ class KalshiBiasAgent:
             source="kalshi_bias",
             probability=round(corrected_prob, 4),
             uncertainty=0.02,
-            weight=0.55,
+            weight=0.25,
             data_issued_at=datetime.now(tz=timezone.utc),
             metadata={
                 "ticker": ticker,

@@ -111,6 +111,7 @@ def serialize_event_group(
             4,
         ),
         "spread_penalty_multiplier": round(best_market.spread_penalty_multiplier, 4),
+        "settlement_proximity_multiplier": round(best_market.settlement_proximity_multiplier, 4),
         "coverage_pct": round(coverage_fraction(best_market) * 100, 1),
         "yes_bid": market.yes_bid,
         "yes_ask": market.yes_ask,
@@ -122,6 +123,7 @@ def serialize_event_group(
         "signals": MarketScorer._scores_dict(best_market),
         "signal_estimates": signal_estimates,
         "close_time": market.close_time.isoformat(),
+        "hours_to_close": round(hours_to_close, 2),
         "series_url": kalshi_market_url(event_ticker),
     }
 

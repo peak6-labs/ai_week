@@ -7,7 +7,6 @@ description: >-
   /portfolio skill and orchestrate Step 0.75. Does NOT place orders.
 tools: Bash, WebSearch
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(KALSHI_ENV=prod*)"
   - "Bash(PYTHONPATH=*)"
   - WebSearch

@@ -1,0 +1,261 @@
+{
+  "KXHIGHAUS": {
+    "station_id": "AUS",
+    "lat": 30.18304,
+    "lon": -97.67987,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:56.119562+00:00"
+  },
+  "KXHIGHCHI": {
+    "station_id": "MDW",
+    "lat": 41.78417,
+    "lon": -87.75528,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:15:35.126323+00:00"
+  },
+  "KXHIGHDEN": {
+    "station_id": "DEN",
+    "lat": 39.84658,
+    "lon": -104.65622,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:37:05.405624+00:00"
+  },
+  "KXHIGHLAX": {
+    "station_id": "LAX",
+    "lat": 33.93806,
+    "lon": -118.38889,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:15:35.927035+00:00"
+  },
+  "KXHIGHMIA": {
+    "station_id": "MIA",
+    "lat": 25.79056,
+    "lon": -80.31639,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:57.244345+00:00"
+  },
+  "KXHIGHNY": {
+    "station_id": "NYC",
+    "lat": 40.78333,
+    "lon": -73.96667,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:57.814440+00:00"
+  },
+  "KXHIGHPHIL": {
+    "station_id": "PHL",
+    "lat": 39.87327,
+    "lon": -75.22678,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:57.901104+00:00"
+  },
+  "KXHIGHTATL": {
+    "station_id": "ATL",
+    "lat": 33.64028,
+    "lon": -84.42694,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:58.070790+00:00"
+  },
+  "KXHIGHTBOS": {
+    "station_id": "BOS",
+    "lat": 42.36056,
+    "lon": -71.01056,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:15:36.963583+00:00"
+  },
+  "KXHIGHTDAL": {
+    "station_id": "DFW",
+    "lat": 32.89743,
+    "lon": -97.02196,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:58.415975+00:00"
+  },
+  "KXHIGHTDC": {
+    "station_id": "DCA",
+    "lat": 38.84833,
+    "lon": -77.03417,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:58.703293+00:00"
+  },
+  "KXHIGHTHOU": {
+    "station_id": "HOU",
+    "lat": 29.6375,
+    "lon": -95.2825,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:58.812299+00:00"
+  },
+  "KXHIGHTLV": {
+    "station_id": "LAS",
+    "lat": 36.07188,
+    "lon": -115.1634,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:59.033269+00:00"
+  },
+  "KXHIGHTMIN": {
+    "station_id": "MSP",
+    "lat": 44.88306,
+    "lon": -93.22889,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:59.201733+00:00"
+  },
+  "KXHIGHTOKC": {
+    "station_id": "OKC",
+    "lat": 35.38861,
+    "lon": -97.60028,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:15:37.680783+00:00"
+  },
+  "KXHIGHTPHX": {
+    "station_id": "PHX",
+    "lat": 33.427799,
+    "lon": -112.003465,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:59.340602+00:00"
+  },
+  "KXHIGHTSEA": {
+    "station_id": "SEA",
+    "lat": 47.44472,
+    "lon": -122.31361,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:59.692183+00:00"
+  },
+  "KXHIGHTSFO": {
+    "station_id": "SFO",
+    "lat": 37.61961,
+    "lon": -122.36558,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:15:38.310292+00:00"
+  },
+  "KXLOWTATL": {
+    "station_id": "ATL",
+    "lat": 33.64028,
+    "lon": -84.42694,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:07:59.957778+00:00"
+  },
+  "KXLOWTAUS": {
+    "station_id": "AUS",
+    "lat": 30.18304,
+    "lon": -97.67987,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.167525+00:00"
+  },
+  "KXLOWTBOS": {
+    "station_id": "BOS",
+    "lat": 42.36056,
+    "lon": -71.01056,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.288437+00:00"
+  },
+  "KXLOWTCHI": {
+    "station_id": "MDW",
+    "lat": 41.78417,
+    "lon": -87.75528,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.384072+00:00"
+  },
+  "KXLOWTDAL": {
+    "station_id": "DFW",
+    "lat": 32.89743,
+    "lon": -97.02196,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.473647+00:00"
+  },
+  "KXLOWTDC": {
+    "station_id": "DCA",
+    "lat": 38.84833,
+    "lon": -77.03417,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.645642+00:00"
+  },
+  "KXLOWTDEN": {
+    "station_id": "DEN",
+    "lat": 39.84658,
+    "lon": -104.65622,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.713648+00:00"
+  },
+  "KXLOWTHOU": {
+    "station_id": "HOU",
+    "lat": 29.6375,
+    "lon": -95.2825,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.823141+00:00"
+  },
+  "KXLOWTLAX": {
+    "station_id": "LAX",
+    "lat": 33.93806,
+    "lon": -118.38889,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:00.900414+00:00"
+  },
+  "KXLOWTLV": {
+    "station_id": "LAS",
+    "lat": 36.07188,
+    "lon": -115.1634,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.039781+00:00"
+  },
+  "KXLOWTMIA": {
+    "station_id": "MIA",
+    "lat": 25.79056,
+    "lon": -80.31639,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.118265+00:00"
+  },
+  "KXLOWTMIN": {
+    "station_id": "MSP",
+    "lat": 44.88306,
+    "lon": -93.22889,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.249825+00:00"
+  },
+  "KXLOWTNYC": {
+    "station_id": "NYC",
+    "lat": 40.78333,
+    "lon": -73.96667,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.350987+00:00"
+  },
+  "KXLOWTOKC": {
+    "station_id": "OKC",
+    "lat": 35.38861,
+    "lon": -97.60028,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.517242+00:00"
+  },
+  "KXLOWTPHIL": {
+    "station_id": "PHL",
+    "lat": 39.87327,
+    "lon": -75.22678,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.582572+00:00"
+  },
+  "KXLOWTPHX": {
+    "station_id": "PHX",
+    "lat": 33.427799,
+    "lon": -112.003465,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.723982+00:00"
+  },
+  "KXLOWTSEA": {
+    "station_id": "SEA",
+    "lat": 47.44472,
+    "lon": -122.31361,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.793545+00:00"
+  },
+  "KXLOWTSFO": {
+    "station_id": "SFO",
+    "lat": 37.61961,
+    "lon": -122.36558,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:01.927353+00:00"
+  },
+  "KXRAINNYCM": {
+    "station_id": "NYC",
+    "lat": 40.78333,
+    "lon": -73.96667,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T15:08:02.040521+00:00"
+  }
+}

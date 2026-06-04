@@ -254,5 +254,13 @@ __marimo__/
 
 # Superpowers / Claude Code tooling
 .superpowers/
-.claude/
+# Ignore .claude/ contents by default, but check in the shared, machine-independent
+# config — agent cards, skills, and settings.json (team-wide relative permission
+# rules) — so it reaches every developer's checkout. Personal/per-machine overrides
+# stay ignored in .claude/settings.local.json. (Negation requires ignoring the
+# directory's *contents* with .claude/*, not the directory itself.)
+.claude/*
+!.claude/agents/
+!.claude/skills/
+!.claude/settings.json
 docs/superpowers/

@@ -106,6 +106,7 @@ class ScoredMarket:
     volume_oi_ratio_score: float
     raw_composite_score: Optional[float] = None
     spread_penalty_multiplier: float = 1.0
+    settlement_proximity_multiplier: float = 1.0
     relative_historical_volume_score: Optional[float] = None
     volume_spike_short_term_score: Optional[float] = None
     oi_change_score: Optional[float] = None

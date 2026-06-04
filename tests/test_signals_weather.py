@@ -6,11 +6,13 @@ import scipy.stats
 from datetime import datetime, timedelta, timezone
 
 from kalshi_trader.signals.weather import (
+    _round_to_settlement_degree,
     build_authority_signal,
     build_ensemble_signal,
     build_weather_signal,
     observation_lock_fraction,
 )
+from kalshi_trader.ui.config_manager import cfg
 
 
 def _now_iso() -> str:
@@ -33,7 +35,7 @@ def test_build_weather_signal_precipitation_basic():
     assert sig.source == "noaa_gfs"
     assert sig.probability == pytest.approx(0.73)
     assert sig.uncertainty == pytest.approx(0.05)
-    assert sig.weight == pytest.approx(0.85)
+    assert sig.weight == pytest.approx(cfg.get("weight_noaa"))
     assert sig.metadata["data_quality"] == "fresh"
     assert sig.metadata["ticker"] == "WEATHER-NYC-RAIN-JUNE3"
     assert sig.metadata["forecast_model"] == "noaa_gfs"
@@ -236,7 +238,7 @@ def test_build_authority_signal_source_weight_uncertainty():
         operator="above", authority_forecast=forecast, independent_of_noaa=True,
     )
     assert sig.source == "x_weather_authority"
-    assert sig.weight == pytest.approx(0.70)
+    assert sig.weight == pytest.approx(cfg.get("weight_x_authority"))
     # base temp uncertainty, high confidence, 2 posts, independent → no bumps
     assert sig.uncertainty == pytest.approx(0.10)
     assert sig.metadata["forecast_model"] == "x_weather_authority"
@@ -463,7 +465,7 @@ def test_build_ensemble_signal_source_weight_uncertainty_metadata():
         ensemble=_ensemble(members),
     )
     assert sig.source == "gfs_ensemble"
-    assert sig.weight == pytest.approx(0.85)  # weight_ensemble default
+    assert sig.weight == pytest.approx(cfg.get("weight_ensemble"))
     assert sig.uncertainty == pytest.approx(0.07)  # uncertainty_ensemble_temp default
     assert sig.metadata["data_quality"] == "fresh"
     assert "ensemble_mean" in sig.metadata
@@ -487,6 +489,86 @@ def test_build_ensemble_signal_between_counts_members_in_band():
     assert sig.probability == pytest.approx(expected_satisfying / len(members))
     assert sig.metadata["members_satisfying"] == 2
     assert "in [85.0, 86.0]" in sig.metadata["narrative"]
+
+
+# ---------------------------------------------------------------------------
+# Settlement-degree rounding (P0): temperature buckets on the integer daily
+# extreme, precipitation on raw inches. Confirmed against the LAXHIGH contract
+# terms (strikes at "consecutive increments of 1 degree", inclusive integer
+# band) + NWS Daily Climate Report whole-degree (round-half-up) publishing.
+# ---------------------------------------------------------------------------
+
+def test_round_to_settlement_degree_is_half_up_including_negatives():
+    # Half-degrees round up (toward +∞), not banker's-rounding to even.
+    assert _round_to_settlement_degree(60.5) == 61
+    assert _round_to_settlement_degree(61.5) == 62  # round(61.5) would give 62 too
+    assert _round_to_settlement_degree(60.4) == 60
+    assert _round_to_settlement_degree(60.8) == 61
+    # Banker's rounding would send 60.5 → 60; we must get 61.
+    assert _round_to_settlement_degree(60.5) != 60
+    # Sub-freezing readings stay on the same half-up rule.
+    assert _round_to_settlement_degree(-0.5) == 0
+    assert _round_to_settlement_degree(-2.5) == -2
+    assert _round_to_settlement_degree(-2.6) == -3
+    assert _round_to_settlement_degree(-2.4) == -2
+
+
+def test_build_ensemble_signal_temp_rounds_members_before_bucketing():
+    # Audit's worked example: members {60.4, 60.8, 61.2} vs band [61, 62].
+    # Rounded to settlement degrees → {60, 61, 61}: 60.8 and 61.2 count, 60.4 does
+    # not. Raw-float bucketing would have counted ZERO (none are ≥ 61.0 raw).
+    members = [60.4, 60.8, 61.2] * 4  # 12 members ≥ ensemble_min_members
+    sig = build_ensemble_signal(
+        ticker="KXLOWTXXX-26JUN04-B61.5", metric="temp_low", threshold=61.0,
+        operator="between", ensemble=_ensemble(members, field="temperature_2m_min"),
+        threshold_high=62.0,
+    )
+    # 2 of every 3 members (60.8, 61.2) land in the band after rounding.
+    assert sig.metadata["members_satisfying"] == 8
+    assert sig.probability == pytest.approx(8 / 12)
+
+
+def test_build_ensemble_signal_realized_locked_low_scores_high_not_floored():
+    # The fake-edge root cause: an already-locked realized low of 60.8°F settles
+    # the [61, 62] band TRUE (60.8 → 61), but raw-float bucketing scored it ~1%.
+    # With round-to-settlement the locked obs scores high.
+    members = [60.8] * 31
+    sig = build_ensemble_signal(
+        ticker="KXLOWTXXX-26JUN04-B61.5", metric="temp_low", threshold=61.0,
+        operator="between", ensemble=_ensemble(members, field="temperature_2m_min"),
+        threshold_high=62.0, observation=_observation(60.8, station_id="KXXX"),
+        lock_fraction=1.0,
+    )
+    assert sig.probability == pytest.approx(0.99)
+    assert sig.metadata["members_clamped"] is True
+
+
+def test_build_ensemble_signal_above_strike_rounds_members():
+    # ">79" settles on integer highs ≥ 80. A member forecast of 79.4 rounds to 79
+    # (a MISS); 79.6 rounds to 80 (a HIT). Raw-float bucketing would have counted
+    # ALL 31 (both 79.4 and 79.6 are > 79.0 raw) — overstating the probability.
+    members = [79.4] * 15 + [79.6] * 16
+    sig = build_ensemble_signal(
+        ticker="KXHIGHTXXX-26JUN04-T79", metric="temp_high", threshold=79.0,
+        operator="above", ensemble=_ensemble(members),
+    )
+    # Only the 16 members that round to 80 count.
+    assert sig.metadata["members_satisfying"] == 16
+    assert sig.probability == pytest.approx(16 / 31)
+
+
+def test_build_ensemble_signal_precipitation_is_not_rounded():
+    # Precip settles on the fractional 0.01" measurable threshold, never a whole
+    # degree. Members just above the threshold (0.02") must count even though they
+    # round to 0 inches.
+    members = [0.0] * 16 + [0.02] * 15
+    sig = build_ensemble_signal(
+        ticker="KXRAINXXX-26JUN04", metric="precipitation", threshold=0.0,
+        operator="above", ensemble=_ensemble(members, field="precipitation_sum", units="inch"),
+    )
+    # All 15 wet members exceed 0.01" — none are rounded away.
+    assert sig.metadata["members_satisfying"] == 15
+    assert sig.probability == pytest.approx(15 / 31)
 
 
 # ---------------------------------------------------------------------------
@@ -523,14 +605,62 @@ def test_clamp_temp_low_cap_pulls_warm_members_into_band_atlanta():
 
 
 def test_clamp_temp_low_cap_collapses_in_band_members_to_miss_austin():
-    # Austin case: ensemble at 70.5 (inside the 70-71 band) → bare P ~0.99.
-    # Realized low 69.8 caps every member below the band → P → ~0.01 (YES missed).
+    # Austin case: ensemble at 70.5 (settles 71, inside the 70-71 band) → bare
+    # P ~0.99. A realized low of 69.3 (settles 69, below the band) caps every
+    # member below the band → P → ~0.01 (YES missed). 69.3 rounds to 69, not 70,
+    # so the clamp lands the settlement degree under the band — the miss survives
+    # the round-to-settlement bucketing.
     members = [70.5] * 31
     sig = build_ensemble_signal(
         ticker="KXLOWTAUS-26JUN03-B70.5", metric="temp_low", threshold=70.0,
         operator="between", ensemble=_ensemble(members, field="temperature_2m_min"),
-        threshold_high=71.0, observation=_observation(69.8, station_id="KAUS"),
+        threshold_high=71.0, observation=_observation(69.3, station_id="KAUS"),
         lock_fraction=1.0,
+    )
+    assert sig.probability == pytest.approx(0.01)
+    assert sig.metadata["members_clamped"] is True
+
+
+def test_clamp_temp_low_lifts_cold_members_up_to_locked_warm_low():
+    # The Las Vegas fake-edge root cause: a cold-biased ensemble (all 76°F) under a
+    # realized morning low ALREADY locked at 78.8°F. The low is done for the day, so
+    # every member must converge UP to the realized ~79 — "low > 77" then settles
+    # TRUE (~0.99). The bare min-clamp (min(76, 78.8) = 76) left members cold and
+    # produced the bogus 1% (and its +98¢ edge against a market trading 99).
+    members = [76.0] * 31
+    sig = build_ensemble_signal(
+        ticker="KXLOWTLV-26JUN04-T77", metric="temp_low", threshold=77.0,
+        operator="above", ensemble=_ensemble(members, field="temperature_2m_min"),
+        observation=_observation(78.8, station_id="KLAS"), lock_fraction=1.0,
+    )
+    assert sig.probability == pytest.approx(0.99)
+    assert sig.metadata["members_clamped"] is True
+
+
+def test_clamp_temp_low_partial_lock_blends_cold_members_toward_realized():
+    # Half-locked: a cold member is pulled halfway to the realized low, not all the
+    # way. members 76, realized 80, lock 0.5 → 76*0.5 + 80*0.5 = 78 → settles 78,
+    # which clears "> 77", so the band is already (mostly) satisfied.
+    members = [76.0] * 31
+    sig = build_ensemble_signal(
+        ticker="KXLOWTLV-26JUN04-T77", metric="temp_low", threshold=77.0,
+        operator="above", ensemble=_ensemble(members, field="temperature_2m_min"),
+        observation=_observation(80.0, station_id="KLAS"), lock_fraction=0.5,
+    )
+    assert sig.probability == pytest.approx(0.99)
+
+
+def test_clamp_temp_low_zero_lock_leaves_cold_members_open():
+    # Early in the day (lock 0) a cold member is still viable — the low could still
+    # fall to it — so the pure monotonic clamp leaves it and only warm members above
+    # the realized-so-far min are pulled down. members 76, realized 80, lock 0.0 →
+    # member stays 76 (min(76, 80)) → "low > 77" stays FALSE (~0.01). This pins that
+    # the cold-member lift is gated on lock_fraction, not unconditional.
+    members = [76.0] * 31
+    sig = build_ensemble_signal(
+        ticker="KXLOWTLV-26JUN04-T77", metric="temp_low", threshold=77.0,
+        operator="above", ensemble=_ensemble(members, field="temperature_2m_min"),
+        observation=_observation(80.0, station_id="KLAS"), lock_fraction=0.0,
     )
     assert sig.probability == pytest.approx(0.01)
     assert sig.metadata["members_clamped"] is True
@@ -609,14 +739,16 @@ def test_observation_lock_fraction_missing_timezone_is_zero():
 
 
 def test_build_weather_signal_between_is_cdf_difference():
-    # Forecast high 86, std = max((86-68)/6, 2) = 3. P(85 ≤ high ≤ 86) = cdf(86) - cdf(85).
+    # Forecast high 86, std = max((86-68)/6, 2) = 3. The band [85, 86] settles on
+    # integer highs in {85, 86}, so with the continuity correction
+    # P(85 ≤ high ≤ 86) = cdf(86 + 0.5) - cdf(85 - 0.5) = cdf(86.5) - cdf(84.5).
     forecast = {"temp_high": 86, "temp_low": 68, "precip_pct": 0, "data_age_minutes": 10}
     sig = build_weather_signal(
         ticker="KXHIGHTMIN-26JUN03-B85.5", metric="temp_high", threshold=85.0,
         operator="between", forecast=forecast, threshold_high=86.0,
     )
     dist = scipy.stats.norm(86.0, 3.0)
-    expected = float(dist.cdf(86.0) - dist.cdf(85.0))
+    expected = float(dist.cdf(86.5) - dist.cdf(84.5))
     assert sig.probability == pytest.approx(expected, abs=1e-6)
     assert "85.0 ≤ temp_high ≤ 86.0" in sig.metadata["narrative"]
 
@@ -632,5 +764,6 @@ def test_build_authority_signal_between_uses_band_probability():
         threshold_high=86.0,
     )
     dist = scipy.stats.norm(86.0, 3.0)
-    expected = float(dist.cdf(86.0) - dist.cdf(85.0))
+    # Continuity-corrected band probability (integer highs {85, 86}).
+    expected = float(dist.cdf(86.5) - dist.cdf(84.5))
     assert sig.probability == pytest.approx(expected, abs=1e-6)

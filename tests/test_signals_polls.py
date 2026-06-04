@@ -1,6 +1,6 @@
 import pytest
 
-from kalshi_trader.signals.polls import build_polls_signal
+from kalshi_trader.signals.polls import build_polls_signal, WEIGHT_FIVETHIRTYEIGHT
 
 
 def _summary(margin, candidate_pct=51.0, opponent_pct=49.0, poll_count=8):
@@ -22,7 +22,7 @@ def test_build_polls_signal_basic_lead():
         state="georgia",
     )
     assert sig.source == "fivethirtyeight"
-    assert sig.weight == pytest.approx(0.75)
+    assert sig.weight == pytest.approx(WEIGHT_FIVETHIRTYEIGHT)
     assert sig.uncertainty == pytest.approx(0.10)
     # A +4 margin should give a win probability above 0.5.
     assert sig.probability > 0.5

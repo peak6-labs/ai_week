@@ -38,6 +38,23 @@ def test_get_markets_normalizes_every_row():
     assert out["markets"][1]["yes_ask"] == 90.0
 
 
+def test_get_events_normalizes_nested_markets():
+    raw = {"events": [
+        {"event_ticker": "E1", "markets": [
+            {"ticker": "A", "yes_bid_dollars": "0.2600"},
+            {"ticker": "B", "yes_ask_dollars": "0.9000"},
+        ]},
+        {"event_ticker": "E2", "markets": [
+            {"ticker": "C", "yes_bid_dollars": "0.0500", "volume_24h_fp": "12.0"},
+        ]},
+    ]}
+    out = asyncio.run(_client_with_raw(raw).get_events())
+    assert out["events"][0]["markets"][0]["yes_bid"] == 26.0
+    assert out["events"][0]["markets"][1]["yes_ask"] == 90.0
+    assert out["events"][1]["markets"][0]["yes_bid"] == 5.0
+    assert out["events"][1]["markets"][0]["volume_24h"] == 12.0
+
+
 def test_get_orderbook_normalizes_fp_levels():
     raw = {"orderbook_fp": {"yes_dollars": [["0.0100", "1396.00"]],
                             "no_dollars": [["0.8900", "50.00"]]}}

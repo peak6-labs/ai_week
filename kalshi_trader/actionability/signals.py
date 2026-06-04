@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from kalshi_trader.models import Candle, Market
 
 
@@ -29,6 +31,35 @@ def spread_penalty_multiplier(market: Market) -> float:
     if spread_cents <= 20.0:
         return 0.70
     return 0.55
+
+
+def settlement_proximity_multiplier(market: Market) -> float:
+    """Time-to-settlement multiplier — favors markets that settle sooner.
+
+    A market resolving soon is preferred over one that settles a long time from
+    now: capital turns over faster and the thesis is exposed to fewer unforeseen
+    developments before resolution. Applied to the composite score alongside the
+    spread penalty, so a far-dated market must be meaningfully more actionable to
+    outrank a near one. This is a soft down-rank only — it never zeroes a market
+    out. A timezone-naive ``close_time`` is treated as UTC.
+    """
+    close_time = market.close_time
+    if close_time.tzinfo is None:
+        close_time = close_time.replace(tzinfo=timezone.utc)
+    hours_to_close = max(
+        0.0, (close_time - datetime.now(timezone.utc)).total_seconds() / 3600.0
+    )
+    if hours_to_close <= 24.0:      # within a day
+        return 1.00
+    if hours_to_close <= 72.0:      # within 3 days
+        return 0.90
+    if hours_to_close <= 168.0:     # within a week
+        return 0.78
+    if hours_to_close <= 720.0:     # within 30 days
+        return 0.60
+    if hours_to_close <= 2160.0:    # within 90 days
+        return 0.42
+    return 0.28                     # beyond 90 days
 
 
 def relative_historical_volume_score(

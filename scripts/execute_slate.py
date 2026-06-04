@@ -93,6 +93,8 @@ async def _main() -> None:
                 )
             except Exception as caught_exception:
                 print(f"FAILED {idea.ticker}: {caught_exception}", file=sys.stderr)
+            # Space consecutive placements to stay under the 429 rate limit.
+            await asyncio.sleep(kalshi_trader.config.INTER_ORDER_DELAY_SECONDS)
 
 
 if __name__ == "__main__":

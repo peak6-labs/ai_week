@@ -5,7 +5,6 @@ description: >-
   gap > 10 cents. Use for any market that likely has a Polymarket equivalent.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -32,11 +31,11 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root (your project checkout):
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polymarket-price-signal: checking Poly/Kalshi gap for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "polymarket-price-signal: checking Poly/Kalshi gap for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.polymarket_price \
      --ticker TICKER \
      --title "TITLE" \
@@ -52,11 +51,11 @@ You need the caller to supply:
 2. **Check the output.**
    - If the array is empty (`[]`):
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polymarket-price-signal: TICKER → no gap (markets don't match or gap <10¢)" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "polymarket-price-signal: TICKER → no gap (markets don't match or gap <10¢)" warning
      ```
    - If non-empty: log gap size, direction, and edge.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "polymarket-price-signal: TICKER → <N>¢ gap favoring <direction>"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "polymarket-price-signal: TICKER → <N>¢ gap favoring <direction>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the

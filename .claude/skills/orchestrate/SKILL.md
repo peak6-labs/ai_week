@@ -39,8 +39,7 @@ Python snippet that approximates the tool.
 ## Step 0 — Setup
 
 ```bash
-cd /Users/scorley/code
-TS=$(date -u +%Y%m%dT%H%M%SZ)
+# run from the repo root (your project checkout — do not hard-code an absolute path)TS=$(date -u +%Y%m%dT%H%M%SZ)
 echo "TS=$TS"
 CYCLE=$(( $(wc -l < reports/cycle-log.txt 2>/dev/null || echo 0) + 1 ))
 .venv/bin/python scripts/ui_log.py "Orchestrator: cycle $CYCLE started (TS=$TS)"
@@ -83,8 +82,7 @@ losing or winning positions before the cycle generates new recommendations,
 and prevents duplicate ideas for markets we are already exiting.
 
 ```bash
-cd /Users/scorley/code
-KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/evaluate_portfolio.py \
+# run from the repo root (your project checkout — do not hard-code an absolute path)KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/evaluate_portfolio.py \
   --out /tmp/portfolio_eval_${TS}.json
 ```
 
@@ -380,8 +378,7 @@ non-empty estimate the agents returned and let the scorer filter.
 ## Step 4 — Score deterministically
 
 ```bash
-cd /Users/scorley/code
-PYTHONPATH=. .venv/bin/python scripts/score_signals.py \
+# run from the repo root (your project checkout — do not hard-code an absolute path)PYTHONPATH=. .venv/bin/python scripts/score_signals.py \
   --signals-file /tmp/signals_${TS}.json \
   --config runtime_config.json > /tmp/scored_${TS}.json
 .venv/bin/python scripts/ui_log.py "Orchestrator: deterministic scoring complete"
@@ -537,7 +534,7 @@ surviving idea's `suggested_size_dollars = approved_size_dollars`. Log:
 ## Step 8 — Write outputs
 
 ```bash
-cd /Users/scorley/code && mkdir -p reports
+mkdir -p reports
 ```
 
 Write two files with the **Write** tool:
@@ -590,8 +587,7 @@ If the approved slate is non-empty, dispatch the **`idea-publisher`** agent:
 Then log completion (substitute real counts):
 
 ```bash
-cd /Users/scorley/code
-.venv/bin/python scripts/ui_log.py "Orchestrator: cycle complete — N markets, K approved ideas"
+# run from the repo root (your project checkout — do not hard-code an absolute path).venv/bin/python scripts/ui_log.py "Orchestrator: cycle complete — N markets, K approved ideas"
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) | N markets | K approved | top: TICKER EDGEc" >> reports/cycle-log.txt
 ```
 

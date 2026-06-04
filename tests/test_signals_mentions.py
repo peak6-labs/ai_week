@@ -7,6 +7,9 @@ from kalshi_trader.signals.mentions import (
     PROBABILITY_MENTIONS_LIVE,
     SOURCE_HEARING_SCHEDULE,
     SOURCE_MENTIONS_LIVE,
+    WEIGHT_CORPUS_BACKED,
+    WEIGHT_GDELT_ONLY,
+    WEIGHT_MENTIONS_LIVE,
     build_hearing_schedule_signal,
     build_mentions_base_signal,
     build_mentions_live_signal,
@@ -96,6 +99,10 @@ def _gdelt(fraction, period_count=30, **extra):
 
 
 def test_gdelt_only_fallback_tier():
+    # Calibration fix (audit B1, 2026-06-04 backtest): a GDELT-only read is now a
+    # non-tradeable prior under the default require-corpus regime — it is suppressed
+    # (uncertainty>=0.99) so the scorer drops it, rather than emitting at 0.22. The
+    # probability/weight/lineage fields are unchanged; only it is flagged suppressed.
     sig = build_mentions_base_signal(
         "KXMENTION-POWELL-RECESSION", "recession", ["CSPAN"],
         gdelt_base_rate=_gdelt(0.7), corpus=None, speaker="Jerome Powell",
@@ -104,9 +111,9 @@ def test_gdelt_only_fallback_tier():
     assert sig is not None
     assert sig.source == "mentions_base"
     assert sig.probability == pytest.approx(0.7)
-    assert sig.weight == pytest.approx(0.40)
-    assert sig.uncertainty == pytest.approx(0.22)
-    assert sig.metadata["data_quality"] == "stale"
+    assert sig.weight == pytest.approx(WEIGHT_GDELT_ONLY)
+    assert sig.uncertainty >= 0.99  # suppressed (was 0.22 before the calibration fix)
+    assert sig.metadata["suppressed"] is True
     assert sig.metadata["independent"] is False
     assert sig.metadata["speaker_key"] == "powell"
     assert sig.data_issued_at.tzinfo is not None
@@ -121,7 +128,7 @@ def test_corpus_backed_tier_fuses_corpus_and_gdelt():
         corpus={"document_count": 20, "match_count": 14},
         speaker="Jerome Powell",
     )
-    assert sig.weight == pytest.approx(0.55)
+    assert sig.weight == pytest.approx(WEIGHT_CORPUS_BACKED)
     assert sig.uncertainty == pytest.approx(0.18)
     assert sig.metadata["data_quality"] == "fresh"
     assert sig.metadata["independent"] is True
@@ -233,7 +240,7 @@ def test_live_match_emits_092_stamped_with_clip_timestamp():
     assert sig is not None
     assert sig.source == SOURCE_MENTIONS_LIVE
     assert sig.probability == pytest.approx(PROBABILITY_MENTIONS_LIVE)
-    assert sig.weight == pytest.approx(0.85)
+    assert sig.weight == pytest.approx(WEIGHT_MENTIONS_LIVE)
     assert sig.metadata["independent"] is False
     # data_issued_at is the matching clip's own timestamp (14:00), not now().
     assert sig.data_issued_at == datetime(2026, 6, 3, 14, 0, 0, tzinfo=timezone.utc)

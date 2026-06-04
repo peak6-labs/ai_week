@@ -239,14 +239,15 @@ def test_check_trade_fee_estimate_uses_corrected_fee(risk, sample_idea, empty_po
 
 
 def test_adaptive_sizing_reduces_after_three_losses(risk, empty_portfolio):
-    # A modest-edge idea whose half-Kelly size lands below MAX_SINGLE_POSITION,
-    # so the post-loss reduction is observable rather than masked by the cap.
+    # A modest-edge idea whose quarter-Kelly size lands below MAX_SINGLE_POSITION
+    # yet above MIN_SINGLE_POSITION even after the post-loss halving, so the
+    # reduction is observable rather than masked by the cap or floored out.
     modest_idea = TradeIdea(
         agent_id="conditional_event",
         ticker="NBA-CELTICS-WIN",
         side=Side.YES,
         action=OrderAction.BUY,
-        confidence=0.26,
+        confidence=0.30,
         market_price=20.0,
         reasoning="Slight edge",
         signal_sources=["A1"],
