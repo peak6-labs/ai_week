@@ -184,10 +184,10 @@ async def run(dry_run: bool) -> None:
                     log.info("No open positions — WebSocket not active")
 
         await _refresh()
-        last_refresh_time = asyncio.get_event_loop().time()
+        last_refresh_time = asyncio.get_running_loop().time()
 
         while True:
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             if now - last_refresh_time >= 30.0:
                 try:
                     await _refresh()
