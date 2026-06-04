@@ -191,17 +191,17 @@ async def run(dry_run: bool) -> None:
             if now - last_refresh_time >= 30.0:
                 try:
                     await _refresh()
-                except Exception as refresh_exc:
-                    log.warning("Position refresh failed: %s", refresh_exc)
+                except Exception as refresh_exception:
+                    log.warning("Position refresh failed: %s", refresh_exception)
                 last_refresh_time = now
 
             # Detect silent WebSocket task death and log loudly
             if ws_task is not None and ws_task.done():
-                exc = ws_task.exception() if not ws_task.cancelled() else None
+                ws_task_exception = ws_task.exception() if not ws_task.cancelled() else None
                 log.error(
                     "WebSocket task died unexpectedly (exc=%s) — "
                     "prices are stale, exit checks suspended until next refresh",
-                    exc,
+                    ws_task_exception,
                 )
                 ws_task = None  # cleared so _refresh() will restart it
 
@@ -259,10 +259,10 @@ async def run(dry_run: bool) -> None:
                                         realized_pnl_dollars=realized_pnl,
                                         exit_reason=signal.reason,
                                     )
-                                except Exception as db_exc:
-                                    log.debug("Supabase close_position skipped: %s", db_exc)
-                        except Exception as order_exc:
-                            log.error("Exit order failed for %s: %s", ticker, order_exc)
+                                except Exception as database_exception:
+                                    log.debug("Supabase close_position skipped: %s", database_exception)
+                        except Exception as order_exception:
+                            log.error("Exit order failed for %s: %s", ticker, order_exception)
                             pending_exits.discard(ticker)
 
                     await _notify_server(msg, "warning")
