@@ -143,12 +143,13 @@ async def run(dry_run: bool) -> None:
         orderbook_state = OrderBookState()
         position_metadata: dict[str, dict] = {}
         pending_exits: set[str] = set()
+        new_this_cycle: set[str] = set()   # tickers that just appeared; skip for one cycle
         ws_client: KalshiWebSocketClient | None = None
         ws_task: asyncio.Task | None = None
         subscribed_tickers: set[str] = set()
 
         async def _refresh() -> None:
-            nonlocal ws_client, ws_task, subscribed_tickers
+            nonlocal ws_client, ws_task, subscribed_tickers, new_this_cycle
 
             new_positions = await _fetch_open_positions(kalshi_client)
 
@@ -162,6 +163,13 @@ async def run(dry_run: bool) -> None:
                             meta["fair_value_cents"] = round(prob * 100.0, 2)
                 except Exception as fair_value_exception:
                     log.debug("Fair value lookup failed: %s", fair_value_exception)
+
+            # Track tickers that are brand new this cycle — skip exit checks for one cycle
+            # so a position we just entered isn't immediately exited before it has a chance to move.
+            new_this_cycle = set(new_positions) - set(position_metadata)
+            if new_this_cycle:
+                log.info("New positions this cycle (skipping exit checks for one cycle): %s",
+                         sorted(new_this_cycle))
 
             position_metadata.clear()
             position_metadata.update(new_positions)
@@ -223,6 +231,8 @@ async def run(dry_run: bool) -> None:
             for ticker, meta in list(position_metadata.items()):
                 if ticker in pending_exits:
                     continue
+                if ticker in new_this_cycle:
+                    continue  # just entered; wait one cycle before checking exits
 
                 position_dict = _build_position_dict(meta, orderbook_state, ticker)
                 if position_dict is None:
