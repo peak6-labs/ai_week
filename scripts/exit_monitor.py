@@ -51,10 +51,9 @@ def _build_position_dict(
         "midpoint_yes_price_cents": midpoint_yes_price_cents,
     }
     if position_meta.get("fair_value_cents") is not None:
-        yes_fair = position_meta["fair_value_cents"]
-        # fair_value_cents is stored in YES terms (predicted_prob × 100).
-        # current_price_cents is side-relative, so convert fair value to match.
-        result["fair_value_cents"] = yes_fair if side == "yes" else (100.0 - yes_fair)
+        # predicted_prob is the probability of the recommended side, so fair_value_cents
+        # is already in side-relative terms — no conversion needed.
+        result["fair_value_cents"] = position_meta["fair_value_cents"]
     return result
 
 

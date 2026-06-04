@@ -91,12 +91,13 @@ class TestBuildPositionDict:
         result = _build_position_dict(meta, state, TICKER)
         assert result["fair_value_cents"] == 70.0
 
-    def test_no_fair_value_converted_to_no_side(self):
-        # predicted_prob=0.70 → YES fair=70 → NO fair = 100 - 70 = 30
+    def test_no_fair_value_passed_through_unchanged(self):
+        # predicted_prob for a NO trade = P(NO), so fair_value_cents is already
+        # in NO-side terms — no conversion applied.
         meta = {**_make_meta(side="no"), "fair_value_cents": 70.0}
         state = _make_orderbook(bid=47, no_bid=50)
         result = _build_position_dict(meta, state, TICKER)
-        assert result["fair_value_cents"] == 30.0
+        assert result["fair_value_cents"] == 70.0
 
     def test_no_fair_value_absent_when_not_set(self):
         state = _make_orderbook(bid=47, no_bid=50)
