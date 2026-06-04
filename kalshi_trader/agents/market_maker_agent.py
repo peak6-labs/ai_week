@@ -243,10 +243,10 @@ class MarketMakerAgent:
             weight = cfg.get("weight_market_maker")
         elif spread_anomaly:
             uncertainty = 0.15
-            weight = 0.55
+            weight = 0.25
         else:
             uncertainty = 0.12
-            weight = 0.60
+            weight = 0.25
 
         narrative = (
             f"Spread {spread_cents:.0f}¢ (anomaly={spread_anomaly}). "
