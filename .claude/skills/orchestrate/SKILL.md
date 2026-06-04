@@ -75,64 +75,6 @@ low-priority step — see Step 10 — so it never delays analysis.)
 
 ---
 
-## Step 0.5 — Portfolio evaluation
-
-Before scanning for new ideas, tend to open positions. This ensures we exit
-losing or winning positions before the cycle generates new recommendations,
-and prevents duplicate ideas for markets we are already exiting.
-
-```bash
-# run from the repo root (your project checkout — do not hard-code an absolute path)KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/evaluate_portfolio.py \
-  --out /tmp/portfolio_eval_${TS}.json
-```
-
-Read `/tmp/portfolio_eval_${TS}.json` and log any exits:
-
-```bash
-# Log a line per triggered exit (substitute real values):
-.venv/bin/python scripts/ui_log.py "Portfolio: exited TICKER SIDE (REASON)" 2>/dev/null || true
-# Log overall summary:
-.venv/bin/python scripts/ui_log.py "Portfolio: N positions evaluated, K exits placed" 2>/dev/null || true
-```
-
-If `errors` is non-empty in the results, log each error at warning level:
-
-```bash
-.venv/bin/python scripts/ui_log.py "Portfolio error: TICKER — REASON" warning 2>/dev/null || true
-```
-
-Continue to Step 1 unconditionally — portfolio evaluation never blocks idea generation.
-
----
-
-## Step 0.75 — AI position review
-
-Only runs if `clean_positions` from `/tmp/portfolio_eval_${TS}.json` contains
-positions with `market_exposure_dollars >= 2.0`.
-
-If none qualify:
-```bash
-.venv/bin/python scripts/ui_log.py "Portfolio review: no positions to review" 2>/dev/null || true
-```
-Then continue to Step 1 immediately.
-
-If there are qualifying positions, follow the `/portfolio` skill's Steps 3–7
-verbatim (fetch rules → collect signals → dispatch position-reviewer → present
-recommendations → prompt y/n → place approved exits). Use the `clean_positions`
-from `/tmp/portfolio_eval_${TS}.json` as the starting data.
-
-Signal dispatch is batched at 3 positions (same discipline as Step 2 of this
-pipeline).
-
-**This step pauses for user input.** Do not proceed to Step 1 until the user
-has responded to all position prompts (or there are no positions to review).
-
-```bash
-.venv/bin/python scripts/ui_log.py "Portfolio review: starting AI position analysis" 2>/dev/null || true
-```
-
----
-
 ## Step 1 — Find markets with the market-scout agent
 
 Dispatch the **`market-scout`** agent with the `Agent` tool. Tell it explicitly
@@ -325,18 +267,16 @@ state change is fine):
 
 Each signal agent returns a JSON **array of `SignalEstimate` objects** — each
 with `source`, `probability`, `uncertainty`, `weight`, `data_issued_at`, and
-`metadata`. For every market, build one `signal_estimates` list by **starting
-with the scout row's `signal_estimates`** (microstructure + kalshi_bias) and
-**appending every estimate from the agents you dispatched** (an agent like
-`x-signal` may return several — keep them all; each is a source). Do **not**
-unwrap to the `metadata` field — the scorer combines the estimates' own
-`probability`/`uncertainty`/`weight` directly.
+`metadata`. For every market in the **deep-signal subset**, build one
+`signal_estimates` list by **starting with the scout row's `signal_estimates`**
+(microstructure + kalshi_bias) and **appending every estimate from the agents
+you dispatched** (an agent may return several — keep them all; each is a
+source). Do **not** unwrap to the `metadata` field — the scorer combines the
+estimates' own `probability`/`uncertainty`/`weight` directly.
 
-Build the signals file for the **entire coverage set (~200 markets)**, not just
-the subset: start each market from its scout `signal_estimates`, and for the
-deep-signal subset additionally append the agent estimates you collected. Markets
-outside the subset simply carry their two deterministic scout signals — that's
-fine; they still get scored and (if 2+ sources) recorded for the backtest.
+Build the signals file for the **deep-signal subset only** (~40 markets). There
+is no need to carry the remaining ~160 coverage-set markets through scoring —
+they cannot become candidates and omitting them cuts scoring time significantly.
 
 **Confirm live prices.** Subset markets already have their `yes_bid`/`yes_ask`
 updated from `/tmp/live_prices_${TS}.json` (done at the end of Step 1, before
@@ -522,8 +462,38 @@ The risk agent runs `scripts/run_risk.py`, which adds `approved`,
 `approved_size_dollars`, and `rejection_reason` to each idea. Save its returned
 JSON to `/tmp/risk_${TS}.json` (Write tool).
 
-**Keep only ideas where `approved == true`.** These are the final slate. Set each
-surviving idea's `suggested_size_dollars = approved_size_dollars`. Log:
+**Keep only ideas where `approved == true`.** These are the final slate.
+
+**Proportional Kelly sizing (small-account correction).** The risk script's raw
+`approved_size_dollars` often hits the $25 floor for all ideas simultaneously
+because half-Kelly dollar amounts vastly exceed the per-trade cap on a sub-$1000
+account. Raw Kelly is not useful when the cap is binding for every trade. Instead,
+scale proportionally across the approved slate so the strongest idea gets the cap
+and weaker ideas scale down:
+
+```python
+import math
+
+cap = 25.0          # hard per-trade ceiling
+balance = BALANCE   # live balance
+
+for idea in approved_ideas:
+    p = idea["confidence"]          # probability of winning
+    q = 1 - p
+    cost = idea["market_price"] / 100.0   # cost per $1 of payout
+    b = (1 - cost) / cost           # net odds (payout per dollar staked)
+    full_kelly = max(0, (p * b - q) / b)
+    idea["_half_kelly"] = full_kelly / 2
+
+max_hk = max(idea["_half_kelly"] for idea in approved_ideas) or 1
+for idea in approved_ideas:
+    norm = idea["_half_kelly"] / max_hk
+    idea["suggested_size_dollars"] = max(1, round(norm * cap))
+```
+
+This gives the highest-conviction idea the full cap ($25) and scales others down
+proportionally. If only one idea survives, it gets the full cap. Never size below
+$1. Log:
 
 ```bash
 .venv/bin/python scripts/ui_log.py "Orchestrator: risk approved K of N ideas"
@@ -543,21 +513,13 @@ Write two files with the **Write** tool:
 `ticker`, `side`, `confidence`, `market_price`, `suggested_size_dollars`,
 `reasoning`, `signal_sources`, `category`, `agent_id`, `selection_summary`.
 
-**Record the slate as paper recommendations** (for the calibration loop — marked
-to market on later cycles; no execution). Record the risk-approved slate first
-(disposition `approved`), then record **all other** scored 2+ source markets
-(disposition `worth_trading` if they cleared the edge bar but risk/challenge
-dropped them, else `insufficient_edge`). Recording the rejected ones too lets us
-mark them to market and judge whether the 5¢ edge bar is set correctly —
-`paper_track.py report --by-edge-bucket --by-disposition` reads it back:
+**Record the approved slate as paper recommendations** (for the calibration loop — marked
+to market on later cycles; no execution):
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/paper_track.py record \
   --ideas-file reports/orchestrator-${TS}.json --cycle-ts ${TS} \
   --disposition approved || true
-PYTHONPATH=. .venv/bin/python scripts/paper_track.py record-scored \
-  --scored-file /tmp/scored_${TS}.json --cycle-ts ${TS} \
-  --exclude-file reports/orchestrator-${TS}.json --min-sources 2 || true
 ```
 
 **`reports/orchestrator-${TS}.md`** — a human-readable ranked table: ticker
