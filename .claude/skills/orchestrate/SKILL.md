@@ -95,25 +95,18 @@ rows sorted by `average_score` descending. Each row has: `event_ticker`,
 `open_interest`, `volume_24h`, `signals`, `close_time`, `series_url`.
 **Prices are in cents (0–99).**
 
-**Coverage: score the WHOLE board, dispatch external agents to a subset.** The
-deterministic scout signals (`microstructure` + `kalshi_bias`) are already
-attached to every one of the ~200 rows at no cost, so we **score and record all
-of them** (Steps 3–4) — this is the calibration dataset and it's nearly free.
-What is expensive is the external signal *agents* (weather/sportsbook/polymarket/
-x), so we only spend those on a prioritized **deep-signal subset**.
+**Dispatch external agents to a focused subset only.** External signal agents
+are expensive — cap the subset at **≤ 20 markets** to keep wall time bounded.
 
-- **Coverage set = all scout rows** (cap ~200). Every one gets deterministic
-  scoring and, if it reaches 2+ sources, gets recorded for the backtest.
-- **Deep-signal subset (≤ ~40)** = the highest-priority rows for external agent
-  dispatch. No pre-score filter — include markets across the full range to find
-  fresh signal. Select by this priority order until you hit 40:
+- **Deep-signal subset (≤ 20)** = the highest-priority rows for external agent
+  dispatch. Select by this priority order until you hit 20:
   1. All weather/climate markets (NOAA is independent and cheap)
-  2. All sports markets with game-outcome resolution (sportsbook odds)
-  3. All mentions markets (GDELT base-rate)
+  2. All mentions markets (GDELT base-rate)
+  3. All sports markets with game-outcome resolution (sportsbook odds)
   4. All markets with `volume_24h > 5000` (OFI eligible)
   5. Top rows by `average_score` to fill remaining slots
-  Wider subsets mean more OFI coverage and catch markets the score filter misses.
-  Only this subset gets Step 2's agent dispatch.
+  Only this subset gets Step 2's agent dispatch, Steps 3–4 scoring, and
+  the adversarial challenge.
 
 For each row compute `hours_to_close` from `close_time`; use `best_market_ticker`
 as the tradeable `ticker`.
@@ -499,28 +492,35 @@ $1. Log:
 .venv/bin/python scripts/ui_log.py "Orchestrator: risk approved K of N ideas"
 ```
 
----
-
-## Step 8 — Write outputs
+**Immediately write the slate and push to Ideas History** — do this now, before
+any other post-processing, so ideas appear in the UI while they are still
+actionable:
 
 ```bash
 mkdir -p reports
 ```
 
-Write two files with the **Write** tool:
+Write **`reports/orchestrator-${TS}.json`** with the **Write** tool — the
+approved slate, one object per idea: `ticker`, `side`, `confidence`,
+`market_price`, `suggested_size_dollars`, `reasoning`, `signal_sources`,
+`category`, `agent_id`, `selection_summary`.
 
-**`reports/orchestrator-${TS}.json`** — the approved slate, one object per idea:
-`ticker`, `side`, `confidence`, `market_price`, `suggested_size_dollars`,
-`reasoning`, `signal_sources`, `category`, `agent_id`, `selection_summary`.
-
-**Record the approved slate as paper recommendations** (for the calibration loop — marked
-to market on later cycles; no execution):
+**Record to Ideas History immediately:**
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/paper_track.py record \
   --ideas-file reports/orchestrator-${TS}.json --cycle-ts ${TS} \
   --disposition approved || true
 ```
+
+Then dispatch the **`idea-publisher`** agent right now (do not wait for Step 9):
+
+> Publish the approved trade ideas to the dashboard.
+> `IDEAS_FILE=reports/orchestrator-<TS>.json`.
+
+---
+
+## Step 8 — Write remaining outputs
 
 **`reports/orchestrator-${TS}.md`** — a human-readable ranked table: ticker
 (backtick-formatted, link via the row's `series_url`), side, edge, size,
@@ -539,14 +539,7 @@ when nothing passes. With the **Write** tool create `/tmp/recent_${TS}.json` as
 
 ---
 
-## Step 9 — Publish and log
-
-If the approved slate is non-empty, dispatch the **`idea-publisher`** agent:
-
-> Publish the approved trade ideas to the dashboard.
-> `IDEAS_FILE=reports/orchestrator-<TS>.json`.
-
-Then log completion (substitute real counts):
+## Step 9 — Log completion
 
 ```bash
 # run from the repo root (your project checkout — do not hard-code an absolute path).venv/bin/python scripts/ui_log.py "Orchestrator: cycle complete — N markets, K approved ideas"
