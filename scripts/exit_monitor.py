@@ -56,12 +56,14 @@ def _select_yes_price(
     orderbook_state: OrderBookState,
     ticker: str,
 ) -> int | None:
-    """Return the YES-price limit (cents) for the exit order.
+    """Return the value to pass as ``yes_price`` to ``create_order()`` for this exit.
 
-    YES stop_loss:       bid  (aggressive — immediate fill, guarantee exit)
-    YES profit_target:   ask  (passive maker — fee-efficient, rest on book)
-    NO  stop_loss:       ask  (aggressive NO sell crosses YES ask side)
-    NO  profit_target:   bid  (passive NO sell rests at 100 - YES bid)
+    All four combos map to the raw order-book integer to pass directly to the API:
+
+    YES stop_loss:       bid  (aggressive — immediate fill at YES bid)
+    YES profit_target:   ask  (passive maker — rests at YES ask, fee-efficient)
+    NO  stop_loss:       ask  (aggressive — yes_price=ask means NO is sold at 100-ask=NO_bid)
+    NO  profit_target:   bid  (passive — yes_price=bid means NO rests at 100-bid=NO_ask)
     """
     bid = orderbook_state.best_bid(ticker)
     ask = orderbook_state.best_ask(ticker)
