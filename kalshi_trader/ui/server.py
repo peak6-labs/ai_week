@@ -281,38 +281,45 @@ async def _poll_fills(trading_state: TradingState) -> None:
     await asyncio.sleep(4)
     trading_state.log("Fills poller started")
 
-    async with KalshiClient() as raw_client:
-        client = ReadOnlyKalshiClient(raw_client)
-        while True:
-            try:
-                fills_cache: dict[str, list[dict]] = {}
-                cursor: str | None = None
-
+    while True:
+        try:
+            async with KalshiClient() as raw_client:
+                client = ReadOnlyKalshiClient(raw_client)
                 while True:
-                    response = await client.get_fills(cursor=cursor)
-                    page_fills = response.get("fills") or []
-                    for fill in page_fills:
-                        ticker = fill.get("ticker", "")
-                        if ticker:
-                            fills_cache.setdefault(ticker, []).append(fill)
-                    next_cursor = response.get("cursor")
-                    if not next_cursor or not page_fills:
-                        break
-                    cursor = next_cursor
+                    try:
+                        fills_cache: dict[str, list[dict]] = {}
+                        cursor: str | None = None
 
-                open_tickers = {
-                    p["ticker"] for p in trading_state.positions if p.get("ticker")
-                }
-                trading_state.closed_positions = compute_closed_positions(
-                    fills_cache, open_tickers
-                )
+                        while True:
+                            response = await client.get_fills(cursor=cursor)
+                            page_fills = response.get("fills") or []
+                            for fill in page_fills:
+                                ticker = fill.get("ticker", "")
+                                if ticker:
+                                    fills_cache.setdefault(ticker, []).append(fill)
+                            next_cursor = response.get("cursor")
+                            if not next_cursor or not page_fills:
+                                break
+                            cursor = next_cursor
 
-            except asyncio.CancelledError:
-                raise
-            except Exception as caught_exception:
-                logger.warning("Fills poll failed: %s", caught_exception)
+                        open_tickers = {
+                            p["ticker"] for p in trading_state.positions if p.get("ticker")
+                        }
+                        trading_state.closed_positions = compute_closed_positions(
+                            fills_cache, open_tickers
+                        )
 
-            await asyncio.sleep(300)  # 5 minutes
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as caught_exception:
+                        logger.warning("Fills poll failed: %s", caught_exception)
+
+                    await asyncio.sleep(300)  # 5 minutes
+        except asyncio.CancelledError:
+            raise
+        except Exception as caught_exception:
+            logger.warning("Fills poller client error, retrying in 60s: %s", caught_exception)
+            await asyncio.sleep(60)
 
 
 # ---------------------------------------------------------------------------
