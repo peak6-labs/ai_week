@@ -216,17 +216,10 @@ KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
   --tickers CANDIDATE_TICKER... >> /tmp/rules_${TS}.json
 ```
 
-Fetch contract terms PDFs:
-
-```bash
-KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/contract_terms_doc.py \
-  --tickers CANDIDATE_TICKER... > /tmp/contract_docs_${TS}.json
-```
-
 Read each PDF and for each surviving market answer five questions:
 
 1. **Settlement rule** — does `rules_primary`, `settlement_sources`, and the
-   PDF confirm the market resolves on what the signals measured? Check
+   rules metadata confirm the market resolves on what the signals measured? Check
    `data_quality` fields. Drop if there's a timing/threshold twist.
 2. **Bear case** — what specific mechanism makes the signal wrong?
 3. **Source independence** — three paths:

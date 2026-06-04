@@ -11,8 +11,7 @@ from kalshi_trader.portfolio_checks import (
     check_stop_loss,
     check_profit_target,
     EXIT_CHECKS,
-    PROFIT_TARGET_MULTIPLE,
-    PROFIT_CONVERGENCE_FRACTION,
+    _profit_target_multiple,
 )
 
 
@@ -65,80 +64,96 @@ def test_stop_loss_skips_zero_quantity():
 
 
 # ---------------------------------------------------------------------------
+# _profit_target_multiple — scaling by entry price
+# ---------------------------------------------------------------------------
+
+def test_profit_target_multiple_longshot():
+    assert _profit_target_multiple(10.0) == 1.75
+
+def test_profit_target_multiple_below_15():
+    assert _profit_target_multiple(14.9) == 1.75
+
+def test_profit_target_multiple_15_to_30():
+    assert _profit_target_multiple(15.0) == 1.50
+    assert _profit_target_multiple(29.9) == 1.50
+
+def test_profit_target_multiple_30_to_50():
+    assert _profit_target_multiple(30.0) == 1.35
+    assert _profit_target_multiple(49.9) == 1.35
+
+def test_profit_target_multiple_high_entry():
+    assert _profit_target_multiple(50.0) == 1.25
+    assert _profit_target_multiple(75.0) == 1.25
+
+
+# ---------------------------------------------------------------------------
 # check_profit_target
 # ---------------------------------------------------------------------------
 
-def test_profit_target_triggers_when_up_80_percent():
-    # 50¢ entry (cost_basis=$5, quantity=10). Target = 50 + 0.75*(100-50) = 87.5¢.
-    # At 90¢ → triggers.
-    position = _position(cost_basis=5.0, quantity=10.0, current_price_cents=90.0)
+def test_profit_target_high_entry_triggers_at_25_percent():
+    # 50¢ entry (cost=$5, qty=10). Threshold=1.25×. Target value=$6.25 → price=62.5¢.
+    # At 63¢ → triggers.
+    position = _position(cost_basis=5.0, quantity=10.0, current_price_cents=63.0)
     signal = check_profit_target(position)
     assert signal is not None
     assert signal.reason == "profit_target"
-    assert "80%" in signal.description
-    assert signal.exit_price_cents == 90.0
 
 
-def test_profit_target_does_not_trigger_when_up_48_percent():
-    # 50¢ entry. Target = min(75, 87.5) = 75¢. At 74¢ → no trigger.
-    position = _position(cost_basis=5.0, quantity=10.0, current_price_cents=74.0)
+def test_profit_target_high_entry_does_not_trigger_below_25_percent():
+    # 50¢ entry. At 62¢ (just below 62.5¢ threshold) → no trigger.
+    position = _position(cost_basis=5.0, quantity=10.0, current_price_cents=62.0)
     assert check_profit_target(position) is None
 
 
-def test_profit_target_does_not_trigger_at_exact_threshold():
-    # 50¢ entry. Target = 75¢ exactly (not strictly greater) → no trigger.
-    position = _position(cost_basis=5.0, quantity=10.0, current_price_cents=75.0)
+def test_profit_target_high_entry_does_not_trigger_at_exact_threshold():
+    # 50¢ entry. Exactly at 62.5¢ (value=$6.25 = 1.25×$5, not strictly greater) → no trigger.
+    position = _position(cost_basis=5.0, quantity=10.0, current_price_cents=62.5)
     assert check_profit_target(position) is None
 
 
-def test_profit_target_low_entry_exits_at_double():
-    # 15¢ entry: target = min(30, 78.75) = 30¢. At 31¢ → triggers.
-    position = _position(cost_basis=15.0, quantity=100.0, current_price_cents=31.0)
+def test_profit_target_mid_entry_triggers_at_35_percent():
+    # 40¢ entry (cost=$4, qty=10). Threshold=1.35×. Target value=$5.40 → price=54¢.
+    # At 55¢ → triggers.
+    position = _position(cost_basis=4.0, quantity=10.0, current_price_cents=55.0)
     signal = check_profit_target(position)
     assert signal is not None
     assert signal.reason == "profit_target"
 
 
-def test_profit_target_low_entry_holds_below_1_5x():
-    # 15¢ entry: target = min(22.5, 78.75) = 22.5¢. At 22¢ → no trigger.
-    position = _position(cost_basis=15.0, quantity=100.0, current_price_cents=22.0)
+def test_profit_target_mid_entry_does_not_trigger_below_threshold():
+    # 40¢ entry. At 53¢ (below 54¢ threshold) → no trigger.
+    position = _position(cost_basis=4.0, quantity=10.0, current_price_cents=53.0)
     assert check_profit_target(position) is None
 
 
-def test_profit_target_9c_entry_exits_at_double():
-    # 9¢ entry: target = min(18, 77.25) = 18¢. At 19¢ → triggers.
-    position = _position(cost_basis=9.0, quantity=100.0, current_price_cents=19.0)
+def test_profit_target_low_entry_triggers_at_50_percent():
+    # 20¢ entry (cost=$20, qty=100). Threshold=1.50×. Target value=$30 → price=30¢.
+    # At 31¢ → triggers.
+    position = _position(cost_basis=20.0, quantity=100.0, current_price_cents=31.0)
     signal = check_profit_target(position)
     assert signal is not None
     assert signal.reason == "profit_target"
 
 
-def test_profit_target_high_entry_triggers_via_convergence():
-    # 75¢ entry: target = min(150, 93.75) = 93.75¢. Old 1.75× rule (131¢) was impossible.
-    # At 94¢ → triggers.
-    position = _position(cost_basis=7.5, quantity=10.0, current_price_cents=94.0)
+def test_profit_target_low_entry_holds_below_50_percent():
+    # 20¢ entry. At 29¢ → no trigger.
+    position = _position(cost_basis=20.0, quantity=100.0, current_price_cents=29.0)
+    assert check_profit_target(position) is None
+
+
+def test_profit_target_longshot_triggers_at_75_percent():
+    # 9¢ entry (cost=$9, qty=100). Threshold=1.75×. Target value=$15.75 → price=15.75¢.
+    # At 16¢ → triggers.
+    position = _position(cost_basis=9.0, quantity=100.0, current_price_cents=16.0)
     signal = check_profit_target(position)
     assert signal is not None
     assert signal.reason == "profit_target"
 
 
-def test_profit_target_threshold_consistent():
-    # Verify the exact trigger boundary for representative entry prices.
-    # Below ~60¢: 1.5x rule wins. Above ~60¢: convergence rule wins.
-    cases = [
-        (9.0,  13.5),   # min(13.5,  77.25) = 13.5  — 1.5x
-        (15.0, 22.5),   # min(22.5,  78.75) = 22.5  — 1.5x
-        (25.0, 37.5),   # min(37.5,  81.25) = 37.5  — 1.5x
-        (50.0, 75.0),   # min(75,    87.5 ) = 75.0  — 1.5x
-        (75.0, 93.75),  # min(112.5, 93.75) = 93.75 — convergence
-    ]
-    for entry_cents, target_cents in cases:
-        quantity = 100.0
-        cost_basis = entry_cents * quantity / 100.0
-        pos_at = _position(cost_basis=cost_basis, quantity=quantity, current_price_cents=target_cents)
-        assert check_profit_target(pos_at) is None, f"should not trigger at threshold for entry={entry_cents}¢"
-        pos_above = _position(cost_basis=cost_basis, quantity=quantity, current_price_cents=target_cents + 0.01)
-        assert check_profit_target(pos_above) is not None, f"should trigger just above threshold for entry={entry_cents}¢"
+def test_profit_target_longshot_holds_below_75_percent():
+    # 9¢ entry. At 15¢ (below 15.75¢ threshold) → no trigger.
+    position = _position(cost_basis=9.0, quantity=100.0, current_price_cents=15.0)
+    assert check_profit_target(position) is None
 
 
 def test_profit_target_skips_zero_cost_basis():

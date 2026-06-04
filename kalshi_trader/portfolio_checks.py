@@ -21,7 +21,17 @@ from __future__ import annotations
 from kalshi_trader.models import ExitSignal
 
 STOP_LOSS_THRESHOLD = 0.75        # exit if current_value < 75% of cost basis (down 25%)
-PROFIT_TARGET_THRESHOLD = 1.25   # exit if current_value > 125% of cost basis (up 25%)
+
+
+def _profit_target_multiple(entry_price_cents: float) -> float:
+    """Scale the profit target: longshots run longer, high-confidence positions exit sooner."""
+    if entry_price_cents < 15:
+        return 1.75   # +75% — longshot, huge remaining upside
+    if entry_price_cents < 30:
+        return 1.50   # +50%
+    if entry_price_cents < 50:
+        return 1.35   # +35%
+    return 1.25       # +25% — higher entry, take profits sooner
 
 
 def check_stop_loss(position: dict) -> ExitSignal | None:
@@ -48,7 +58,9 @@ def check_profit_target(position: dict) -> ExitSignal | None:
     if cost_basis <= 0 or quantity <= 0 or current_price_cents is None:
         return None
     current_value = quantity * current_price_cents / 100.0
-    if current_value > PROFIT_TARGET_THRESHOLD * cost_basis:
+    entry_price_cents = (cost_basis / quantity) * 100.0
+    threshold = _profit_target_multiple(entry_price_cents)
+    if current_value > threshold * cost_basis:
         gain_pct = round((current_value / cost_basis - 1.0) * 100.0)
         return ExitSignal(
             reason="profit_target",
