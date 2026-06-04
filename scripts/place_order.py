@@ -231,3 +231,107 @@ async def cancel_and_replace(
     if not dry_run:
         await asyncio.sleep(0.5)
     return await place_order_op(ticker, action, side, count, yes_price, client, dry_run=dry_run)
+
+
+def _merge_params(parsed_intent: dict, flags: dict) -> dict:
+    """Merge NL-parsed intent with explicit CLI flags. Flags take precedence."""
+    merged = dict(parsed_intent)
+    for flag_key, flag_value in flags.items():
+        if flag_value is not None:
+            merged[flag_key] = flag_value
+    return merged
+
+
+async def _run(ticker: str, intent: str | None, flags: dict, dry_run: bool) -> None:
+    """Core async logic: parse intent, resolve params, dispatch operation."""
+    if intent:
+        parsed = await parse_intent(intent)
+    else:
+        parsed = {
+            "action": None, "side": None, "quantity": None, "amount_dollars": None,
+            "pricing": None, "yes_price": None, "cancel_first": False, "cancel_only": False,
+        }
+
+    params = _merge_params(parsed, flags)
+
+    cancel_only: bool = params.get("cancel_only", False)
+    cancel_first: bool = params.get("cancel_first", False)
+    action: str | None = params.get("action")
+    side: str | None = params.get("side")
+    quantity_spec = params.get("quantity")
+    amount_dollars: float | None = params.get("amount_dollars")
+    pricing: str | None = params.get("pricing") or "midmarket_maker"
+    yes_price: int | None = params.get("yes_price")
+
+    async with KalshiClient() as client:
+        if cancel_only:
+            await cancel_orders(ticker, client, dry_run=dry_run)
+            return
+
+        if yes_price is None:
+            orderbook_data = await client.get_orderbook(ticker)
+            yes_price = compute_limit_price(orderbook_data, action or "sell", pricing)
+            if pricing == "cross_spread":
+                print("WARNING: cross_spread incurs taker fees (~7% of profit)")
+
+        resolved_side, contract_count = await resolve_quantity(
+            ticker, quantity_spec, action or "sell", client,
+            amount_dollars=amount_dollars, yes_price_cents=yes_price,
+        )
+        final_side = side or resolved_side
+        final_action = action or "sell"
+
+        if cancel_first:
+            await cancel_and_replace(
+                ticker, final_action, final_side, contract_count, yes_price,
+                client, dry_run=dry_run,
+            )
+        else:
+            await place_order_op(
+                ticker, final_action, final_side, contract_count, yes_price,
+                client, dry_run=dry_run,
+            )
+
+
+def _main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Place, cancel, or cancel-and-replace Kalshi orders"
+    )
+    parser.add_argument("--ticker", required=True, help="Market ticker, e.g. KXATL-26JUN-A1")
+    parser.add_argument("intent", nargs="?", default=None,
+                        help="Natural language order instruction (parsed by Haiku)")
+    parser.add_argument("--action", choices=["buy", "sell"])
+    parser.add_argument("--side", choices=["yes", "no"])
+    parser.add_argument("--quantity", help="Integer contract count or 'all'")
+    parser.add_argument("--amount", type=float, dest="amount_dollars",
+                        help="Dollar amount for buys (e.g. 10)")
+    parser.add_argument("--pricing",
+                        choices=["midmarket_maker", "join_bid", "join_ask", "cross_spread"])
+    parser.add_argument("--yes-price", type=int, dest="yes_price",
+                        help="Explicit limit price in cents (1-99)")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    quantity_spec = None
+    if args.quantity is not None:
+        quantity_spec = "all" if args.quantity.lower() == "all" else int(args.quantity)
+
+    flags = {
+        "action": args.action,
+        "side": args.side,
+        "quantity": quantity_spec,
+        "amount_dollars": args.amount_dollars,
+        "pricing": args.pricing,
+        "yes_price": args.yes_price,
+    }
+
+    asyncio.run(_run(
+        ticker=args.ticker,
+        intent=args.intent,
+        flags=flags,
+        dry_run=args.dry_run,
+    ))
+
+
+if __name__ == "__main__":
+    _main()

@@ -263,3 +263,37 @@ async def test_place_order_op_dry_run_skips_api():
     )
     assert result["dry_run"] is True
     mock_client.create_order.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_main_dry_run_sell_all_midmarket(capsys):
+    """End-to-end dry-run: NL intent + orderbook fetch + position fetch → correct price printed."""
+    mock_client = MagicMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.get_orderbook = AsyncMock(return_value={
+        "orderbook": {"yes": [[62, 100]], "no": [[35, 100]]}
+    })
+    mock_client.get_positions = AsyncMock(return_value={
+        "market_positions": [{"ticker": "KXFOO", "position_fp": "20.00"}]
+    })
+
+    haiku_response = {
+        "action": "sell", "side": None, "quantity": "all", "amount_dollars": None,
+        "pricing": "midmarket_maker", "yes_price": None,
+        "cancel_first": False, "cancel_only": False,
+    }
+
+    with patch("scripts.place_order.KalshiClient", return_value=mock_client), \
+         patch_haiku(haiku_response):
+        await place_order._run(
+            ticker="KXFOO",
+            intent="exit full position at midmarket no fees",
+            flags={},
+            dry_run=True,
+        )
+
+    captured = capsys.readouterr()
+    assert "[DRY-RUN]" in captured.out
+    assert "yes_price=64" in captured.out   # ceil((62+65)/2) = 64
+    assert "20 contracts" in captured.out
