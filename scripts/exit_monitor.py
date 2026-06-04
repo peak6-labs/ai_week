@@ -50,7 +50,10 @@ def _build_position_dict(
         "midpoint_yes_price_cents": midpoint_yes_price_cents,
     }
     if position_meta.get("fair_value_cents") is not None:
-        result["fair_value_cents"] = position_meta["fair_value_cents"]
+        yes_fair = position_meta["fair_value_cents"]
+        # fair_value_cents is stored in YES terms (predicted_prob × 100).
+        # current_price_cents is side-relative, so convert fair value to match.
+        result["fair_value_cents"] = yes_fair if side == "yes" else (100.0 - yes_fair)
     return result
 
 
@@ -124,8 +127,9 @@ async def _notify_server(message: str, level: str = "info") -> None:
 
     Silently swallowed if the server is not running.
     """
+    connector = aiohttp.TCPConnector()
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=connector) as session:
             await session.post(
                 "http://localhost:8000/api/log",
                 json={"message": message, "level": level},
@@ -133,6 +137,8 @@ async def _notify_server(message: str, level: str = "info") -> None:
             )
     except Exception:
         pass
+    finally:
+        await connector.close()
 
 
 async def run(dry_run: bool) -> None:

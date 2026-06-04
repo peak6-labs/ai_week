@@ -67,6 +67,25 @@ class TestBuildPositionDict:
         assert result["market_exposure_dollars"] == 5.0
         assert result["quantity"] == 10.0
 
+    def test_yes_fair_value_passed_through_unchanged(self):
+        # predicted_prob=0.70 → fair_value_cents=70 for a YES position
+        meta = {**_make_meta(side="yes"), "fair_value_cents": 70.0}
+        state = _make_orderbook(bid=47, no_price=53)
+        result = _build_position_dict(meta, state, TICKER)
+        assert result["fair_value_cents"] == 70.0
+
+    def test_no_fair_value_converted_to_no_side(self):
+        # predicted_prob=0.70 → YES fair=70, NO fair=30 → target for NO position is 30
+        meta = {**_make_meta(side="no"), "fair_value_cents": 70.0}
+        state = _make_orderbook(bid=47, no_price=53)
+        result = _build_position_dict(meta, state, TICKER)
+        assert result["fair_value_cents"] == 30.0  # 100 - 70
+
+    def test_no_fair_value_absent_when_not_set(self):
+        state = _make_orderbook(bid=47, no_price=53)
+        result = _build_position_dict(_make_meta(side="no"), state, TICKER)
+        assert "fair_value_cents" not in result
+
 
 class TestSelectYesPrice:
     def test_yes_stop_loss_uses_bid(self):
