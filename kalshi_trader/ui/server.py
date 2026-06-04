@@ -217,6 +217,13 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                 )
                 price_data_map: dict[str, dict | None] = dict(zip(tickers, price_results))
 
+                position_fair_value_map: dict[str, float | None] = {}
+                if tickers:
+                    try:
+                        position_fair_value_map = await _db.get_fair_values_from_recommendations(tickers)
+                    except Exception as fair_value_exception:
+                        logger.debug("Position fair value lookup failed: %s", fair_value_exception)
+
                 total_exposure = 0.0
                 total_unrealized_pnl = 0.0
                 parsed: list[dict] = []
@@ -254,6 +261,7 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                         "current_price_dollars": round(current_price_cents / 100.0, 4) if current_price_cents is not None else None,
                         "yes_bid": price_data["bid"] if price_data else None,
                         "yes_ask": price_data["ask"] if price_data else None,
+                        "fair_value_cents": round(position_fair_value_map[ticker] * 100, 1) if position_fair_value_map.get(ticker) is not None else None,
                         "total_cost_dollars": round(exposure, 2),
                         "total_cost_with_fees_dollars": round(exposure + fees, 2),
                         "gross_unrealized_pnl_dollars": round(gross_unrealized_pnl, 2) if gross_unrealized_pnl is not None else None,

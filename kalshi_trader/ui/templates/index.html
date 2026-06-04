@@ -821,6 +821,7 @@
               <th>Bid ¢</th>
               <th>Ask ¢</th>
               <th>Current</th>
+              <th>Fair Val ¢</th>
               <th>Cost</th>
               <th>Cost+Fees</th>
               <th>Gross P&amp;L</th>
@@ -829,7 +830,7 @@
             </tr>
           </thead>
           <tbody id="positions-tbody">
-            <tr class="empty-row"><td colspan="12">No open positions</td></tr>
+            <tr class="empty-row"><td colspan="13">No open positions</td></tr>
           </tbody>
         </table>
       </div>
@@ -1140,7 +1141,7 @@ function updateStatusBar(state) {
 function renderPositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions || positions.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="12">No open positions</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="13">No open positions</td></tr>';
     return;
   }
   tbody.innerHTML = positions.map(p => {
@@ -1180,6 +1181,7 @@ function renderPositions(positions) {
       <td style="color:var(--text-secondary)">${escHtml(bidDisplay)}</td>
       <td style="color:var(--text-secondary)">${escHtml(askDisplay)}</td>
       <td>${currentDisplay}</td>
+      <td class="${p.fair_value_cents != null && p.current_price_dollars != null ? (p.fair_value_cents > p.current_price_dollars * 100 ? 'pnl-pos' : p.fair_value_cents < p.current_price_dollars * 100 ? 'pnl-neg' : '') : ''}">${p.fair_value_cents != null ? p.fair_value_cents + '¢' : '—'}</td>
       <td>${fmt$(p.total_cost_dollars ?? 0)}</td>
       <td>${fmt$(p.total_cost_with_fees_dollars ?? 0)}</td>
       <td>${grossPnlDisplay}</td>
