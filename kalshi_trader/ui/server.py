@@ -25,6 +25,68 @@ logger = logging.getLogger(__name__)
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
+def _avco_price(fill_list: list[dict], use_no_price: bool) -> float:
+    total_weight = sum(fill.get("count", 0) for fill in fill_list)
+    if total_weight == 0:
+        return 0.0
+    weighted_sum = sum(
+        fill.get("count", 0) * (
+            (100 - fill.get("yes_price", 0)) if use_no_price
+            else fill.get("yes_price", 0)
+        )
+        for fill in fill_list
+    )
+    return weighted_sum / total_weight
+
+
+def compute_closed_positions(
+    fills_cache: dict[str, list[dict]],
+    open_tickers: set[str],
+) -> list[dict]:
+    """Reconstruct closed positions from a per-ticker fills cache.
+
+    A position is closed when total sell count >= total buy count for a ticker
+    AND that ticker is not in the current open positions set. Returns rows
+    sorted newest-closed-first, matching the shape expected by
+    renderClosedPositions() in the UI.
+    """
+    result: list[dict] = []
+    for ticker, fills in fills_cache.items():
+        if ticker in open_tickers:
+            continue
+        buy_fills = [fill for fill in fills if fill.get("action") == "buy"]
+        sell_fills = [fill for fill in fills if fill.get("action") == "sell"]
+        total_bought = sum(fill.get("count", 0) for fill in buy_fills)
+        total_sold = sum(fill.get("count", 0) for fill in sell_fills)
+        if total_bought == 0 or total_sold < total_bought:
+            continue
+
+        side_raw = (buy_fills[0].get("side") or "yes").lower()
+        side = "YES" if side_raw == "yes" else "NO"
+        use_no_price = side == "NO"
+
+        entry_price_cents = _avco_price(buy_fills, use_no_price)
+        exit_price_cents = _avco_price(sell_fills, use_no_price)
+        realized_pnl_dollars = (exit_price_cents - entry_price_cents) * total_bought / 100.0
+
+        opened_at = min(fill.get("created_time", "") for fill in buy_fills)
+        closed_at = max(fill.get("created_time", "") for fill in sell_fills)
+
+        result.append({
+            "ticker": ticker,
+            "side": side,
+            "contracts": total_bought,
+            "entry_price_cents": entry_price_cents,
+            "exit_price_cents": exit_price_cents,
+            "opened_at": opened_at,
+            "closed_at": closed_at,
+            "realized_pnl_dollars": round(realized_pnl_dollars, 4),
+        })
+
+    result.sort(key=lambda row: row["closed_at"], reverse=True)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Kalshi account poller — runs independently of the trading loop
 # ---------------------------------------------------------------------------
@@ -206,6 +268,21 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
             await asyncio.sleep(10)
 
 
+async def _poll_closed_positions(trading_state: TradingState) -> None:
+    """Poll Supabase every 60 s for recently closed positions."""
+    from kalshi_trader import db as _db
+
+    await asyncio.sleep(5)
+    while True:
+        try:
+            trading_state.closed_positions = await _db.get_closed_positions(limit=50)
+        except asyncio.CancelledError:
+            raise
+        except Exception as caught_exception:
+            logger.debug("Closed positions poll failed: %s", caught_exception)
+        await asyncio.sleep(60)
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -239,6 +316,7 @@ def create_app(
     @app.on_event("startup")
     async def _start_account_poller() -> None:
         asyncio.create_task(_poll_kalshi_account(trading_state))
+        asyncio.create_task(_poll_closed_positions(trading_state))
 
     # ------------------------------------------------------------------
     # Routes
