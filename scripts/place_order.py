@@ -105,8 +105,13 @@ async def parse_intent(intent: str) -> dict:
         system=_INTENT_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": intent}],
     )
-    text = next((block.text for block in message.content if hasattr(block, "text")), "{}")
-    parsed = json.loads(text)
+    raw_text = next((block.text for block in message.content if hasattr(block, "text")), "")
+    # Strip markdown code fences that models sometimes add despite instructions
+    stripped_text = raw_text.strip()
+    if stripped_text.startswith("```"):
+        lines = stripped_text.splitlines()
+        stripped_text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    parsed = json.loads(stripped_text or "{}")
     return {
         "action": parsed.get("action"),
         "side": parsed.get("side"),
@@ -262,6 +267,12 @@ async def _run(ticker: str, intent: str | None, flags: dict, dry_run: bool) -> N
     amount_dollars: float | None = params.get("amount_dollars")
     pricing: str | None = params.get("pricing") or "midmarket_maker"
     yes_price: int | None = params.get("yes_price")
+
+    # Default sell operations to "all" when no quantity is specified — you can only
+    # sell what you hold, and cancel-and-replace implies replacing an existing position.
+    effective_action = action or "sell"
+    if quantity_spec is None and amount_dollars is None and effective_action == "sell":
+        quantity_spec = "all"
 
     async with KalshiClient() as client:
         if cancel_only:
