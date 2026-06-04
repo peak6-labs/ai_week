@@ -94,3 +94,89 @@ class TestSelectYesPrice:
     def test_returns_none_for_no_side_when_no_data(self):
         state = OrderBookState()
         assert _select_yes_price("stop_loss", "no", state, TICKER) is None
+
+
+import asyncio
+
+
+class TestFetchOpenPositions:
+    def test_extracts_yes_position(self):
+        raw = {
+            "market_positions": [
+                {
+                    "ticker": "KXTEST-1",
+                    "position_fp": "10",
+                    "market_exposure_dollars": "5.00",
+                }
+            ]
+        }
+
+        class FakeClient:
+            async def get_positions(self):
+                return raw
+
+        result = asyncio.run(exit_monitor._fetch_open_positions(FakeClient()))
+        assert "KXTEST-1" in result
+        pos = result["KXTEST-1"]
+        assert pos["side"] == "yes"
+        assert pos["quantity"] == 10.0
+        assert pos["market_exposure_dollars"] == 5.0
+
+    def test_extracts_no_position(self):
+        raw = {
+            "market_positions": [
+                {
+                    "ticker": "KXTEST-2",
+                    "position_fp": "-5",
+                    "market_exposure_dollars": "2.50",
+                }
+            ]
+        }
+
+        class FakeClient:
+            async def get_positions(self):
+                return raw
+
+        result = asyncio.run(exit_monitor._fetch_open_positions(FakeClient()))
+        assert result["KXTEST-2"]["side"] == "no"
+        assert result["KXTEST-2"]["quantity"] == 5.0
+
+    def test_skips_zero_position(self):
+        raw = {
+            "market_positions": [
+                {"ticker": "KXTEST-3", "position_fp": "0", "market_exposure_dollars": "0"}
+            ]
+        }
+
+        class FakeClient:
+            async def get_positions(self):
+                return raw
+
+        result = asyncio.run(exit_monitor._fetch_open_positions(FakeClient()))
+        assert "KXTEST-3" not in result
+
+
+class TestFetchRestingSellTickers:
+    def test_returns_sell_tickers(self):
+        raw = {
+            "orders": [
+                {"ticker": "KXTEST-1", "action": "sell"},
+                {"ticker": "KXTEST-2", "action": "buy"},
+            ]
+        }
+
+        class FakeClient:
+            async def get_orders(self, status="resting"):
+                return raw
+
+        result = asyncio.run(exit_monitor._fetch_resting_sell_tickers(FakeClient()))
+        assert "KXTEST-1" in result
+        assert "KXTEST-2" not in result
+
+    def test_returns_empty_set_when_no_orders(self):
+        class FakeClient:
+            async def get_orders(self, status="resting"):
+                return {"orders": []}
+
+        result = asyncio.run(exit_monitor._fetch_resting_sell_tickers(FakeClient()))
+        assert result == set()

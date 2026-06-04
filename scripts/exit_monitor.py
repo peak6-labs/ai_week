@@ -73,3 +73,43 @@ def _select_yes_price(
         return bid if signal_reason == "stop_loss" else ask
     else:
         return ask if signal_reason == "stop_loss" else bid
+
+
+async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
+    """Fetch open positions from Kalshi REST API.
+
+    Returns {ticker: {ticker, side, quantity, market_exposure_dollars}}.
+    Only includes positions with nonzero quantity.
+    """
+    response = await client.get_positions()
+    raw_positions = response.get("market_positions") or []
+    positions: dict[str, dict] = {}
+    for raw in raw_positions:
+        qty = float(raw.get("position_fp", "0") or 0)
+        if qty == 0:
+            continue
+        ticker = raw.get("ticker", "")
+        if not ticker:
+            continue
+        positions[ticker] = {
+            "ticker": ticker,
+            "side": "yes" if qty > 0 else "no",
+            "quantity": abs(qty),
+            "market_exposure_dollars": float(raw.get("market_exposure_dollars", "0") or 0),
+        }
+    return positions
+
+
+async def _fetch_resting_sell_tickers(client: KalshiClient) -> set[str]:
+    """Return tickers that already have a resting sell order.
+
+    Used on startup and refresh to pre-populate _pending_exits and prevent
+    duplicate orders.
+    """
+    response = await client.get_orders(status="resting")
+    orders = response.get("orders") or []
+    return {
+        o.get("ticker", "")
+        for o in orders
+        if o.get("action") == "sell" and o.get("ticker")
+    }
