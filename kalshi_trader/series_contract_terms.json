@@ -76,6 +76,17 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ALBUMRELEASEDATE.pdf",
     "fetched_at": "2026-06-03T21:16:54.804516+00:00"
   },
+  "KXALBUMRELEASENBAYB": {
+    "settlement_sources": [
+      {
+        "name": "Spotify",
+        "url": "https://www.spotify.com"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ALBUMRELEASE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ALBUMRELEASE.pdf",
+    "fetched_at": "2026-06-04T18:33:22.094631+00:00"
+  },
   "KXARTISTSTREAMSY": {
     "settlement_sources": [
       {
@@ -362,6 +373,40 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/EARTHQUAKEAREA.pdf",
     "fetched_at": "2026-06-04T15:55:42.011865+00:00"
   },
+  "KXECONSTATCPIYOY": {
+    "settlement_sources": [
+      {
+        "name": "Bureau of Labor Statistics- Employment Situation",
+        "url": "https://www.bls.gov/news.release/empsit.nr0.htm"
+      },
+      {
+        "name": "Bureau of Labor Statistics- Consumer Price Index",
+        "url": "https://www.bls.gov/news.release/cpi.nr0.htm"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ECONSTAT.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ECONSTAT.pdf",
+    "fetched_at": "2026-06-04T13:09:00.250941+00:00"
+  },
+  "KXELECTIONEMERGENCY": {
+    "settlement_sources": [
+      {
+        "name": "the White House",
+        "url": "https://www.whitehouse.gov"
+      },
+      {
+        "name": "Federal Register",
+        "url": "https://www.federalregister.gov/"
+      },
+      {
+        "name": "the President of the United States",
+        "url": "https://www.whitehouse.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/PRESACTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/PRESACTION.pdf",
+    "fetched_at": "2026-06-04T13:09:00.335336+00:00"
+  },
   "KXENGAGEMENTSWEENEYBRUAN": {
     "settlement_sources": [
       {
@@ -637,6 +682,17 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/CHIHIGH.pdf",
     "fetched_at": "2026-06-04T13:18:01.970181+00:00"
   },
+  "KXHIGHDEN": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report",
+        "url": "https://forecast.weather.gov/product.php?site=BOU&product=CLI&issuedby=DEN"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/DENHIGH.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/DENHIGH.pdf",
+    "fetched_at": "2026-06-04T13:18:01.876910+00:00"
+  },
   "KXHIGHLAX": {
     "settlement_sources": [
       {
@@ -691,6 +747,17 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
     "fetched_at": "2026-06-04T13:18:03.056459+00:00"
+  },
+  "KXHIGHTBOS": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Boston",
+        "url": "https://forecast.weather.gov/product.php?site=BOX&product=CLI&issuedby=BOS"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:02.052295+00:00"
   },
   "KXHIGHTDAL": {
     "settlement_sources": [
@@ -768,6 +835,17 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
     "fetched_at": "2026-06-04T13:18:02.316725+00:00"
+  },
+  "KXHIGHTPHX": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Phoenix",
+        "url": "https://forecast.weather.gov/product.php?site=PSR&product=CLI&issuedby=PHX"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:03.455552+00:00"
   },
   "KXHIGHTSATX": {
     "settlement_sources": [
@@ -1136,6 +1214,17 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/MENTION.pdf",
     "fetched_at": "2026-06-03T21:34:49.206501+00:00"
   },
+  "KXLOWTATL": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Atlanta",
+        "url": "https://forecast.weather.gov/product.php?site=FFC&product=CLI&issuedby=ATL"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:05.854196+00:00"
+  },
   "KXLOWTAUS": {
     "settlement_sources": [
       {
@@ -1158,6 +1247,50 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
     "fetched_at": "2026-06-03T19:20:37.229524+00:00"
   },
+  "KXLOWTCHI": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Chicago Midway",
+        "url": "https://forecast.weather.gov/product.php?site=LOT&product=CLI&issuedby=MDW"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:04.292188+00:00"
+  },
+  "KXLOWTDAL": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report Dallas",
+        "url": "https://forecast.weather.gov/product.php?site=FWD&product=CLI&issuedby=DFW"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:03.536443+00:00"
+  },
+  "KXLOWTDC": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report DC ",
+        "url": "https://forecast.weather.gov/product.php?site=LWX&product=CLI&issuedby=DCA"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:03.613297+00:00"
+  },
+  "KXLOWTDEN": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report",
+        "url": "https://forecast.weather.gov/product.php?site=BOU&product=CLI&issuedby=DEN"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:03.688403+00:00"
+  },
   "KXLOWTHOU": {
     "settlement_sources": [
       {
@@ -1168,6 +1301,17 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
     "fetched_at": "2026-06-04T13:17:05.351415+00:00"
+  },
+  "KXLOWTLAX": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report",
+        "url": "https://forecast.weather.gov/product.php?site=LOX&product=CLI&issuedby=LAX"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+    "fetched_at": "2026-06-04T13:18:03.763198+00:00"
   },
   "KXLOWTLV": {
     "settlement_sources": [
@@ -1465,6 +1609,81 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SPORTSMENTION.pdf",
     "fetched_at": "2026-06-03T19:20:37.199233+00:00"
   },
+  "KXNBAATTEND": {
+    "settlement_sources": [
+      {
+        "name": "USA Today",
+        "url": "https://www.usatoday.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Vogue",
+        "url": "https://www.vogue.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ATTEND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ATTEND.pdf",
+    "fetched_at": "2026-06-04T18:33:22.136196+00:00"
+  },
   "KXNBAMENTION": {
     "settlement_sources": [
       {
@@ -1486,6 +1705,36 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NEWOUTBREAK.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NEWOUTBREAK.pdf",
     "fetched_at": "2026-06-03T21:04:06.372629+00:00"
+  },
+  "KXNEWTARIFFS": {
+    "settlement_sources": [
+      {
+        "name": "the White House",
+        "url": "https://www.whitehouse.gov"
+      },
+      {
+        "name": "Federal Register",
+        "url": "https://www.federalregister.gov/"
+      },
+      {
+        "name": "the President of the United States",
+        "url": "https://www.whitehouse.gov/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/PRESACTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/PRESACTION.pdf",
+    "fetched_at": "2026-06-04T18:33:22.094413+00:00"
+  },
+  "KXNEWTAYLOR": {
+    "settlement_sources": [
+      {
+        "name": "Taylor Swift",
+        "url": "https://www.taylorswift.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NEWTAYLOR.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NEWTAYLOR.pdf",
+    "fetched_at": "2026-06-04T18:33:22.094431+00:00"
   },
   "KXNEXTDEF": {
     "settlement_sources": [
@@ -1560,6 +1809,17 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/NEXTPM.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/NEXTPM.pdf",
     "fetched_at": "2026-06-03T20:29:19.260050+00:00"
+  },
+  "KXNHLMENTION": {
+    "settlement_sources": [
+      {
+        "name": "NHL",
+        "url": "https://www.nhl.com"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/SPORTSMENTION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/SPORTSMENTION.pdf",
+    "fetched_at": "2026-06-04T18:33:22.091362+00:00"
   },
   "KXPAYROLLS": {
     "settlement_sources": [
@@ -1649,6 +1909,17 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINM.pdf",
     "fetched_at": "2026-06-04T13:18:05.113258+00:00"
   },
+  "KXRAINLAXM": {
+    "settlement_sources": [
+      {
+        "name": "National Weather Service",
+        "url": "https://www.weather.gov"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RAINM.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINM.pdf",
+    "fetched_at": "2026-06-04T13:17:05.206097+00:00"
+  },
   "KXRAINMIAM": {
     "settlement_sources": [
       {
@@ -1659,6 +1930,17 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RAINM.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINM.pdf",
     "fetched_at": "2026-06-04T13:18:05.202132+00:00"
+  },
+  "KXRAINNYC": {
+    "settlement_sources": [
+      {
+        "name": "NWS Climatological Report",
+        "url": "https://forecast.weather.gov/product.php?site=OKX&product=CLI&issuedby=NYC"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RAINNYC.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINNYC.pdf",
+    "fetched_at": "2026-06-04T13:18:05.282295+00:00"
   },
   "KXRAINNYCM": {
     "settlement_sources": [
@@ -2243,6 +2525,81 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/TRUMPSAY.pdf",
     "fetched_at": "2026-06-03T19:41:07.605199+00:00"
   },
+  "KXTRUMPUFC": {
+    "settlement_sources": [
+      {
+        "name": "USA Today",
+        "url": "https://www.usatoday.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com/"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com/"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      },
+      {
+        "name": "Vogue",
+        "url": "https://www.vogue.com/"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com/"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com/"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "Billboard",
+        "url": "https://www.billboard.com/charts/hot-100/"
+      },
+      {
+        "name": "The New York Times",
+        "url": "https://www.nytimes.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "the Associated Press",
+        "url": "https://apnews.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ATTEND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ATTEND.pdf",
+    "fetched_at": "2026-06-04T18:33:22.094378+00:00"
+  },
   "KXTVSEASONANNOUNCEST": {
     "settlement_sources": [
       {
@@ -2640,160 +2997,5 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/USCLIMATE.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/USCLIMATE.pdf",
     "fetched_at": "2026-06-04T15:55:42.751003+00:00"
-  },
-  "KXECONSTATCPIYOY": {
-    "settlement_sources": [
-      {
-        "name": "Bureau of Labor Statistics- Employment Situation",
-        "url": "https://www.bls.gov/news.release/empsit.nr0.htm"
-      },
-      {
-        "name": "Bureau of Labor Statistics- Consumer Price Index",
-        "url": "https://www.bls.gov/news.release/cpi.nr0.htm"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ECONSTAT.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ECONSTAT.pdf",
-    "fetched_at": "2026-06-04T13:09:00.250941+00:00"
-  },
-  "KXELECTIONEMERGENCY": {
-    "settlement_sources": [
-      {
-        "name": "the White House",
-        "url": "https://www.whitehouse.gov"
-      },
-      {
-        "name": "Federal Register",
-        "url": "https://www.federalregister.gov/"
-      },
-      {
-        "name": "the President of the United States",
-        "url": "https://www.whitehouse.gov/"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/PRESACTION.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/PRESACTION.pdf",
-    "fetched_at": "2026-06-04T13:09:00.335336+00:00"
-  },
-  "KXHIGHDEN": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report",
-        "url": "https://forecast.weather.gov/product.php?site=BOU&product=CLI&issuedby=DEN"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/DENHIGH.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/DENHIGH.pdf",
-    "fetched_at": "2026-06-04T13:18:01.876910+00:00"
-  },
-  "KXHIGHTBOS": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report Boston",
-        "url": "https://forecast.weather.gov/product.php?site=BOX&product=CLI&issuedby=BOS"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:02.052295+00:00"
-  },
-  "KXHIGHTPHX": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report Phoenix",
-        "url": "https://forecast.weather.gov/product.php?site=PSR&product=CLI&issuedby=PHX"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:03.455552+00:00"
-  },
-  "KXLOWTATL": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report Atlanta",
-        "url": "https://forecast.weather.gov/product.php?site=FFC&product=CLI&issuedby=ATL"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:05.854196+00:00"
-  },
-  "KXLOWTCHI": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report Chicago Midway",
-        "url": "https://forecast.weather.gov/product.php?site=LOT&product=CLI&issuedby=MDW"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:04.292188+00:00"
-  },
-  "KXLOWTDAL": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report Dallas",
-        "url": "https://forecast.weather.gov/product.php?site=FWD&product=CLI&issuedby=DFW"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:03.536443+00:00"
-  },
-  "KXLOWTDC": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report DC ",
-        "url": "https://forecast.weather.gov/product.php?site=LWX&product=CLI&issuedby=DCA"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:03.613297+00:00"
-  },
-  "KXLOWTDEN": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report",
-        "url": "https://forecast.weather.gov/product.php?site=BOU&product=CLI&issuedby=DEN"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:03.688403+00:00"
-  },
-  "KXLOWTLAX": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report",
-        "url": "https://forecast.weather.gov/product.php?site=LOX&product=CLI&issuedby=LAX"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/GLOBALTEMPERATURE.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
-    "fetched_at": "2026-06-04T13:18:03.763198+00:00"
-  },
-  "KXRAINLAXM": {
-    "settlement_sources": [
-      {
-        "name": "National Weather Service",
-        "url": "https://www.weather.gov"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RAINM.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINM.pdf",
-    "fetched_at": "2026-06-04T13:17:05.206097+00:00"
-  },
-  "KXRAINNYC": {
-    "settlement_sources": [
-      {
-        "name": "NWS Climatological Report",
-        "url": "https://forecast.weather.gov/product.php?site=OKX&product=CLI&issuedby=NYC"
-      }
-    ],
-    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/RAINNYC.pdf",
-    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/RAINNYC.pdf",
-    "fetched_at": "2026-06-04T13:18:05.282295+00:00"
   }
 }

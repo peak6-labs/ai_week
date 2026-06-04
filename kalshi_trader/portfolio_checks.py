@@ -20,14 +20,8 @@ from __future__ import annotations
 
 from kalshi_trader.models import ExitSignal
 
-STOP_LOSS_THRESHOLD = 0.75        # exit if current_value < 75% of cost basis
-
-# Low-entry positions (longshots) exit when price doubles — e.g. a 15¢ entry
-# waits for 30¢. For higher entries the convergence rule takes over: price must
-# cover 75% of the remaining distance to certainty (matches old 1.75× at 50¢).
-# The two targets cross at ~46¢ entry; whichever is lower is the active rule.
-PROFIT_TARGET_MULTIPLE = 1.5
-PROFIT_CONVERGENCE_FRACTION = 0.75
+STOP_LOSS_THRESHOLD = 0.75        # exit if current_value < 75% of cost basis (down 25%)
+PROFIT_TARGET_THRESHOLD = 1.25   # exit if current_value > 125% of cost basis (up 25%)
 
 
 def check_stop_loss(position: dict) -> ExitSignal | None:
@@ -53,18 +47,9 @@ def check_profit_target(position: dict) -> ExitSignal | None:
     current_price_cents = position.get("current_price_cents")
     if cost_basis <= 0 or quantity <= 0 or current_price_cents is None:
         return None
-    entry_price_cents = (cost_basis / quantity) * 100.0
-
-    fair_value_cents = position.get("fair_value_cents")
-    if fair_value_cents is not None:
-        target_price_cents = fair_value_cents
-    else:
-        doubling_target = entry_price_cents * PROFIT_TARGET_MULTIPLE
-        convergence_target = entry_price_cents + PROFIT_CONVERGENCE_FRACTION * (100.0 - entry_price_cents)
-        target_price_cents = min(doubling_target, convergence_target)
-
-    if current_price_cents > target_price_cents:
-        gain_pct = round((current_price_cents / entry_price_cents - 1.0) * 100.0)
+    current_value = quantity * current_price_cents / 100.0
+    if current_value > PROFIT_TARGET_THRESHOLD * cost_basis:
+        gain_pct = round((current_value / cost_basis - 1.0) * 100.0)
         return ExitSignal(
             reason="profit_target",
             exit_price_cents=position["midpoint_yes_price_cents"],

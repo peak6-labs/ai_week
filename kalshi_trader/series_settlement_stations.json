@@ -97,6 +97,13 @@
     "source_type": "nws_station",
     "resolved_at": "2026-06-04T15:07:59.201733+00:00"
   },
+  "KXHIGHTNOLA": {
+    "station_id": "MSY",
+    "lat": 29.99278,
+    "lon": -90.25083,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T18:05:14.923494+00:00"
+  },
   "KXHIGHTOKC": {
     "station_id": "OKC",
     "lat": 35.38861,
@@ -110,6 +117,13 @@
     "lon": -112.003465,
     "source_type": "nws_station",
     "resolved_at": "2026-06-04T15:07:59.340602+00:00"
+  },
+  "KXHIGHTSATX": {
+    "station_id": "SAT",
+    "lat": 29.53278,
+    "lon": -98.46361,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T16:27:15.426879+00:00"
   },
   "KXHIGHTSEA": {
     "station_id": "SEA",
@@ -209,6 +223,13 @@
     "source_type": "nws_station",
     "resolved_at": "2026-06-04T15:08:01.249825+00:00"
   },
+  "KXLOWTNOLA": {
+    "station_id": "MSY",
+    "lat": 29.99278,
+    "lon": -90.25083,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T16:54:59.688694+00:00"
+  },
   "KXLOWTNYC": {
     "station_id": "NYC",
     "lat": 40.78333,
@@ -236,6 +257,13 @@
     "lon": -112.003465,
     "source_type": "nws_station",
     "resolved_at": "2026-06-04T15:08:01.723982+00:00"
+  },
+  "KXLOWTSATX": {
+    "station_id": "SAT",
+    "lat": 29.53278,
+    "lon": -98.46361,
+    "source_type": "nws_station",
+    "resolved_at": "2026-06-04T16:55:03.255942+00:00"
   },
   "KXLOWTSEA": {
     "station_id": "SEA",

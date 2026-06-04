@@ -34,10 +34,11 @@ def _candidate(
     side: str = "yes",
     confidence: float = 0.65,
     market_price: float = 55.0,
-    category: str = "politics",
+    category: str = "climate and weather",
     hours_to_close: float = 24.0,
+    suggested_size_dollars: float | None = None,
 ) -> dict:
-    return {
+    candidate = {
         "ticker": ticker,
         "side": side,
         "confidence": confidence,
@@ -49,12 +50,17 @@ def _candidate(
         "agent_id": "night_mode",
         "selection_summary": "Test",
     }
+    if suggested_size_dollars is not None:
+        candidate["suggested_size_dollars"] = suggested_size_dollars
+    return candidate
 
 
 def _make_client(order_id: str = "ord_night1", status: str = "resting") -> MagicMock:
     client = MagicMock()
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=None)
+    client.get_balance = AsyncMock(return_value={"balance_dollars": "200.00"})
+    client.get_positions = AsyncMock(return_value={"market_positions": []})
     client.create_order = AsyncMock(
         return_value={"order": {"order_id": order_id, "status": status}}
     )
@@ -101,6 +107,19 @@ def test_apply_rules_rejects_unquoted_100_price():
     assert apply_rules(_candidate(market_price=100.0), _session()) == "unquoted"
 
 
+def test_apply_rules_rejects_price_below_20():
+    assert apply_rules(_candidate(market_price=19.0, confidence=0.30), _session()) == "entry_price_out_of_band"
+
+
+def test_apply_rules_rejects_price_above_80():
+    assert apply_rules(_candidate(market_price=81.0, confidence=0.95), _session()) == "entry_price_out_of_band"
+
+
+def test_apply_rules_allows_price_at_band_edges():
+    assert apply_rules(_candidate(market_price=20.0, confidence=0.30), _session()) is None
+    assert apply_rules(_candidate(market_price=80.0, confidence=0.90), _session()) is None
+
+
 def test_apply_rules_rejects_weather_under_2h():
     candidate = _candidate(category="climate and weather", hours_to_close=1.5)
     assert apply_rules(candidate, _session()) == "settlement_proximity"
@@ -118,10 +137,9 @@ def test_apply_rules_passes_weather_over_12h():
     assert apply_rules(candidate, _session()) is None
 
 
-def test_apply_rules_passes_politics_under_12h():
-    """The 12h gate only applies to weather — politics at 5h is fine."""
+def test_apply_rules_rejects_non_weather():
     candidate = _candidate(category="politics", hours_to_close=5.0)
-    assert apply_rules(candidate, _session()) is None
+    assert apply_rules(candidate, _session()) == "non_weather_excluded"
 
 
 def test_apply_rules_passes_no_hours():
@@ -137,14 +155,13 @@ def test_apply_rules_rejects_love_island_under_2h():
 
 
 def test_apply_rules_rejects_politics_under_2h():
-    """All categories blocked under 2h — not just weather."""
     candidate = _candidate(category="politics", hours_to_close=0.1)
-    assert apply_rules(candidate, _session()) == "settlement_proximity"
+    assert apply_rules(candidate, _session()) == "non_weather_excluded"
 
 
 def test_apply_rules_rejects_sports_under_2h():
     candidate = _candidate(category="sports", hours_to_close=0.0)
-    assert apply_rules(candidate, _session()) == "settlement_proximity"
+    assert apply_rules(candidate, _session()) == "non_weather_excluded"
 
 
 def test_apply_rules_rejects_love_island():
@@ -159,13 +176,23 @@ def test_apply_rules_rejects_love_island_regardless_of_edge():
     assert apply_rules(candidate, _session()) == "love_island_excluded"
 
 
+def test_apply_rules_rejects_duplicate_trade_from_session():
+    session = _session()
+    session["tickers_traded"] = ["KXTEST-1"]
+    assert apply_rules(_candidate(), session) == "duplicate_trade"
+
+
+def test_apply_rules_rejects_duplicate_trade_from_current_run():
+    assert apply_rules(_candidate(), _session(), seen_tickers={"KXTEST-1"}) == "duplicate_trade"
+
+
 # ---------------------------------------------------------------------------
 # run() — integration tests with mocked KalshiClient
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_run_executes_valid_candidate(tmp_path):
-    """Valid candidate triggers a buy order at $10 flat."""
+    """Valid weather candidate triggers one sized buy order."""
     client = _make_client()
     session_file = str(tmp_path / "session.json")
 
@@ -185,8 +212,9 @@ async def test_run_executes_valid_candidate(tmp_path):
     assert record["order_status"] == "resting"
     assert record["session_trade_number"] == 1
     assert record["session_dollars_spent"] == 10.0
+    assert record["suggested_size_dollars"] == 10.0
 
-    # YES side, market_price=55 → yes_price=55, count=floor(1000/55)=18
+    # 200-dollar balance fallback sizing would be $11.11, but night mode caps it at $10.
     client.create_order.assert_awaited_once_with(
         ticker="KXTEST-1",
         action="buy",
@@ -202,7 +230,7 @@ async def test_run_no_side_yes_price_complement(tmp_path):
     """NO-side order: yes_price = round(100 - market_price)."""
     client = _make_client()
     session_file = str(tmp_path / "session.json")
-    # NO side: market_price=40 → yes_price=60, count=floor(1000/40)=25
+    # NO side: fallback sizing would be $25.00, but night mode caps it at $10.
     candidate = _candidate(side="no", market_price=40.0, confidence=0.70)
 
     with patch("scripts.night_execute.KalshiClient", return_value=client):
@@ -221,6 +249,32 @@ async def test_run_no_side_yes_price_complement(tmp_path):
         count=25,
         order_type="limit",
         yes_price=60,
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_scales_below_10_when_kelly_size_is_smaller(tmp_path):
+    client = _make_client()
+    session_file = str(tmp_path / "session.json")
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        results = await night_execute.run(
+            candidates=[_candidate(confidence=0.61, market_price=55.0)],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    assert results[0]["suggested_size_dollars"] == 6.67
+    assert results[0]["session_dollars_spent"] == 6.67
+    client.create_order.assert_awaited_once_with(
+        ticker="KXTEST-1",
+        action="buy",
+        side="yes",
+        count=12,
+        order_type="limit",
+        yes_price=55,
     )
 
 
@@ -252,7 +306,7 @@ async def test_run_session_cap_stops_after_10th_trade(tmp_path):
          "dollars_spent": 90.0, "tickers_traded": []}
     ))
     client = _make_client()
-    candidates = [_candidate(ticker=f"KXTEST-{i}") for i in range(2)]
+    candidates = [_candidate(ticker=f"KXTEST-{i}", suggested_size_dollars=10.0) for i in range(2)]
 
     with patch("scripts.night_execute.KalshiClient", return_value=client):
         results = await night_execute.run(
@@ -335,6 +389,61 @@ async def test_run_jsonl_appended(tmp_path):
     assert len(lines) == 2
     assert json.loads(lines[0])["ticker"] == "KXTEST-1"
     assert json.loads(lines[1])["rejection_reason"] == "edge_insufficient"
+
+
+@pytest.mark.asyncio
+async def test_run_rejects_non_weather_candidate(tmp_path):
+    session_file = str(tmp_path / "session.json")
+    client = _make_client()
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        results = await night_execute.run(
+            candidates=[_candidate(category="politics")],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    assert results[0]["rejection_reason"] == "non_weather_excluded"
+    client.create_order.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_rejects_out_of_band_entry_price(tmp_path):
+    session_file = str(tmp_path / "session.json")
+    client = _make_client()
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        results = await night_execute.run(
+            candidates=[_candidate(market_price=81.0, confidence=0.95)],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    assert results[0]["rejection_reason"] == "entry_price_out_of_band"
+    client.create_order.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_duplicate_ticker_only_attempted_once(tmp_path):
+    session_file = str(tmp_path / "session.json")
+    client = _make_client()
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        results = await night_execute.run(
+            candidates=[_candidate(), _candidate(confidence=0.80)],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    assert results[0]["rejection_reason"] is None
+    assert results[1]["rejection_reason"] == "duplicate_trade"
+    assert client.create_order.await_count == 1
 
 
 @pytest.mark.asyncio

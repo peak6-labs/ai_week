@@ -164,23 +164,36 @@ async def run(dry_run: bool, out: str | None) -> dict:
                 })
                 continue
 
-            yes_price = max(1, min(99, round(exit_signal.exit_price_cents)))
+            if ticker in tickers_with_resting_exit:
+                print(
+                    f"SKIP {ticker}: resting exit order already exists",
+                    file=sys.stderr,
+                )
+                continue
+
+            exit_quantity = int(quantity)
+            if exit_quantity < 1:
+                print(f"SKIP {ticker}: fractional position ({quantity:.2f} contracts)", file=sys.stderr)
+                continue
+
+            # Stop-losses cross the spread to guarantee a fill even when prices are ripping.
+            # Profit targets rest at midmarket (maker, no fees).
+            if exit_signal.reason == "stop_loss":
+                # Taker pricing: sell YES at bid, sell NO at ask (both cross immediately).
+                taker_yes_price = yes_bid if side == "yes" else yes_ask
+                yes_price = max(1, min(99, round(taker_yes_price)))
+            else:
+                yes_price = max(1, min(99, round(exit_signal.exit_price_cents)))
             order_id = None
             order_status = None
 
             if not dry_run:
-                if ticker in tickers_with_resting_exit:
-                    print(
-                        f"SKIP {ticker}: resting exit order already exists",
-                        file=sys.stderr,
-                    )
-                    continue
                 try:
                     order_response = await client.create_order(
                         ticker=ticker,
                         action="sell",
                         side=side,
-                        count=int(quantity),
+                        count=exit_quantity,
                         order_type="limit",
                         yes_price=yes_price,
                     )
@@ -188,7 +201,7 @@ async def run(dry_run: bool, out: str | None) -> dict:
                     order_id = order_data.get("order_id")
                     order_status = order_data.get("status")
                     print(
-                        f"EXITED {ticker} {side.upper()} qty={int(quantity)} "
+                        f"EXITED {ticker} {side.upper()} qty={exit_quantity} "
                         f"price={yes_price}¢ ({exit_signal.description}) order={order_id}"
                     )
                     # Space consecutive placements to stay under the 429 rate limit.
@@ -199,7 +212,7 @@ async def run(dry_run: bool, out: str | None) -> dict:
                     continue
             else:
                 print(
-                    f"[DRY-RUN] Would exit {ticker} {side.upper()} qty={int(quantity)} "
+                    f"[DRY-RUN] Would exit {ticker} {side.upper()} qty={exit_quantity} "
                     f"price={yes_price}¢ ({exit_signal.description})"
                 )
 

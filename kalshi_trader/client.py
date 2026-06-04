@@ -177,12 +177,12 @@ class KalshiClient:
         if yes_price is not None:
             body["yes_price"] = yes_price
         # Retry 429s with backoff; raise (don't return {}) if the order never lands.
-        return await with_retry(self.post, "/portfolio/orders", body, raise_on_exhaust=True)
+        return await with_retry(self.post, "/portfolio/orders", body)
 
     async def cancel_order(self, order_id: str) -> dict:
         # Cancels reduce exposure, so they are NOT gated by the order kill-switch.
         return await with_retry(
-            self.delete, f"/portfolio/orders/{order_id}", raise_on_exhaust=True
+            self.delete, f"/portfolio/orders/{order_id}"
         )
 
     async def get_market_candlesticks_batch(

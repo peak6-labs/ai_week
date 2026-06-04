@@ -79,9 +79,11 @@ def _select_yes_price(
         return None
     yes_ask = 100 - no_bid
     if side == "yes":
-        return yes_bid if signal_reason == "stop_loss" else yes_ask
+        raw = yes_bid if signal_reason == "stop_loss" else yes_ask
     else:
-        return yes_ask if signal_reason == "stop_loss" else yes_bid
+        raw = yes_ask if signal_reason == "stop_loss" else yes_bid
+    # Clamp to valid Kalshi range — 0 or 100 are rejected; near-settled books hit these extremes.
+    return max(1, min(99, raw))
 
 
 async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
@@ -95,7 +97,8 @@ async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
     positions: dict[str, dict] = {}
     for raw in raw_positions:
         qty = parse_fixed_point(raw.get("position_fp"))
-        if qty == 0:
+        rounded_quantity = int(round(abs(qty)))
+        if rounded_quantity == 0:
             continue
         ticker = raw.get("ticker", "")
         if not ticker:
@@ -103,7 +106,7 @@ async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
         positions[ticker] = {
             "ticker": ticker,
             "side": "yes" if qty > 0 else "no",
-            "quantity": int(round(abs(qty))),
+            "quantity": rounded_quantity,
             "market_exposure_dollars": parse_fixed_point(raw.get("market_exposure_dollars")),
         }
     return positions
@@ -120,7 +123,9 @@ async def _fetch_resting_sell_tickers(client: KalshiClient) -> set[str]:
     return {
         o.get("ticker", "")
         for o in orders
-        if o.get("action") == "sell" and o.get("ticker")
+        if o.get("action") == "sell"
+        and o.get("ticker")
+        and parse_fixed_point(o.get("remaining_count_fp", "0")) > 0
     }
 
 
@@ -325,10 +330,18 @@ async def run(dry_run: bool) -> None:
                                 except Exception as database_exception:
                                     log.debug("Supabase close_position skipped: %s", database_exception)
                         except Exception as order_exception:
-                            log.error("Exit order failed for %s: %s", ticker, order_exception)
+                            response_body = ""
+                            raw_response = getattr(order_exception, "response", None)
+                            if raw_response is not None:
+                                try:
+                                    response_body = f" — {raw_response.text}"
+                                except Exception:
+                                    pass
+                            log.error("Exit order failed for %s: %s%s", ticker, order_exception, response_body)
                             pending_exits.discard(ticker)
 
                     await _notify_server(msg, "warning")
+                    await asyncio.sleep(0.5)  # pace consecutive exit orders
                     break  # only first signal per ticker per loop iteration
 
             await asyncio.sleep(0.5)
