@@ -194,7 +194,7 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
 
                     from kalshi_trader import db as _db
                     try:
-                        fair_value_map = await _db.get_latest_fair_values(order_tickers)
+                        fair_value_map = await _db.get_fair_values_from_recommendations(order_tickers)
                     except Exception as fair_value_exception:
                         logger.debug("Fair value lookup failed: %s", fair_value_exception)
                         fair_value_map = {}
