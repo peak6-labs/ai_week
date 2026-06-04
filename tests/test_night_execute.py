@@ -106,8 +106,21 @@ def test_apply_rules_rejects_weather_under_2h():
     assert apply_rules(candidate, _session()) == "settlement_proximity"
 
 
-def test_apply_rules_passes_weather_over_2h():
-    candidate = _candidate(category="climate and weather", hours_to_close=3.0)
+def test_apply_rules_rejects_weather_same_day_under_12h():
+    """Weather markets with < 12h to close are excluded (same-day filter)."""
+    candidate = _candidate(category="climate and weather", hours_to_close=5.0)
+    assert apply_rules(candidate, _session()) == "weather_same_day_excluded"
+
+
+def test_apply_rules_passes_weather_over_12h():
+    """Weather markets with 12h+ to close are allowed."""
+    candidate = _candidate(category="climate and weather", hours_to_close=15.0)
+    assert apply_rules(candidate, _session()) is None
+
+
+def test_apply_rules_passes_politics_under_12h():
+    """The 12h gate only applies to weather — politics at 5h is fine."""
+    candidate = _candidate(category="politics", hours_to_close=5.0)
     assert apply_rules(candidate, _session()) is None
 
 
