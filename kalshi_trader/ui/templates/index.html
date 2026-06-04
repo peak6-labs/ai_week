@@ -879,6 +879,15 @@
           <tbody id="closed-positions-tbody">
             <tr class="empty-row"><td colspan="8">No closed positions</td></tr>
           </tbody>
+          <tfoot id="closed-positions-tfoot" style="display:none">
+            <tr style="border-top:2px solid var(--border);font-weight:600">
+              <td colspan="2" style="padding:8px 10px;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Totals</td>
+              <td id="closed-total-contracts" style="padding:8px 10px"></td>
+              <td colspan="2" style="padding:8px 10px"></td>
+              <td colspan="2" style="padding:8px 10px"></td>
+              <td id="closed-total-pnl" style="padding:8px 10px"></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -1177,8 +1186,10 @@ function renderPositions(positions) {
 // ---------------------------------------------------------------------------
 function renderClosedPositions(positions) {
   const tbody = document.getElementById('closed-positions-tbody');
+  const tfoot = document.getElementById('closed-positions-tfoot');
   if (!positions || positions.length === 0) {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No closed positions</td></tr>';
+    tfoot.style.display = 'none';
     return;
   }
   tbody.innerHTML = positions.map(p => {
@@ -1206,6 +1217,14 @@ function renderClosedPositions(positions) {
       <td>${pnlDisplay}</td>
     </tr>`;
   }).join('');
+
+  // Totals row
+  const totalContracts = positions.reduce((sum, p) => sum + (p.contracts ?? 0), 0);
+  const totalPnl = positions.reduce((sum, p) => sum + (p.realized_pnl_dollars ?? 0), 0);
+  document.getElementById('closed-total-contracts').textContent = totalContracts;
+  const totalPnlEl = document.getElementById('closed-total-pnl');
+  totalPnlEl.innerHTML = `<span class="${pnlClass(totalPnl)}">${(totalPnl >= 0 ? '+' : '') + fmt$(totalPnl)}</span>`;
+  tfoot.style.display = '';
 }
 
 // ---------------------------------------------------------------------------
