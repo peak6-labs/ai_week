@@ -620,8 +620,8 @@ def create_app(
         """Return YES bid, ask, and mid-price in cents for each requested ticker.
 
         Accepts a comma-separated ``tickers`` query parameter (e.g.
-        ``?tickers=FOO-1,BAR-2``).  Up to 20 tickers are fetched in parallel
-        with a concurrency limit of 5.  Returns
+        ``?tickers=FOO-1,BAR-2``).  Up to 100 tickers are fetched with a
+        concurrency limit of 5.  Returns
         ``{ticker: {"bid": float|null, "ask": float|null, "mid": float} | null}``.
         """
         from kalshi_trader.client import KalshiClient
@@ -631,7 +631,7 @@ def create_app(
             return JSONResponse({})
 
         raw_tickers = [ticker.strip() for ticker in tickers.split(",") if ticker.strip()]
-        unique_tickers = list(dict.fromkeys(raw_tickers))[:20]
+        unique_tickers = list(dict.fromkeys(raw_tickers))[:100]
         if not unique_tickers:
             return JSONResponse({})
 

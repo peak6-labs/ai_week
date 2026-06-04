@@ -1352,12 +1352,18 @@ let liveHistoryPollTimer = null;
 async function fetchLivePricesForHistory() {
   if (!ideasHistory || ideasHistory.length === 0) return;
   const openIdeas = ideasHistory.filter(idea => idea.status !== 'resolved' && idea.ticker);
-  const uniqueTickers = [...new Set(openIdeas.slice(0, 20).map(idea => idea.ticker))];
+  const uniqueTickers = [...new Set(openIdeas.map(idea => idea.ticker))];
   if (uniqueTickers.length === 0) return;
   try {
-    const resp = await fetch('/api/markets/prices?tickers=' + uniqueTickers.join(','));
-    if (!resp.ok) return;
-    livePricesMap = await resp.json();
+    const newPrices = {};
+    // Fetch in batches of 100 to match server cap
+    for (let i = 0; i < uniqueTickers.length; i += 100) {
+      const batch = uniqueTickers.slice(i, i + 100);
+      const resp = await fetch('/api/markets/prices?tickers=' + batch.join(','));
+      if (!resp.ok) continue;
+      Object.assign(newPrices, await resp.json());
+    }
+    livePricesMap = newPrices;
     livePricesUpdatedAt = new Date();
     if (activeTab === 'history') renderIdeasHistory();
   } catch (err) {
