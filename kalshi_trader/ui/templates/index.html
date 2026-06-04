@@ -823,12 +823,13 @@
               <th>Current</th>
               <th>Cost</th>
               <th>Cost+Fees</th>
+              <th>Gross P&amp;L</th>
               <th>Net P&amp;L</th>
               <th>Fees</th>
             </tr>
           </thead>
           <tbody id="positions-tbody">
-            <tr class="empty-row"><td colspan="11">No open positions</td></tr>
+            <tr class="empty-row"><td colspan="12">No open positions</td></tr>
           </tbody>
         </table>
       </div>
@@ -873,11 +874,12 @@
               <th>Closed</th>
               <th>Entry ¢</th>
               <th>Exit ¢</th>
+              <th>Gross P&amp;L</th>
               <th>Net P&amp;L</th>
             </tr>
           </thead>
           <tbody id="closed-positions-tbody">
-            <tr class="empty-row"><td colspan="8">No closed positions</td></tr>
+            <tr class="empty-row"><td colspan="9">No closed positions</td></tr>
           </tbody>
           <tfoot id="closed-positions-tfoot" style="display:none">
             <tr style="border-top:2px solid var(--border);font-weight:600">
@@ -885,6 +887,7 @@
               <td id="closed-total-contracts" style="padding:8px 10px"></td>
               <td colspan="2" style="padding:8px 10px"></td>
               <td colspan="2" style="padding:8px 10px"></td>
+              <td id="closed-total-gross-pnl" style="padding:8px 10px"></td>
               <td id="closed-total-pnl" style="padding:8px 10px"></td>
             </tr>
           </tfoot>
@@ -1137,10 +1140,11 @@ function updateStatusBar(state) {
 function renderPositions(positions) {
   const tbody = document.getElementById('positions-tbody');
   if (!positions || positions.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">No open positions</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="12">No open positions</td></tr>';
     return;
   }
   tbody.innerHTML = positions.map(p => {
+    const grossPnl = p.gross_unrealized_pnl_dollars;
     const upnl = p.unrealized_pnl_dollars;
     const fees = p.fees_paid_dollars ?? 0;
     const sideBadge = String(p.side || '').toUpperCase() === 'YES'
@@ -1159,6 +1163,9 @@ function renderPositions(positions) {
     const askDisplay = sideAsk != null ? Math.round(sideAsk) + '¢' : '—';
     const currentDisplay = p.current_price_dollars !== null && p.current_price_dollars !== undefined
       ? fmt$(p.current_price_dollars) : '—';
+    const grossPnlDisplay = grossPnl !== null && grossPnl !== undefined
+      ? `<span class="${pnlClass(grossPnl)}">${(grossPnl >= 0 ? '+' : '') + fmt$(grossPnl)}</span>`
+      : '<span style="color:var(--text-tertiary)">—</span>';
     const upnlDisplay = upnl !== null && upnl !== undefined
       ? `<span class="${pnlClass(upnl)}">${(upnl >= 0 ? '+' : '') + fmt$(upnl)}</span>`
       : '<span style="color:var(--text-tertiary)">—</span>';
@@ -1175,6 +1182,7 @@ function renderPositions(positions) {
       <td>${currentDisplay}</td>
       <td>${fmt$(p.total_cost_dollars ?? 0)}</td>
       <td>${fmt$(p.total_cost_with_fees_dollars ?? 0)}</td>
+      <td>${grossPnlDisplay}</td>
       <td>${upnlDisplay}</td>
       <td>${feesDisplay}</td>
     </tr>`;
@@ -1188,7 +1196,7 @@ function renderClosedPositions(positions) {
   const tbody = document.getElementById('closed-positions-tbody');
   const tfoot = document.getElementById('closed-positions-tfoot');
   if (!positions || positions.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No closed positions</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No closed positions</td></tr>';
     tfoot.style.display = 'none';
     return;
   }
@@ -1202,6 +1210,10 @@ function renderClosedPositions(positions) {
       : `<span class="text-mono">${escHtml(p.ticker ?? '')}</span>`;
     const entryDisplay = p.entry_price_cents != null ? Math.round(p.entry_price_cents) + '¢' : '—';
     const exitDisplay = p.exit_price_cents != null ? Math.round(p.exit_price_cents) + '¢' : '—';
+    const grossPnl = p.gross_realized_pnl_dollars;
+    const grossPnlDisplay = grossPnl != null
+      ? `<span class="${pnlClass(grossPnl)}">${(grossPnl >= 0 ? '+' : '') + fmt$(grossPnl)}</span>`
+      : '<span style="color:var(--text-tertiary)">—</span>';
     const pnl = p.realized_pnl_dollars;
     const pnlDisplay = pnl != null
       ? `<span class="${pnlClass(pnl)}">${(pnl >= 0 ? '+' : '') + fmt$(pnl)}</span>`
@@ -1214,14 +1226,18 @@ function renderClosedPositions(positions) {
       <td style="color:var(--text-secondary)">${escHtml(timeDateTime(p.closed_at))}</td>
       <td>${escHtml(entryDisplay)}</td>
       <td>${escHtml(exitDisplay)}</td>
+      <td>${grossPnlDisplay}</td>
       <td>${pnlDisplay}</td>
     </tr>`;
   }).join('');
 
   // Totals row
   const totalContracts = positions.reduce((sum, p) => sum + (p.contracts ?? 0), 0);
+  const totalGrossPnl = positions.reduce((sum, p) => sum + (p.gross_realized_pnl_dollars ?? 0), 0);
   const totalPnl = positions.reduce((sum, p) => sum + (p.realized_pnl_dollars ?? 0), 0);
   document.getElementById('closed-total-contracts').textContent = totalContracts;
+  const totalGrossPnlEl = document.getElementById('closed-total-gross-pnl');
+  totalGrossPnlEl.innerHTML = `<span class="${pnlClass(totalGrossPnl)}">${(totalGrossPnl >= 0 ? '+' : '') + fmt$(totalGrossPnl)}</span>`;
   const totalPnlEl = document.getElementById('closed-total-pnl');
   totalPnlEl.innerHTML = `<span class="${pnlClass(totalPnl)}">${(totalPnl >= 0 ? '+' : '') + fmt$(totalPnl)}</span>`;
   tfoot.style.display = '';

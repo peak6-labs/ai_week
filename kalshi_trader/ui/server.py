@@ -67,8 +67,9 @@ def compute_closed_positions(
 
         entry_price_cents = _avco_price(buy_fills, use_no_price)
         exit_price_cents = _avco_price(sell_fills, use_no_price)
+        gross_realized_pnl_dollars = (exit_price_cents - entry_price_cents) * total_bought / 100.0
         total_fees = sum(fill.get("fee_cost", 0.0) for fill in fills)
-        realized_pnl_dollars = (exit_price_cents - entry_price_cents) * total_bought / 100.0 - total_fees
+        realized_pnl_dollars = gross_realized_pnl_dollars - total_fees
 
         opened_at = min(fill.get("created_time", "") for fill in buy_fills)
         closed_at = max(fill.get("created_time", "") for fill in sell_fills)
@@ -81,6 +82,7 @@ def compute_closed_positions(
             "exit_price_cents": exit_price_cents,
             "opened_at": opened_at,
             "closed_at": closed_at,
+            "gross_realized_pnl_dollars": round(gross_realized_pnl_dollars, 4),
             "realized_pnl_dollars": round(realized_pnl_dollars, 4),
         })
 
@@ -232,11 +234,13 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                     price_data = price_data_map.get(ticker)
                     yes_price = price_data["mid"] if price_data else None
                     current_price_cents: float | None = None
+                    gross_unrealized_pnl: float | None = None
                     unrealized_pnl: float | None = None
                     if yes_price is not None and qty > 0:
                         current_price_cents = yes_price if side == "YES" else (100.0 - yes_price)
                         current_market_value = qty * current_price_cents / 100.0
-                        unrealized_pnl = current_market_value - exposure - fees
+                        gross_unrealized_pnl = current_market_value - exposure
+                        unrealized_pnl = gross_unrealized_pnl - fees
 
                     total_exposure += exposure
                     if unrealized_pnl is not None:
@@ -252,6 +256,7 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                         "yes_ask": price_data["ask"] if price_data else None,
                         "total_cost_dollars": round(exposure, 2),
                         "total_cost_with_fees_dollars": round(exposure + fees, 2),
+                        "gross_unrealized_pnl_dollars": round(gross_unrealized_pnl, 2) if gross_unrealized_pnl is not None else None,
                         "unrealized_pnl_dollars": round(unrealized_pnl, 2) if unrealized_pnl is not None else None,
                         "fees_paid_dollars": round(fees, 2),
                         "realized_pnl_dollars": round(realized, 2),
