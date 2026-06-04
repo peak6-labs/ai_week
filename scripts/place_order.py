@@ -33,9 +33,9 @@ def compute_limit_price(orderbook_data: dict, action: str, pricing: str) -> int:
     cross_spread crosses immediately — taker fees apply.
     Raises ValueError if either side of the book is empty.
     """
-    ob = orderbook_data.get("orderbook", {})
-    yes_prices = [lvl[0] for lvl in ob.get("yes", []) if lvl]
-    no_prices = [lvl[0] for lvl in ob.get("no", []) if lvl]
+    orderbook = orderbook_data.get("orderbook", {})
+    yes_prices = [lvl[0] for lvl in orderbook.get("yes", []) if lvl]
+    no_prices = [lvl[0] for lvl in orderbook.get("no", []) if lvl]
 
     if not yes_prices:
         raise ValueError("best_bid unavailable — YES book is empty. Use --yes-price to set price explicitly.")
