@@ -1,0 +1,42 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+#
+# Scope for this run: CORE APP ONLY.
+# Keep: kalshi_trader/ (source), sql/, run_ui.py, kalshi_auth.py,
+#       requirements.txt, CLAUDE.md, KALSHI_SETUP.md, runtime_config.json
+# Exclude everything else below.
+
+# --- Test suite (behavior, not architecture) ---
+tests/
+
+# --- Operational / backtest scripts ---
+scripts/
+
+# --- Docs, research notes, planning, agent tooling ---
+docs/
+documentation/
+thoughts/
+plans/
+.agents/
+.claude/
+
+# --- Generated output / data snapshots ---
+reports/
+data/
+live_markets*.json
+live_markets*.csv
+output.txt
+skills-lock.json
+
+# --- Secrets / env ---
+secrets/
+*.pem
+*.key
+.env
+.env.local
+
+# --- Python/venv/caches (also covered by built-in defaults) ---
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[codz]
