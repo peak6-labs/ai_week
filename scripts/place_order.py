@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, ".")
 
 import kalshi_trader.config  # noqa: F401 — loads .env
+from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
 
 
 def compute_limit_price(orderbook_data: dict, action: str, pricing: str) -> int:
@@ -115,3 +116,50 @@ async def parse_intent(intent: str) -> dict:
         "cancel_first": bool(parsed.get("cancel_first", False)),
         "cancel_only": bool(parsed.get("cancel_only", False)),
     }
+
+
+async def resolve_quantity(
+    ticker: str,
+    quantity_spec,
+    action: str,
+    client,
+    *,
+    amount_dollars: float | None = None,
+    yes_price_cents: int | None = None,
+) -> tuple[str, int]:
+    """Return (side, contract_count) ready to pass to create_order.
+
+    quantity_spec: int → use directly; "all" → fetch position; None → compute from amount_dollars
+    """
+    if quantity_spec == "all":
+        positions_response = await client.get_positions()
+        market_positions = positions_response.get("market_positions", [])
+        held_position = next(
+            (position for position in market_positions if position.get("ticker") == ticker),
+            None,
+        )
+        if held_position is None:
+            print(f"ERROR: No open position for {ticker}", file=sys.stderr)
+            sys.exit(1)
+        signed_quantity = parse_fixed_point(held_position.get("position_fp"))
+        side = "yes" if signed_quantity >= 0 else "no"
+        return side, int(abs(signed_quantity))
+
+    if isinstance(quantity_spec, int) and quantity_spec > 0:
+        return action, quantity_spec
+
+    if amount_dollars is not None and yes_price_cents is not None and yes_price_cents > 0:
+        contract_count = math.floor(amount_dollars / (yes_price_cents / 100.0))
+        if contract_count < 1:
+            print(
+                f"ERROR: ${amount_dollars} at {yes_price_cents}¢/contract yields 0 contracts",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        return action, contract_count
+
+    print(
+        "ERROR: quantity or amount required — provide --quantity, --quantity all, or --amount",
+        file=sys.stderr,
+    )
+    sys.exit(1)

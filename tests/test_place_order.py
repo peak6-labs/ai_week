@@ -164,3 +164,46 @@ async def test_parse_intent_buy_with_amount():
     assert result["action"] == "buy"
     assert result["amount_dollars"] == 10.0
     assert result["side"] == "yes"
+
+
+@pytest.mark.asyncio
+async def test_resolve_quantity_explicit_int():
+    assert await place_order.resolve_quantity("KXFOO", 10, "sell", None) == ("sell", 10)
+
+
+@pytest.mark.asyncio
+async def test_resolve_quantity_all_reads_position():
+    mock_client = MagicMock()
+    mock_client.get_positions = AsyncMock(return_value={
+        "market_positions": [
+            {"ticker": "KXFOO", "position_fp": "20.00"},
+        ]
+    })
+    side, count = await place_order.resolve_quantity("KXFOO", "all", "sell", mock_client)
+    assert side == "yes"
+    assert count == 20
+
+
+@pytest.mark.asyncio
+async def test_resolve_quantity_all_no_position_raises():
+    mock_client = MagicMock()
+    mock_client.get_positions = AsyncMock(return_value={"market_positions": []})
+    with pytest.raises(SystemExit):
+        await place_order.resolve_quantity("KXFOO", "all", "sell", mock_client)
+
+
+@pytest.mark.asyncio
+async def test_resolve_quantity_amount_dollars():
+    # $10 at 50 cents/contract = floor(10 / 0.50) = 20 contracts
+    side, count = await place_order.resolve_quantity(
+        "KXFOO", None, "buy", None,
+        amount_dollars=10.0, yes_price_cents=50,
+    )
+    assert side == "buy"
+    assert count == 20
+
+
+@pytest.mark.asyncio
+async def test_resolve_quantity_missing_raises():
+    with pytest.raises(SystemExit):
+        await place_order.resolve_quantity("KXFOO", None, "buy", None)
