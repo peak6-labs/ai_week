@@ -136,6 +136,30 @@ class NOAAClient:
         ).replace(tzinfo=None)
         return {"text": product.get("productText", ""), "issuance_time": issuance_time}
 
+    async def get_station_coordinates(self, station_id: str) -> tuple[float, float] | None:
+        """Return ``(lat, lon)`` for an NWS settlement station, or ``None``.
+
+        Reuses the same candidate ids and ``/stations/{id}`` endpoint that
+        ``get_observed_extreme`` already hits, but reads ``geometry.coordinates``
+        (GeoJSON ``[lon, lat]``) instead of ``timeZone``. Used to forecast the
+        ensemble at the station the contract actually settles on rather than the
+        city centroid. Returns ``None`` when no candidate resolves or the station
+        object carries no usable point geometry.
+        """
+        for candidate in _observation_station_candidates(station_id):
+            try:
+                metadata = await self._get(f"{NWS_BASE}/stations/{candidate}")
+            except Exception:  # 404 for the wrong candidate, or transient failure
+                continue
+            coordinates = ((metadata.get("geometry") or {}).get("coordinates")) or []
+            if isinstance(coordinates, (list, tuple)) and len(coordinates) >= 2:
+                longitude, latitude = coordinates[0], coordinates[1]
+                try:
+                    return float(latitude), float(longitude)
+                except (TypeError, ValueError):
+                    continue
+        return None
+
     async def get_observed_extreme(
         self, station_id: str, target_date_local: date, metric: str
     ) -> dict:

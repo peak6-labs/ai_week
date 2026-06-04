@@ -1,6 +1,7 @@
 """Converter: raw NOAA forecast data → SignalEstimate."""
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -8,6 +9,23 @@ import scipy.stats
 
 from kalshi_trader.models import SignalEstimate
 from kalshi_trader.ui.config_manager import cfg
+
+
+def _round_to_settlement_degree(value: float) -> int:
+    """Round a temperature to the whole-degree value Kalshi settles on.
+
+    Kalshi temperature contracts settle on the integer daily extreme published in
+    the NWS Daily Climate Report (the contract-terms PDF lists strikes at
+    "consecutive increments of 1 degree" and a "between" band as an inclusive
+    integer pair). The NWS rounds the realized extreme to the nearest whole degree
+    using round-**half-up** (0.5 rounds toward +∞), e.g. a realized 60.5°F → 61.
+    Python's built-in ``round`` is banker's rounding (0.5 → nearest even), which
+    disagrees on half-degrees, so we use ``floor(value + 0.5)`` instead.
+
+    Half-up is applied uniformly across the number line, so it also covers
+    sub-freezing readings: -0.5 → 0, -2.5 → -2, and -2.6 → -3.
+    """
+    return math.floor(value + 0.5)
 
 
 # Climatological local hour by which the daily temperature extreme is typically
@@ -82,10 +100,19 @@ def _metric_to_probability(
         mean = high if metric == "temp_high" else low
         std = max((high - low) / 6.0, 2.0)
         dist = scipy.stats.norm(mean, std)
+        # Continuity correction: the contract settles on the integer-rounded daily
+        # extreme, so the continuous normal is evaluated at the half-degree bucket
+        # edges that round to the strike — ``above N`` covers integers ≥ N+1
+        # (P = sf(N + 0.5)), ``below N`` covers integers ≤ N-1 (P = cdf(N - 0.5)),
+        # and the closed band [low, high] covers integers in [low, high]
+        # (P = cdf(high + 0.5) - cdf(low - 0.5)). Mirrors the ensemble's
+        # round-to-settlement bucketing so the two paths agree.
         if operator == "between":
             band_high = threshold_high if threshold_high is not None else threshold
-            return float(dist.cdf(band_high) - dist.cdf(threshold))
-        return float(dist.sf(threshold) if operator == "above" else dist.cdf(threshold))
+            return float(dist.cdf(band_high + 0.5) - dist.cdf(threshold - 0.5))
+        return float(
+            dist.sf(threshold + 0.5) if operator == "above" else dist.cdf(threshold - 0.5)
+        )
     if metric == "precipitation":
         return (precip_pct if precip_pct is not None else 0) / 100.0
     raise ValueError(f"Unsupported metric: {metric}")
@@ -222,14 +249,23 @@ def build_ensemble_signal(
 
     **Live-observation override:** when ``observation`` carries a realized extreme
     (from ``NOAAClient.get_observed_extreme``) for a same-day market, each member
-    is clamped to respect what has already happened — a member forecast the
-    observation has falsified is moved to the realized bound, by monotonicity::
+    is reconciled with what has already happened in two steps. First it is clamped
+    to the realized value as a hard monotonic bound — a member the observation has
+    already falsified is moved to that bound::
 
         temp_low      → final low ≤ realized min  ⇒ member = min(member, realized)
         temp_high     → final high ≥ realized max ⇒ member = max(member, realized)
         precipitation → final total ≥ realized    ⇒ member = max(member, realized)
 
-    The empirical CDF is then recomputed on the clamped members, and the
+    Second — because a *locked* extreme (past its climatological hour) will not
+    move again — each clamped member is blended toward the realized value in
+    proportion to ``lock_fraction``: at lock 0 the result is the pure monotonic
+    clamp (the extreme may still develop), at lock 1 every member collapses onto
+    the realized extreme. This second step is what lifts a cold-biased ensemble
+    *up* to an already-locked warm low; the ``min`` clamp alone could only pull
+    warm members down, never raise cold ones, which left a stale-cold ensemble
+    scoring ~1% on a low the day had already settled (the fake-edge root cause).
+    The empirical CDF is then recomputed on the reconciled members, and the
     estimate's uncertainty collapses toward ``observation_uncertainty_floor`` in
     proportion to ``lock_fraction`` (how far past the climatological extreme time
     we are). With no observation the function is byte-for-byte the pure ensemble.
@@ -280,29 +316,48 @@ def build_ensemble_signal(
             },
         )
 
-    # Live-observation override: clamp members to respect the realized extreme
-    # (monotonicity) before computing the empirical CDF. Harmless early in the day
-    # — the bound only bites once the obs approaches the band.
+    # Live-observation override (see docstring): clamp members to the realized
+    # extreme as a monotonic bound, then — because a locked extreme will not move
+    # again — blend each clamped member toward the realized value in proportion to
+    # how locked the extreme is. At lock 0 this is the pure monotonic clamp; at
+    # lock 1 every member collapses onto the realized value, which lifts a
+    # cold-biased ensemble up to an already-settled warm low (the min clamp alone
+    # could only ever pull members down).
+    bounded_lock_fraction = min(max(lock_fraction, 0.0), 1.0)
     realized_extreme = (observation or {}).get("realized_extreme")
     members_clamped = False
     if realized_extreme is not None:
         realized_extreme = float(realized_extreme)
         if metric == "temp_low":
-            members = [min(member, realized_extreme) for member in members]
+            bounded_members = [min(member, realized_extreme) for member in members]
         else:  # temp_high / precipitation: the realized value is a LOWER bound
-            members = [max(member, realized_extreme) for member in members]
+            bounded_members = [max(member, realized_extreme) for member in members]
+        members = [
+            bounded_member * (1.0 - bounded_lock_fraction)
+            + realized_extreme * bounded_lock_fraction
+            for bounded_member in bounded_members
+        ]
         members_clamped = True
 
     if metric == "precipitation":
+        # Precipitation settles on a fractional measurable threshold (0.01"), not a
+        # whole degree, so bucket the raw accumulations — never rounded.
         effective_threshold = threshold if threshold and threshold > 0 else _MEASURABLE_PRECIP_INCHES
         members_satisfying = sum(1 for value in members if value > effective_threshold)
-    elif operator == "between":
-        band_high = threshold_high if threshold_high is not None else threshold
-        members_satisfying = sum(1 for value in members if threshold <= value <= band_high)
-    elif operator == "above":
-        members_satisfying = sum(1 for value in members if value > threshold)
-    else:  # below
-        members_satisfying = sum(1 for value in members if value < threshold)
+    else:
+        # Temperature settles on the integer daily extreme (NWS Daily Climate
+        # Report), so round each member to its settlement degree before bucketing —
+        # the empirical CDF must be computed against the same whole-degree value the
+        # contract resolves on, not the raw float. (The realized-extreme clamp above
+        # and the descriptive stats below stay on raw members.)
+        settlement_members = [_round_to_settlement_degree(value) for value in members]
+        if operator == "between":
+            band_high = threshold_high if threshold_high is not None else threshold
+            members_satisfying = sum(1 for value in settlement_members if threshold <= value <= band_high)
+        elif operator == "above":
+            members_satisfying = sum(1 for value in settlement_members if value > threshold)
+        else:  # below
+            members_satisfying = sum(1 for value in settlement_members if value < threshold)
 
     raw_probability = members_satisfying / member_count
     probability = min(max(raw_probability, 0.01), 0.99)
@@ -319,8 +374,8 @@ def build_ensemble_signal(
         else cfg.get("uncertainty_ensemble_temp")
     )
     # When clamped to a realized observation, shrink uncertainty toward the floor
-    # in proportion to how locked the extreme is.
-    bounded_lock_fraction = min(max(lock_fraction, 0.0), 1.0)
+    # in proportion to how locked the extreme is (bounded_lock_fraction computed
+    # above, where the same value drives the member blend).
     if members_clamped:
         uncertainty_floor = cfg.get("observation_uncertainty_floor")
         uncertainty = uncertainty * (1.0 - bounded_lock_fraction) + uncertainty_floor * bounded_lock_fraction
