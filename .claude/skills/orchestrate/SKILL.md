@@ -186,7 +186,15 @@ NOAA; prepared remarks only, not Q&A).
 - `mentions-signal` — for **"mentions"** markets (category `mentions`, or the title
   asks whether a person will *say/mention/utter* a word/phrase in a hearing,
   briefing, floor speech, or press conference); args: ticker, title, SETTLEMENT_JSON.
-  **Always dispatch for mentions markets.**
+  **Always dispatch for mentions markets** — **except** Love Island mentions
+  (`KXLOVEISLMENTION*`), which go to `love-island-signal` instead (GDELT has zero
+  entertainment coverage and returns empty).
+- `love-island-signal` — for **Love Island** markets: ticker starts with
+  `KXLOVEISL`, `KXLIUSA`, or `KXLIUK` (covers bombshell/Casa Amor binaries,
+  eliminations, winners/couples/rankings, and the `KXLOVEISLMENTION*` mentions
+  market), **or** the title contains "Love Island"; args: ticker, title, category.
+  Uses official pre-episode YouTube teasers + Grok X sentiment — no settlement
+  context needed.
 - `weather-signal` — only if `category` contains "weather" or "climate";
   args: ticker, title, SETTLEMENT_JSON. The pipeline now uses GEFS ensemble
   (empirical-CDF) + X meteorologist authority as a second source — these run

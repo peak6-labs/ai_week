@@ -92,6 +92,11 @@ MENTIONS_SATURATION_LOW = 0.15
 # thoughts/shared/research/2026-06-04-mentions-signal-effectiveness.md.
 MENTIONS_REQUIRE_CORPUS_BACKED = True
 
+# YouTube Data API v3 key for the Love Island signal (Peacock teaser discovery +
+# video metadata). Free, ~10k quota units/day. Absent ⇒ YouTubeClient returns
+# empty and the Love Island signal degrades gracefully (X-only or no signal).
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
+
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"
 # Agent Tools API (/v1/responses + x_search) requires a reasoning model; the old
