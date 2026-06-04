@@ -772,6 +772,10 @@
     <span class="stat-value" id="stat-pnl">$0.00</span>
   </div>
   <div class="stat-group">
+    <span class="stat-label">Real. P&amp;L</span>
+    <span class="stat-value" id="stat-realized-pnl">$0.00</span>
+  </div>
+  <div class="stat-group">
     <span class="stat-label">Fees Paid</span>
     <span class="stat-value" id="stat-fees">$0.00</span>
   </div>
@@ -850,6 +854,30 @@
           </thead>
           <tbody id="orders-tbody">
             <tr class="empty-row"><td colspan="9">No resting orders</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Closed Positions — full width -->
+    <div class="panel" style="margin-bottom:12px;overflow-x:auto">
+      <div class="panel-header">Closed Positions</div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Side</th>
+              <th>Contracts</th>
+              <th>Opened</th>
+              <th>Closed</th>
+              <th>Entry ¢</th>
+              <th>Exit ¢</th>
+              <th>P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody id="closed-positions-tbody">
+            <tr class="empty-row"><td colspan="8">No closed positions</td></tr>
           </tbody>
         </table>
       </div>
@@ -1045,6 +1073,15 @@ function timeShort(isoStr) {
   const d = new Date(isoStr);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
+function timeDateTime(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${mo}/${dy} ${hh}:${mm}`;
+}
 
 // ---------------------------------------------------------------------------
 // Status bar update (always runs on every poll)
@@ -1070,6 +1107,12 @@ function updateStatusBar(state) {
   const pnlEl = document.getElementById('stat-pnl');
   pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(pnl);
   pnlEl.className = 'stat-value ' + pnlClass(pnl);
+
+  const realizedPnl = (state.closed_positions || [])
+    .reduce((sum, p) => sum + (p.realized_pnl_dollars ?? 0), 0);
+  const realizedEl = document.getElementById('stat-realized-pnl');
+  realizedEl.textContent = (realizedPnl >= 0 ? '+' : '') + fmt$(realizedPnl);
+  realizedEl.className = 'stat-value ' + pnlClass(realizedPnl);
 
   const totalFees = (state.positions || []).reduce((sum, p) => sum + (p.fees_paid_dollars || 0), 0);
   document.getElementById('stat-fees').textContent = fmt$(totalFees);
@@ -1130,6 +1173,42 @@ function renderPositions(positions) {
 }
 
 // ---------------------------------------------------------------------------
+// Monitor tab: Closed Positions
+// ---------------------------------------------------------------------------
+function renderClosedPositions(positions) {
+  const tbody = document.getElementById('closed-positions-tbody');
+  if (!positions || positions.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No closed positions</td></tr>';
+    return;
+  }
+  tbody.innerHTML = positions.map(p => {
+    const sideBadge = String(p.side || '').toUpperCase() === 'YES'
+      ? '<span class="badge badge-yes">YES</span>'
+      : '<span class="badge badge-no">NO</span>';
+    const cpUrl = p.ticker ? `https://kalshi.com/markets/${p.ticker.split('-')[0].toLowerCase()}` : null;
+    const cpTickerEl = cpUrl
+      ? `<a class="text-mono kalshi-link" href="${cpUrl}" target="_blank" rel="noopener">${escHtml(p.ticker ?? '')}</a>`
+      : `<span class="text-mono">${escHtml(p.ticker ?? '')}</span>`;
+    const entryDisplay = p.entry_price_cents != null ? Math.round(p.entry_price_cents) + '¢' : '—';
+    const exitDisplay = p.exit_price_cents != null ? Math.round(p.exit_price_cents) + '¢' : '—';
+    const pnl = p.realized_pnl_dollars;
+    const pnlDisplay = pnl != null
+      ? `<span class="${pnlClass(pnl)}">${(pnl >= 0 ? '+' : '') + fmt$(pnl)}</span>`
+      : '<span style="color:var(--text-tertiary)">—</span>';
+    return `<tr>
+      <td>${cpTickerEl}</td>
+      <td>${sideBadge}</td>
+      <td>${p.contracts ?? '—'}</td>
+      <td style="color:var(--text-secondary)">${escHtml(timeDateTime(p.opened_at))}</td>
+      <td style="color:var(--text-secondary)">${escHtml(timeDateTime(p.closed_at))}</td>
+      <td>${escHtml(entryDisplay)}</td>
+      <td>${escHtml(exitDisplay)}</td>
+      <td>${pnlDisplay}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------------------------------------------------------------------------
 // Monitor tab: Resting Orders
 // ---------------------------------------------------------------------------
 function renderOrders(orders) {
@@ -1146,8 +1225,13 @@ function renderOrders(orders) {
     const tickerEl = url
       ? `<a class="text-mono kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(o.ticker ?? '')}</a>`
       : `<span class="text-mono">${escHtml(o.ticker ?? '')}</span>`;
-    const bidDisplay = o.yes_bid != null ? o.yes_bid + '¢' : '—';
-    const askDisplay = o.yes_ask != null ? o.yes_ask + '¢' : '—';
+    const isYesSide = String(o.side || '').toUpperCase() === 'YES';
+    const sideBid = (o.yes_bid != null && o.yes_ask != null)
+      ? (isYesSide ? o.yes_bid : 100 - o.yes_ask) : null;
+    const sideAsk = (o.yes_bid != null && o.yes_ask != null)
+      ? (isYesSide ? o.yes_ask : 100 - o.yes_bid) : null;
+    const bidDisplay = sideBid != null ? Math.round(sideBid) + '¢' : '—';
+    const askDisplay = sideAsk != null ? Math.round(sideAsk) + '¢' : '—';
     const fairVal = o.fair_value_cents;
     const fairDisplay = fairVal != null ? fairVal + '¢' : '—';
     const fairCls = fairVal != null && o.price_cents != null
@@ -1239,6 +1323,7 @@ async function poll() {
 
     if (activeTab === 'monitor') {
       renderPositions(state.positions);
+      renderClosedPositions(state.closed_positions || []);
       renderOrders(state.orders || []);
       renderIdeas(state.recent_ideas);
       renderEventLog(state.event_log);
@@ -1521,8 +1606,13 @@ function renderIdeasHistory() {
     const pnlText = livePnl === null ? '—' : (livePnl >= 0 ? '+' : '') + livePnl;
     const pnlCls = livePnl === null ? 'pnl-zer' : pnlClass(livePnl);
     const priceData = livePricesMap[idea.ticker];
-    const bidText = priceData?.bid != null ? Math.round(priceData.bid) + '¢' : '—';
-    const askText = priceData?.ask != null ? Math.round(priceData.ask) + '¢' : '—';
+    const isHistYesSide = String(idea.side || '').toUpperCase() === 'YES';
+    const histSideBid = (priceData?.bid != null && priceData?.ask != null)
+      ? (isHistYesSide ? priceData.bid : 100 - priceData.ask) : null;
+    const histSideAsk = (priceData?.bid != null && priceData?.ask != null)
+      ? (isHistYesSide ? priceData.ask : 100 - priceData.bid) : null;
+    const bidText = histSideBid != null ? Math.round(histSideBid) + '¢' : '—';
+    const askText = histSideAsk != null ? Math.round(histSideAsk) + '¢' : '—';
     const url = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
     const tickerEl = url
       ? `<a class="kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
