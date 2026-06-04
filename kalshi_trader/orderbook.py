@@ -69,10 +69,25 @@ class OrderBookState:
         return (bid_vol - ask_vol) / total
 
     def best_bid(self, ticker: str) -> int | None:
+        """Highest YES bid — the price you receive selling YES at market."""
         bids = self._bids[ticker]
         return max(bids) if bids else None
 
+    def best_no_bid(self, ticker: str) -> int | None:
+        """Highest NO bid — the price you receive selling NO at market.
+
+        The NO book stores all NO buy orders. The *highest* price a NO buyer
+        will pay is the current market NO bid (top of the NO order book).
+        """
+        asks = self._asks[ticker]
+        return max(asks) if asks else None
+
     def best_ask(self, ticker: str) -> int | None:
+        """Lowest NO-book price — used only for spread/imbalance signals.
+
+        This is the floor of the NO book, not the market NO bid. For current
+        pricing use best_no_bid(); for YES ask use (100 - best_no_bid()).
+        """
         asks = self._asks[ticker]
         return min(asks) if asks else None
 

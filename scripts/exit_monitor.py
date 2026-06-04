@@ -35,14 +35,15 @@ def _build_position_dict(
 
     Returns None if bid or ask is not yet available for the ticker.
     """
-    bid = orderbook_state.best_bid(ticker)
-    ask = orderbook_state.best_ask(ticker)
-    if bid is None or ask is None:
+    yes_bid = orderbook_state.best_bid(ticker)      # max YES book = YES bid
+    no_bid = orderbook_state.best_no_bid(ticker)    # max NO book  = NO bid
+    if yes_bid is None or no_bid is None:
         return None
     side = position_meta["side"]
     # Side-relative current price: what we'd receive selling this position now
-    current_price_cents = float(bid) if side == "yes" else (100.0 - float(ask))
-    midpoint_yes_price_cents = (float(bid) + float(ask)) / 2.0
+    current_price_cents = float(yes_bid) if side == "yes" else float(no_bid)
+    # YES midpoint = (YES bid + YES ask) / 2 = (yes_bid + (100 - no_bid)) / 2
+    midpoint_yes_price_cents = (float(yes_bid) + (100.0 - float(no_bid))) / 2.0
     result = {
         "market_exposure_dollars": position_meta["market_exposure_dollars"],
         "quantity": position_meta["quantity"],
@@ -65,21 +66,23 @@ def _select_yes_price(
 ) -> int | None:
     """Return the value to pass as ``yes_price`` to ``create_order()`` for this exit.
 
-    All four combos map to the raw order-book integer to pass directly to the API:
+    yes_bid = max(YES book) = YES bid = price to sell YES aggressively
+    no_bid  = max(NO book)  = NO bid  = price to sell NO aggressively
 
-    YES stop_loss:       bid  (aggressive — immediate fill at YES bid)
-    YES profit_target:   ask  (passive maker — rests at YES ask, fee-efficient)
-    NO  stop_loss:       ask  (aggressive — yes_price=ask means NO is sold at 100-ask=NO_bid)
-    NO  profit_target:   bid  (passive — yes_price=bid means NO rests at 100-bid=NO_ask)
+    YES stop_loss      → yes_price = yes_bid         (sell YES at bid, immediate fill)
+    YES profit_target  → yes_price = 100 - no_bid    (= YES ask, passive maker)
+    NO  stop_loss      → yes_price = 100 - no_bid    (sell NO at NO bid, immediate fill)
+    NO  profit_target  → yes_price = yes_bid         (sell NO at 100-yes_bid = NO ask, passive maker)
     """
-    bid = orderbook_state.best_bid(ticker)
-    ask = orderbook_state.best_ask(ticker)
-    if bid is None or ask is None:
+    yes_bid = orderbook_state.best_bid(ticker)
+    no_bid = orderbook_state.best_no_bid(ticker)
+    if yes_bid is None or no_bid is None:
         return None
+    yes_ask = 100 - no_bid
     if side == "yes":
-        return bid if signal_reason == "stop_loss" else ask
+        return yes_bid if signal_reason == "stop_loss" else yes_ask
     else:
-        return ask if signal_reason == "stop_loss" else bid
+        return yes_ask if signal_reason == "stop_loss" else yes_bid
 
 
 async def _fetch_open_positions(client: KalshiClient) -> dict[str, dict]:
@@ -163,12 +166,21 @@ async def run(dry_run: bool) -> None:
             if new_positions:
                 try:
                     fair_values = await _db.get_fair_values_from_recommendations(list(new_positions))
+                    enriched, missing = [], []
                     for ticker, meta in new_positions.items():
                         prob = fair_values.get(ticker)
                         if prob is not None:
                             meta["fair_value_cents"] = round(prob * 100.0, 2)
+                            enriched.append(f"{ticker}={prob*100:.1f}¢")
+                        else:
+                            missing.append(ticker)
+                    if enriched:
+                        log.info("Fair values loaded: %s", ", ".join(enriched))
+                    if missing:
+                        log.info("No fair value in recommendations (using convergence fallback): %s",
+                                 ", ".join(missing))
                 except Exception as fair_value_exception:
-                    log.debug("Fair value lookup failed: %s", fair_value_exception)
+                    log.warning("Fair value lookup failed: %s", fair_value_exception)
 
             # Track tickers that are brand new this cycle — skip exit checks for one cycle
             # so a position we just entered isn't immediately exited before it has a chance to move.
@@ -242,6 +254,7 @@ async def run(dry_run: bool) -> None:
                 position_dict = _build_position_dict(meta, orderbook_state, ticker)
                 if position_dict is None:
                     continue  # WebSocket not yet priced this ticker
+
 
                 for check in EXIT_CHECKS:
                     signal = check(position_dict)
