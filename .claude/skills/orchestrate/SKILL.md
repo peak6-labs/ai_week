@@ -116,44 +116,22 @@ as the tradeable `ticker`.
 (calibration) signals, computed during the scan with no extra calls. Keep these;
 Step 2 only needs to add the signals that require live lookups or judgment.
 
-**Fetch settlement rules — only for the deep-signal subset (and later any
-candidates).** `market_rules.py` makes one API call per ticker for `rules_*`,
-plus one **per distinct series** for the settlement context — and that series
-call is deduped (a strike ladder is one lookup) and cached across cycles in
-`series_contract_terms.json`, so it stays cheap. Still do NOT fetch rules for all
-~200; fetch them for the deep-signal subset now, and (in Step 5) for any market
-that becomes a candidate:
+**Fetch settlement rules and live prices in parallel** — run both scripts
+simultaneously in one Bash call so neither blocks the other:
 
 ```bash
 KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
-  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/rules_${TS}.json
-```
-
-Read `/tmp/rules_${TS}.json` ({ticker: {rules_primary, subtitle,
-`settlement_sources`, `contract_terms_url`, ...}}). The last two come from the
-market's **series** and say what *source/criterion the contract actually settles
-on* (e.g. NYC temp settles on AccuWeather, not NOAA). Carry each market's
-`rules_primary` **and** its settlement context forward — Step 2 passes them to
-the settlement-sensitive agents, and Step 5 reads `contract_terms_url` for the
-full mechanics.
-
-**Live-price the deep-signal subset.** The snapshot is the market *universe* only;
-its prices may be stale. Every market we evaluate deeply (and might recommend)
-must be priced from the live API, not the snapshot. Fetch live top-of-book for
-the **same subset tickers** now:
-
-```bash
+  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/rules_${TS}.json &
 KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/live_prices.py \
-  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/live_prices_${TS}.json
+  --tickers SUBSET_TICKER1 SUBSET_TICKER2 ... > /tmp/live_prices_${TS}.json &
+wait
 ```
 
-Read `/tmp/live_prices_${TS}.json` ({ticker: {yes_bid, yes_ask, last_price}}).
-**Immediately override each subset market's `yes_bid`/`yes_ask` with these live
-values right now** — before dispatching any signal agents in Step 2. A ticker
-mapping to nulls is illiquid/unquoted — drop it from the subset rather than run
-agents on a stale price. Carry the updated prices forward into Step 2 (agent
-dispatch) and Step 3 (signals file). This guarantees signal agents see the live
-market price, not the potentially-stale scout snapshot.
+Read both output files. From `/tmp/rules_${TS}.json` carry each market's
+`rules_primary` and `settlement_sources` forward — Step 2 passes them to the
+settlement-sensitive agents. From `/tmp/live_prices_${TS}.json` **immediately
+override each subset market's `yes_bid`/`yes_ask`** before dispatching agents.
+A ticker mapping to nulls is illiquid — drop it from the subset.
 
 If the file is empty or missing, log and stop:
 
@@ -325,54 +303,28 @@ and `side`.
 Keep only markets where **`worth_trading == true`**.
 Log the survivor count.
 
-**Persist this cycle** (scored-market snapshots + run stats → Supabase, with a
-local fallback; best-effort, never blocks):
-
-```bash
-PYTHONPATH=. .venv/bin/python scripts/persist_cycle.py \
-  --scout-file /tmp/market_scout_${TS}.json \
-  --scored-file /tmp/scored_${TS}.json --cycle-ts ${TS} || true
-```
+*(persist_cycle.py runs in the trailing step after publish — do not run it here.)*
 
 ---
 
 ## Step 5 — Adversarial challenge
 
-First, **fetch settlement rules for any surviving candidate not already in the
-deep-signal subset** (so every candidate has `rules_primary` for question 1):
-
-```bash
-KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/market_rules.py \
-  --tickers CANDIDATE_TICKER... >> /tmp/rules_${TS}.json   # merge/extend
-```
-
-Then, **for the surviving candidates only, download the full contract-terms
-PDFs** (Tier 1 — deduped by series and cache-by-series, so typically 1–3 reads):
-
-```bash
-KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python scripts/contract_terms_doc.py \
-  --tickers CANDIDATE_TICKER... > /tmp/contract_docs_${TS}.json
-```
-
-This writes each survivor series' PDF to `/tmp/contract_terms_<series>.pdf`.
-**Read** the PDF for each survivor (the Read tool parses PDFs natively) and fold
-its mechanics into question 1 below: strict inequality (`>` vs `>=`),
-determination-delay clauses (e.g. delayed to 11 AM ET on METAR inconsistency),
-"first official report governs", exact expiration time, and the source hierarchy.
-These are the boundary/timing traps the API `rules_primary` text omits.
+All candidates were in the deep-signal subset, so `rules_primary` and
+`settlement_sources` are already in `/tmp/rules_${TS}.json`. Use that text —
+do **not** download or read contract-terms PDFs; the round-trip cost exceeds
+the benefit for most markets.
 
 For each surviving market, answer these five questions before letting it onto the
 candidate slate:
 
 1. **Settlement rule** — read the market's `rules_primary` and
-   `settlement_sources` (from `/tmp/rules_${TS}.json`) and the contract-terms PDF
-   (Tier 1, above). Does it actually resolve on what the title implies, on the
-   source the signals measured? Check the signal metadata's `data_quality` field:
-   a signal with `data_quality: unavailable` or `data_quality: stale` (>120 min
-   for weather) contributed a floor/fallback value, not a real forecast — treat it
-   as absent and do not count it toward source independence. If the rule or PDF
-   has a twist the signals didn't account for (specific date, strict threshold,
-   source of truth, determination delay), drop the market.
+   `settlement_sources` from `/tmp/rules_${TS}.json`. Does it actually resolve
+   on what the title implies, on the source the signals measured? Check the
+   signal metadata's `data_quality` field: a signal with
+   `data_quality: unavailable` or `data_quality: stale` (>120 min for weather)
+   contributed a floor/fallback value — treat it as absent. If the rule has a
+   twist the signals didn't account for (wrong source, wrong threshold,
+   determination delay), drop the market.
 2. **Bear case** — what specific mechanism makes the signal wrong?
 3. **Source independence** — three paths to pass:
    - **External path** (lower bar, 5¢): an independent external signal
@@ -569,8 +521,16 @@ KALSHI_ENV=prod PYTHONPATH=. .venv/bin/python \
   scripts/paper_track.py mark --from-supabase --max-age-minutes 130 || true
 ```
 
-Read-only; never executes trades. This is what keeps the Ideas History P&L
-timeline populated.
+**Also persist this cycle's scored markets to Supabase** (kept here so it never
+delays publishing):
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/persist_cycle.py \
+  --scout-file /tmp/market_scout_${TS}.json \
+  --scored-file /tmp/scored_${TS}.json --cycle-ts ${TS} || true
+```
+
+Read-only and best-effort; never blocks.
 
 ---
 
