@@ -32,7 +32,7 @@ _BASE_URLS = {
 }
 _WS_URLS = {
     "demo": "wss://demo-api.kalshi.co/trade-api/ws/v2",
-    "prod": "wss://external-api.kalshi.com/trade-api/ws/v2",
+    "prod": "wss://external-api-ws.kalshi.com/trade-api/ws/v2",
 }
 KALSHI_BASE_URL = _BASE_URLS.get(KALSHI_ENV, _BASE_URLS["demo"])
 KALSHI_WS_URL = _WS_URLS.get(KALSHI_ENV, _WS_URLS["demo"])
