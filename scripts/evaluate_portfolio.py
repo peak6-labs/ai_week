@@ -70,7 +70,7 @@ async def _fetch_tickers_with_resting_exits(client: KalshiClient) -> set[str]:
     }
 
 
-async def run(dry_run: bool, out: str | None) -> dict:
+async def run(dry_run: bool, out: str | None, night_mode: bool = False) -> dict:
     """Evaluate all open positions and exit triggered ones. Returns results dict."""
     async with KalshiClient() as client:
         positions_response = await client.get_positions()
@@ -176,9 +176,10 @@ async def run(dry_run: bool, out: str | None) -> dict:
                 print(f"SKIP {ticker}: fractional position ({quantity:.2f} contracts)", file=sys.stderr)
                 continue
 
-            # Stop-losses cross the spread to guarantee a fill even when prices are ripping.
-            # Profit targets rest at midmarket (maker, no fees).
-            if exit_signal.reason == "stop_loss":
+            # Stop-losses always cross the spread to guarantee a fill even when prices are ripping.
+            # Profit targets rest at midmarket (maker, no fees) unless --night-mode is set,
+            # in which case they also cross the spread so exits complete without human oversight.
+            if exit_signal.reason == "stop_loss" or night_mode:
                 # Taker pricing: sell YES at bid, sell NO at ask (both cross immediately).
                 taker_yes_price = yes_bid if side == "yes" else yes_ask
                 yes_price = max(1, min(99, round(taker_yes_price)))
@@ -254,10 +255,12 @@ def _main() -> None:
                         help="Force dry-run (the default); kept for clarity/back-compat.")
     parser.add_argument("--out", default=None,
                         help="Write results JSON to this path (for orchestrator)")
+    parser.add_argument("--night-mode", action="store_true",
+                        help="Use taker pricing for profit-target exits so they fill without human oversight.")
     args = parser.parse_args()
     # Dry-run unless execution is explicitly requested; --dry-run also forces it.
     dry_run = args.dry_run or not args.execute
-    asyncio.run(run(dry_run=dry_run, out=args.out))
+    asyncio.run(run(dry_run=dry_run, out=args.out, night_mode=args.night_mode))
 
 
 if __name__ == "__main__":

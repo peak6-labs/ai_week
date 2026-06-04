@@ -68,7 +68,7 @@ cd /Users/scorley/code
 if pgrep -f "scripts/portfolio_loop.sh" >/dev/null; then
   echo "portfolio_loop.sh already running"
 else
-  nohup bash scripts/portfolio_loop.sh > reports/portfolio-loop.log 2>&1 &
+  nohup bash scripts/portfolio_loop.sh --night-mode > reports/portfolio-loop.log 2>&1 &
   echo $! > reports/portfolio-loop.pid
 fi
 ```
