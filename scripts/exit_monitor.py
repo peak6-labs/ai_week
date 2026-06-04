@@ -200,6 +200,20 @@ async def run(dry_run: bool) -> None:
             resting_sell_tickers = await _fetch_resting_sell_tickers(kalshi_client)
             pending_exits.update(resting_sell_tickers & set(position_metadata))
 
+            # Sync orderbook state from REST on every refresh — corrects any WebSocket
+            # delta drift so stop-loss checks always use exchange-accurate prices.
+            for ticker in list(position_metadata):
+                try:
+                    fresh_orderbook_response = await kalshi_client.get_orderbook(ticker)
+                    fresh_orderbook = fresh_orderbook_response.get("orderbook", {})
+                    orderbook_state.apply_snapshot(
+                        ticker,
+                        fresh_orderbook.get("yes", []),
+                        fresh_orderbook.get("no", []),
+                    )
+                except Exception as orderbook_sync_exception:
+                    log.debug("Orderbook REST sync failed for %s: %s", ticker, orderbook_sync_exception)
+
             # Update WebSocket subscriptions if positions changed
             new_tickers = set(position_metadata)
             if new_tickers != subscribed_tickers:

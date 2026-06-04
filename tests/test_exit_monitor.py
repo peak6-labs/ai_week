@@ -220,3 +220,44 @@ class TestFetchRestingSellTickers:
 
         result = asyncio.run(exit_monitor._fetch_resting_sell_tickers(FakeClient()))
         assert result == set()
+
+
+class TestOrderbookRestSync:
+    def test_refresh_applies_rest_snapshot_correcting_stale_ws_bid(self):
+        """REST snapshot on refresh must overwrite stale WebSocket bids."""
+        state = OrderBookState()
+        # Simulate a stale WebSocket book: YES bid stuck at 10¢
+        state.apply_delta(TICKER, "yes", 10, 100)
+        state.apply_delta(TICKER, "no", 90, 100)
+
+        # REST returns the real current book: YES bid dropped to 7¢
+        fresh_orderbook = {"yes": [[7, 100]], "no": [[92, 100]]}
+        state.apply_snapshot(TICKER, fresh_orderbook["yes"], fresh_orderbook["no"])
+
+        assert state.best_bid(TICKER) == 7
+        assert state.best_no_bid(TICKER) == 92
+
+    def test_stale_bid_causes_missed_stop_loss(self):
+        """Reproduce the Chicago bug: stale 10¢ bid hides a 25% loss."""
+        stale_state = _make_orderbook(bid=10, no_bid=88)
+        meta = _make_meta(side="yes", quantity=166, exposure=19.92)
+
+        position_dict = _build_position_dict(meta, stale_state, TICKER)
+        assert position_dict is not None
+        # At stale 10¢: current_value=$16.60 > threshold=$14.94 → no stop-loss
+        from kalshi_trader.portfolio_checks import check_stop_loss
+        assert check_stop_loss(position_dict) is None
+
+    def test_rest_corrected_bid_fires_stop_loss(self):
+        """After REST sync corrects the bid to 7¢, stop-loss must trigger."""
+        state = _make_orderbook(bid=10, no_bid=88)
+        # Apply REST correction
+        state.apply_snapshot(TICKER, [[7, 100]], [[92, 100]])
+
+        meta = _make_meta(side="yes", quantity=166, exposure=19.92)
+        position_dict = _build_position_dict(meta, state, TICKER)
+        assert position_dict is not None
+        # At corrected 7¢: current_value=$11.62 < threshold=$14.94 → stop-loss fires
+        from kalshi_trader.portfolio_checks import check_stop_loss
+        assert check_stop_loss(position_dict) is not None
+        assert check_stop_loss(position_dict).reason == "stop_loss"
