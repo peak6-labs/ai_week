@@ -153,7 +153,7 @@ class KalshiWebSocketClient:
             self.state.record_trade(ticker, size)
 
         elif msg_type == "subscribed":
-            log.info("WS subscription confirmed for tickers: %s", self.tickers)
+            log.info("WS subscription confirmed for %d tickers", len(self.tickers))
         elif msg_type == "error":
             log.error("WS error message from server: %s", envelope)
         # Unknown types are silently ignored

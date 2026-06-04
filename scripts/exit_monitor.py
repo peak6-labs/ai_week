@@ -168,7 +168,7 @@ async def run(dry_run: bool) -> None:
             # so a position we just entered isn't immediately exited before it has a chance to move.
             new_this_cycle = set(new_positions) - set(position_metadata)
             if new_this_cycle:
-                log.info("New positions this cycle (skipping exit checks for one cycle): %s",
+                log.info("New position(s) entered — skipping exit checks for one cycle: %s",
                          sorted(new_this_cycle))
 
             position_metadata.clear()
@@ -199,8 +199,7 @@ async def run(dry_run: bool) -> None:
                 if subscribed_tickers:
                     ws_client = KalshiWebSocketClient(list(subscribed_tickers), orderbook_state)
                     ws_task = asyncio.create_task(ws_client.run())
-                    log.info("WebSocket subscribed to %d tickers: %s",
-                             len(subscribed_tickers), sorted(subscribed_tickers))
+                    log.info("WebSocket subscribed to %d tickers", len(subscribed_tickers))
                 else:
                     ws_client = None
                     ws_task = None
