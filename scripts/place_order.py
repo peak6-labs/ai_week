@@ -10,6 +10,7 @@ Usage:
 """
 from __future__ import annotations
 
+import anthropic
 import argparse
 import asyncio
 import json
@@ -59,3 +60,58 @@ def compute_limit_price(orderbook_data: dict, action: str, pricing: str) -> int:
     if action == "sell":
         return max(math.ceil(midpoint), best_bid + 1)
     return min(math.floor(midpoint), best_ask - 1)
+
+
+_INTENT_SYSTEM_PROMPT = """\
+You parse Kalshi trading order instructions into JSON.
+Return ONLY valid JSON matching the schema below. Use null for any field not mentioned.
+
+DISAMBIGUATION RULES (highest priority):
+- "no fees" / "without fees" ALWAYS → pricing: "midmarket_maker" (never "cross_spread")
+- "need to get filled" / "just get me out" / "urgently" / "asap" / "cross the spread" → pricing: "cross_spread"
+- "get out of" / "exit" / "close" / "sell" / "liquidate" → action: "sell"
+- "buy" / "enter" / "open" / "get into" → action: "buy"
+- "all" / "full position" / "everything" / "the trade" / "the position" → quantity: "all"
+- "best price" on a sell → pricing: "join_ask"; "best price" on a buy → pricing: "join_bid"
+- "midmarket" / "mid" / "no fees" / "without fees" / "get filled without fees" → pricing: "midmarket_maker"
+- "join ask" → pricing: "join_ask"; "join bid" → pricing: "join_bid"
+- "cancel and replace" / "reprice" / "move my order" → cancel_first: true
+- "cancel" alone (without "replace") → cancel_only: true
+- "at N cents" / "at N" / "@ N" → yes_price: N (integer 1-99)
+- "N dollars" / "$N" → amount_dollars: N (float)
+
+Schema:
+{
+  "action": "buy" | "sell" | null,
+  "side": "yes" | "no" | null,
+  "quantity": <integer> | "all" | null,
+  "amount_dollars": <float> | null,
+  "pricing": "midmarket_maker" | "join_bid" | "join_ask" | "cross_spread" | null,
+  "yes_price": <integer 1-99> | null,
+  "cancel_first": false,
+  "cancel_only": false
+}\
+"""
+
+
+async def parse_intent(intent: str) -> dict:
+    """Parse a natural language order instruction into a structured dict via Haiku 4.5."""
+    anthropic_client = anthropic.AsyncAnthropic()
+    message = await anthropic_client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=256,
+        system=_INTENT_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": intent}],
+    )
+    text = next((block.text for block in message.content if hasattr(block, "text")), "{}")
+    parsed = json.loads(text)
+    return {
+        "action": parsed.get("action"),
+        "side": parsed.get("side"),
+        "quantity": parsed.get("quantity"),
+        "amount_dollars": parsed.get("amount_dollars"),
+        "pricing": parsed.get("pricing"),
+        "yes_price": parsed.get("yes_price"),
+        "cancel_first": bool(parsed.get("cancel_first", False)),
+        "cancel_only": bool(parsed.get("cancel_only", False)),
+    }

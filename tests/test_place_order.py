@@ -1,9 +1,12 @@
 """Tests for scripts/place_order.py"""
 from __future__ import annotations
 import importlib
+import json
 import math
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -79,3 +82,85 @@ def test_empty_no_book_raises():
     ob = {"orderbook": {"yes": [[62, 100]], "no": []}}
     with pytest.raises(ValueError, match="best_ask"):
         place_order.compute_limit_price(ob, "sell", "midmarket_maker")
+
+
+def _mock_anthropic(response_json: dict):
+    """Return a mock AsyncAnthropic client that returns response_json as a text block."""
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(text=json.dumps(response_json))]
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+    return mock_client
+
+
+@contextmanager
+def patch_haiku(response_json: dict):
+    mock_client = _mock_anthropic(response_json)
+    with patch("scripts.place_order.anthropic.AsyncAnthropic", return_value=mock_client):
+        yield mock_client
+
+
+@pytest.mark.asyncio
+async def test_parse_intent_exit_midmarket():
+    haiku_response = {
+        "action": "sell", "side": None, "quantity": "all", "amount_dollars": None,
+        "pricing": "midmarket_maker", "yes_price": None,
+        "cancel_first": False, "cancel_only": False,
+    }
+    with patch_haiku(haiku_response):
+        result = await place_order.parse_intent("exit full position at midmarket no fees")
+    assert result["action"] == "sell"
+    assert result["quantity"] == "all"
+    assert result["pricing"] == "midmarket_maker"
+    assert result["cancel_only"] is False
+
+
+@pytest.mark.asyncio
+async def test_parse_intent_cancel_and_replace():
+    haiku_response = {
+        "action": "sell", "side": None, "quantity": None, "amount_dollars": None,
+        "pricing": None, "yes_price": 65,
+        "cancel_first": True, "cancel_only": False,
+    }
+    with patch_haiku(haiku_response):
+        result = await place_order.parse_intent("cancel and replace at 65 cents")
+    assert result["cancel_first"] is True
+    assert result["yes_price"] == 65
+
+
+@pytest.mark.asyncio
+async def test_parse_intent_cross_spread():
+    haiku_response = {
+        "action": "sell", "side": None, "quantity": "all", "amount_dollars": None,
+        "pricing": "cross_spread", "yes_price": None,
+        "cancel_first": False, "cancel_only": False,
+    }
+    with patch_haiku(haiku_response):
+        result = await place_order.parse_intent("i need to get filled")
+    assert result["pricing"] == "cross_spread"
+
+
+@pytest.mark.asyncio
+async def test_parse_intent_cancel_only():
+    haiku_response = {
+        "action": None, "side": None, "quantity": None, "amount_dollars": None,
+        "pricing": None, "yes_price": None,
+        "cancel_first": False, "cancel_only": True,
+    }
+    with patch_haiku(haiku_response):
+        result = await place_order.parse_intent("cancel all resting orders")
+    assert result["cancel_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_parse_intent_buy_with_amount():
+    haiku_response = {
+        "action": "buy", "side": "yes", "quantity": None, "amount_dollars": 10.0,
+        "pricing": "midmarket_maker", "yes_price": None,
+        "cancel_first": False, "cancel_only": False,
+    }
+    with patch_haiku(haiku_response):
+        result = await place_order.parse_intent("buy 10 dollars yes at midmarket")
+    assert result["action"] == "buy"
+    assert result["amount_dollars"] == 10.0
+    assert result["side"] == "yes"
