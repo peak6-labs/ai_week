@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "598f357a3b6ecfbb96fac93c9ed0a5053f69191dbd7a333403c922df89a59056"
+    }
+  }
+}
