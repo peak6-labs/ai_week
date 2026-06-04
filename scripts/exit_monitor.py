@@ -224,10 +224,14 @@ async def run(dry_run: bool) -> None:
 
         await _refresh()
         last_refresh_time = asyncio.get_running_loop().time()
+        exits_since_refresh = 0
 
         while True:
             now = asyncio.get_running_loop().time()
             if now - last_refresh_time >= 30.0:
+                if exits_since_refresh == 0:
+                    log.info("No exits triggered — monitoring %d positions", len(position_metadata))
+                exits_since_refresh = 0
                 try:
                     await _refresh()
                 except Exception as refresh_exception:
@@ -267,6 +271,7 @@ async def run(dry_run: bool) -> None:
                         break
 
                     pending_exits.add(ticker)
+                    exits_since_refresh += 1
                     msg = (
                         f"{signal.reason} fired: {ticker} ({meta['side'].upper()}) "
                         f"at {yes_price}¢ — {signal.description}"
