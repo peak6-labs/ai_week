@@ -1356,9 +1356,9 @@ async function fetchLivePricesForHistory() {
   if (uniqueTickers.length === 0) return;
   try {
     const newPrices = {};
-    // Fetch in batches of 100 to match server cap
-    for (let i = 0; i < uniqueTickers.length; i += 100) {
-      const batch = uniqueTickers.slice(i, i + 100);
+    // Fetch in batches of 50 to match server cap
+    for (let i = 0; i < uniqueTickers.length; i += 50) {
+      const batch = uniqueTickers.slice(i, i + 50);
       const resp = await fetch('/api/markets/prices?tickers=' + batch.join(','));
       if (!resp.ok) continue;
       Object.assign(newPrices, await resp.json());

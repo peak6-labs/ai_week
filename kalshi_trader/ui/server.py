@@ -631,7 +631,7 @@ def create_app(
             return JSONResponse({})
 
         raw_tickers = [ticker.strip() for ticker in tickers.split(",") if ticker.strip()]
-        unique_tickers = list(dict.fromkeys(raw_tickers))[:100]
+        unique_tickers = list(dict.fromkeys(raw_tickers))[:50]
         if not unique_tickers:
             return JSONResponse({})
 
