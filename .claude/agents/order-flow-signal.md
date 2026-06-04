@@ -6,7 +6,6 @@ description: >-
   for any liquid market.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -36,11 +35,11 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`:
+1. **Run the pipeline CLI.** From the repo root (your project checkout):
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: computing OFI/VPIN for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "order-flow-signal: computing OFI/VPIN for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.order_flow \
      --ticker TICKER \
      --title "TITLE"
@@ -52,16 +51,16 @@ You need the caller to supply:
 2. **Check the output.**
    - If the call fails because the module does not exist, log and report:
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: pipeline CLI not yet implemented" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "order-flow-signal: pipeline CLI not yet implemented" warning
      ```
      Return `[]`.
    - If the array is empty (`[]`):
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: TICKER → no signal (sparse trade history)" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "order-flow-signal: TICKER → no signal (sparse trade history)" warning
      ```
    - If non-empty: log and summarize OFI direction, VPIN level, and informed activity implication.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "order-flow-signal: TICKER → OFI=<dir> VPIN=<v> prob=<p>"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "order-flow-signal: TICKER → OFI=<dir> VPIN=<v> prob=<p>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error

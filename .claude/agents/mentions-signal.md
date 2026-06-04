@@ -7,7 +7,6 @@ description: >-
   or press conference.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -37,13 +36,13 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Always
+1. **Run the pipeline CLI.** From the repo root (your project checkout). Always
    pass `--settlement-json` — the pipeline uses it to extract the keyword when the
    title doesn't contain it:
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "mentions-signal: fetching GDELT base rate for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "mentions-signal: fetching GDELT base rate for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.mentions \
      --ticker TICKER \
      --title "TITLE" \
@@ -57,16 +56,16 @@ You need the caller to supply:
    get the reason when the array is empty.
    - If empty and stderr contains `NO_KEYWORD`: keyword not found anywhere.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "mentions-signal: TICKER → no signal (keyword not found in title or settlement context)" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "mentions-signal: TICKER → no signal (keyword not found in title or settlement context)" warning
      ```
    - If empty and stderr contains `NO_COVERAGE`: keyword was extracted but GDELT
      has no historical TV coverage for it (typical for sports-specific vocabulary).
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "mentions-signal: TICKER → no signal (keyword extracted but no GDELT TV coverage — sports-specific phrase)" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "mentions-signal: TICKER → no signal (keyword extracted but no GDELT TV coverage — sports-specific phrase)" warning
      ```
    - If non-empty: log the result and print the raw JSON.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "mentions-signal: TICKER → prob=<p> ±<u>"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "mentions-signal: TICKER → prob=<p> ±<u>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the

@@ -6,7 +6,6 @@ description: >-
   markets.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -33,11 +32,11 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Add `--yes-bid` and `--yes-ask` only when the caller supplied them:
+1. **Run the pipeline CLI.** From the repo root (your project checkout). Add `--yes-bid` and `--yes-ask` only when the caller supplied them:
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: analyzing orderbook spread for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "market-maker-signal: analyzing orderbook spread for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.market_maker \
      --ticker TICKER \
      --title "TITLE" \
@@ -50,21 +49,21 @@ You need the caller to supply:
 2. **Check the output.**
    - If the call fails with `ModuleNotFoundError` or `No module named`:
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: pipeline CLI not yet implemented" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "market-maker-signal: pipeline CLI not yet implemented" warning
      ```
      Return `[]`.
    - If the call fails for any other reason (timeout, API error, etc.), log the actual error:
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → pipeline error: <first line of stderr>" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → pipeline error: <first line of stderr>" warning
      ```
      Return `[]`.
    - If the array is empty (`[]`):
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → no signal (book normal)"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → no signal (book normal)"
      ```
    - If non-empty: log spread and implied direction.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → spread=<s>¢ imbalance=<imb> direction=<dir>"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "market-maker-signal: TICKER → spread=<s>¢ imbalance=<imb> direction=<dir>"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array / error

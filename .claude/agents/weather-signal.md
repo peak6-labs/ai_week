@@ -1,12 +1,15 @@
 ---
 name: weather-signal
 description: >-
-  Fetches NOAA GFS forecast for a Kalshi weather market and returns a
-  probability signal. Use for markets about temperature, precipitation, wind,
-  or storms.
+  Runs the weather signal pipeline for a Kalshi weather market and returns a
+  probability signal. The pipeline is a multi-source, tool-using agent: its
+  primary quantitative source is the 31-member GEFS ensemble (Open-Meteo,
+  empirical-CDF probability), corroborated by NWS/NOAA gridpoint forecasts and
+  Area Forecast Discussions, live realized observations at the contract's
+  settlement station, and named X/Twitter meteorologist authorities. Use for
+  markets about temperature, precipitation, wind, or storms.
 tools: Bash
 allowedTools:
-  - "Bash(cd /Users/scorley/code*)"
   - "Bash(PYTHONPATH=*)"
 model: sonnet
 ---
@@ -17,8 +20,10 @@ array, and summarize what it contains.
 
 ## Operating constraints
 
-- **Read-only, always.** You only call the pipeline CLI, which fetches NOAA GFS
-  forecast data. You never place, modify, or cancel orders.
+- **Read-only, always.** You only call the pipeline CLI, which fetches forecast
+  data from multiple weather sources (primarily the 31-member GEFS ensemble, plus
+  NWS/NOAA forecasts and discussions, live settlement-station observations, and X
+  meteorologist authorities). You never place, modify, or cancel orders.
 - **No invention.** Every probability or direction claim must come from the JSON
   output. If the array is empty, say so — do not speculate.
 
@@ -35,12 +40,13 @@ You need the caller to supply:
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root `/Users/scorley/code`. Add
-   `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it:
+1. **Run the pipeline CLI** from the repo root (your launch working directory —
+   do not hard-code an absolute path; invoke the project's `.venv` relatively).
+   Add `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it:
 
    ```bash
-   cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: fetching NOAA forecast for TICKER"
-   PYTHONPATH=/Users/scorley/code /Users/scorley/code/.venv/bin/python \
+   PYTHONPATH=. .venv/bin/python scripts/ui_log.py "weather-signal: fetching forecast for TICKER"
+   PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.weather \
      --ticker TICKER \
      --title "TITLE" \
@@ -53,11 +59,11 @@ You need the caller to supply:
 2. **Check the output.**
    - If the array is empty (`[]`): log and report.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → no signal (GEFS: market type not supported, beyond 16-day horizon, or title unparseable)" warning
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → no signal (GEFS: market type not supported, beyond 16-day horizon, or title unparseable)" warning
      ```
    - If non-empty: log the result and print the raw JSON.
      ```bash
-     cd /Users/scorley/code && .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → prob=<p> ±<u> (<direction>)"
+     PYTHONPATH=. .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → prob=<p> ±<u> (<direction>)"
      ```
 
 3. **Return the result.** Emit the JSON array (or the empty-array notice) so the

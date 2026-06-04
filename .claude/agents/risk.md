@@ -27,8 +27,7 @@ You are the **Risk Agent**. You apply hard risk rules and Kelly sizing to trade 
 1. **Run the risk script:**
 
    ```bash
-   cd /Users/scorley/code
-   PYTHONPATH=. .venv/bin/python scripts/run_risk.py \
+   # run from the repo root (your project checkout — do not hard-code an absolute path)   PYTHONPATH=. .venv/bin/python scripts/run_risk.py \
      --ideas-file IDEAS_FILE \
      --balance BALANCE \
      [--positions-file POSITIONS_FILE]
