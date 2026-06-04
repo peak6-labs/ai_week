@@ -67,7 +67,8 @@ def compute_closed_positions(
 
         entry_price_cents = _avco_price(buy_fills, use_no_price)
         exit_price_cents = _avco_price(sell_fills, use_no_price)
-        realized_pnl_dollars = (exit_price_cents - entry_price_cents) * total_bought / 100.0
+        total_fees = sum(fill.get("fee_cost", 0.0) for fill in fills)
+        realized_pnl_dollars = (exit_price_cents - entry_price_cents) * total_bought / 100.0 - total_fees
 
         opened_at = min(fill.get("created_time", "") for fill in buy_fills)
         closed_at = max(fill.get("created_time", "") for fill in sell_fills)
@@ -295,8 +296,21 @@ async def _poll_fills(trading_state: TradingState) -> None:
                             page_fills = response.get("fills") or []
                             for fill in page_fills:
                                 ticker = fill.get("ticker", "")
-                                if ticker:
-                                    fills_cache.setdefault(ticker, []).append(fill)
+                                if not ticker:
+                                    continue
+                                # Normalize Kalshi API field names to internal format.
+                                # Kalshi returns count_fp (float string), yes_price_dollars
+                                # (dollar string), and fee_cost (dollar string).
+                                normalized_fill = {
+                                    "ticker": ticker,
+                                    "side": fill.get("outcome_side") or fill.get("side") or "yes",
+                                    "action": fill.get("action", ""),
+                                    "count": int(float(fill.get("count_fp", "0") or "0")),
+                                    "yes_price": round(float(fill.get("yes_price_dollars", "0") or "0") * 100),
+                                    "fee_cost": float(fill.get("fee_cost", "0") or "0"),
+                                    "created_time": fill.get("created_time", ""),
+                                }
+                                fills_cache.setdefault(ticker, []).append(normalized_fill)
                             next_cursor = response.get("cursor")
                             if not next_cursor or not page_fills:
                                 break

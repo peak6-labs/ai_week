@@ -3,13 +3,14 @@ import pytest
 from kalshi_trader.ui.server import compute_closed_positions
 
 
-def _fill(ticker, side, action, count, yes_price, created_time="2026-06-01T10:00:00Z"):
+def _fill(ticker, side, action, count, yes_price, created_time="2026-06-01T10:00:00Z", fee_cost=0.0):
     return {
         "ticker": ticker,
         "side": side,
         "action": action,
         "count": count,
         "yes_price": yes_price,
+        "fee_cost": fee_cost,
         "created_time": created_time,
     }
 
@@ -238,6 +239,19 @@ def test_multiple_tickers_some_open_some_closed():
     tickers = {r["ticker"] for r in result}
     assert tickers == {"FOO-1", "BAZ-1"}
     assert "BAR-1" not in tickers
+
+
+def test_fees_deducted_from_realized_pnl():
+    # 10 contracts YES, entry 30¢, exit 60¢ → gross = $3.00, fees = $0.10 → net = $2.90
+    cache = {
+        "FOO-1": [
+            _fill("FOO-1", "yes", "buy", 6, 30, fee_cost=0.06),
+            _fill("FOO-1", "yes", "buy", 4, 30, fee_cost=0.04),
+            _fill("FOO-1", "yes", "sell", 10, 60),
+        ]
+    }
+    result = compute_closed_positions(cache, set())
+    assert result[0]["realized_pnl_dollars"] == pytest.approx(2.90)
 
 
 def test_output_sorted_newest_closed_first():
