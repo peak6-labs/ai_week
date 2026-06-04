@@ -173,6 +173,7 @@ class MentionsArchiveStore:
         venue_type: str | None,
         phrase: str,
         since: str | None = None,
+        until: str | None = None,
     ) -> dict:
         """Count how often a speaker's transcripts contain a phrase.
 
@@ -182,6 +183,10 @@ class MentionsArchiveStore:
                 every venue attributed to this speaker.
             phrase: The search phrase; normalized the same way as ``norm_text``.
             since: Optional inclusive ``YYYY-MM-DD`` lower bound on ``event_date``.
+            until: Optional **exclusive** ``YYYY-MM-DD`` upper bound on ``event_date``
+                (the walk-forward as-of cutoff). Transcripts dated on or after this
+                date are excluded, so a backtest predicting an event that occurs on
+                ``until`` never counts that event (or anything later) — no look-ahead.
 
         Returns ``{"document_count": int, "match_count": int}`` — ``document_count``
         is the number of attributed transcripts considered (the base-rate
@@ -199,6 +204,9 @@ class MentionsArchiveStore:
         if since:
             clauses.append("event_date >= ?")
             params.append(since)
+        if until:
+            clauses.append("event_date < ?")  # strict: walk-forward as-of cutoff
+            params.append(until)
         where = " AND ".join(clauses)
         result_rows = self._conn.execute(
             f"SELECT norm_text FROM transcripts WHERE {where}", params
@@ -209,6 +217,92 @@ class MentionsArchiveStore:
             1 for (norm_text,) in result_rows if normalized_phrase in (norm_text or "")
         )
         return {"document_count": document_count, "match_count": match_count}
+
+    def count_phrase_global(
+        self,
+        venue_type: str | None,
+        phrase: str,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> dict:
+        """Count phrase occurrences across **all speakers** (the global denominator).
+
+        Identical to :meth:`count_phrase` but without the ``speaker_key`` filter, so
+        it yields the unconditional base rate the speaker-attributed rate is tested
+        against in the corpus-premise backtest (global base rate ⊂ speaker base rate).
+        ``until`` is the same exclusive walk-forward as-of cutoff.
+
+        Returns ``{"document_count": int, "match_count": int}``.
+        """
+        normalized_phrase = normalize_for_match(phrase)
+        if not normalized_phrase:
+            return {"document_count": 0, "match_count": 0}
+
+        clauses: list[str] = []
+        params: list = []
+        if venue_type:
+            clauses.append("venue_type = ?")
+            params.append(venue_type)
+        if since:
+            clauses.append("event_date >= ?")
+            params.append(since)
+        if until:
+            clauses.append("event_date < ?")  # strict: walk-forward as-of cutoff
+            params.append(until)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        result_rows = self._conn.execute(
+            f"SELECT norm_text FROM transcripts{where}", params
+        ).fetchall()
+
+        document_count = len(result_rows)
+        match_count = sum(
+            1 for (norm_text,) in result_rows if normalized_phrase in (norm_text or "")
+        )
+        return {"document_count": document_count, "match_count": match_count}
+
+    def list_transcript_events(self, venue_type: str | None = None) -> list[dict]:
+        """Return every transcript as a lightweight event dict (read-only).
+
+        Used by the corpus-premise backtest, which needs the full attributed
+        timeline (``speaker_key``, ``event_date``, ``norm_text``) to run its own
+        strict walk-forward scoring. Restrict to one ``venue_type`` to pool within
+        a venue (so document-length differences across venues do not bias the rate).
+        """
+        clauses: list[str] = []
+        params: list = []
+        if venue_type:
+            clauses.append("venue_type = ?")
+            params.append(venue_type)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        result_rows = self._conn.execute(
+            f"SELECT speaker_key, venue_type, event_date, norm_text FROM transcripts{where}",
+            params,
+        ).fetchall()
+        return [
+            {"speaker_key": speaker_key, "venue_type": venue_type_value,
+             "event_date": event_date, "norm_text": norm_text}
+            for (speaker_key, venue_type_value, event_date, norm_text) in result_rows
+        ]
+
+    def distinct_venue_types(self) -> list[str]:
+        """Non-empty distinct ``venue_type`` values present in the archive."""
+        result_rows = self._conn.execute(
+            "SELECT DISTINCT venue_type FROM transcripts"
+        ).fetchall()
+        return sorted(venue_type for (venue_type,) in result_rows if venue_type)
+
+    def distinct_speaker_count(self, venue_type: str | None = None) -> int:
+        """How many distinct speakers the archive holds (optionally within a venue)."""
+        if venue_type:
+            result_rows = self._conn.execute(
+                "SELECT COUNT(DISTINCT speaker_key) FROM transcripts WHERE venue_type = ?",
+                (venue_type,),
+            ).fetchone()
+        else:
+            result_rows = self._conn.execute(
+                "SELECT COUNT(DISTINCT speaker_key) FROM transcripts"
+            ).fetchone()
+        return int(result_rows[0] or 0)
 
     # ------------------------------------------------------------------
     # Targets

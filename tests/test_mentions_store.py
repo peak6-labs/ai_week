@@ -109,6 +109,52 @@ def test_count_phrase_since_filter(store):
     assert result["document_count"] == 1
 
 
+def test_count_phrase_until_excludes_on_or_after_cutoff(store):
+    # The as-of cutoff is strict (event_date < until): a transcript dated exactly on
+    # the cutoff date must be excluded, so a backtest never sees the event it predicts.
+    store.upsert_transcripts([
+        _transcript(url="u1", event_date="2024-05-01", full_text="earlier recession"),
+        _transcript(url="u2", event_date="2024-05-10", full_text="on-cutoff recession"),
+        _transcript(url="u3", event_date="2024-05-20", full_text="later recession"),
+    ])
+    result = store.count_phrase("powell", None, "recession", until="2024-05-10")
+    assert result == {"document_count": 1, "match_count": 1}  # only the 2024-05-01 row
+
+
+def test_count_phrase_since_and_until_window(store):
+    store.upsert_transcripts([
+        _transcript(url="u1", event_date="2022-01-01", full_text="too old recession"),
+        _transcript(url="u2", event_date="2024-05-05", full_text="in window recession"),
+        _transcript(url="u3", event_date="2024-09-01", full_text="too new recession"),
+    ])
+    result = store.count_phrase(
+        "powell", None, "recession", since="2024-01-01", until="2024-08-01"
+    )
+    assert result == {"document_count": 1, "match_count": 1}
+
+
+def test_count_phrase_global_ignores_speaker(store):
+    # Two different speakers, one phrase: the global count spans both speakers, while
+    # the speaker-scoped count sees only that speaker's transcripts.
+    store.upsert_transcripts([
+        _transcript(speaker_key="powell", url="p1", full_text="powell on recession"),
+        _transcript(speaker_key="yellen", url="y1", full_text="yellen on recession"),
+        _transcript(speaker_key="yellen", url="y2", full_text="yellen on growth"),
+    ])
+    global_count = store.count_phrase_global(None, "recession")
+    assert global_count == {"document_count": 3, "match_count": 2}
+    assert store.count_phrase("powell", None, "recession")["document_count"] == 1
+
+
+def test_count_phrase_global_respects_until(store):
+    store.upsert_transcripts([
+        _transcript(speaker_key="powell", url="p1", event_date="2024-01-01", full_text="recession early"),
+        _transcript(speaker_key="yellen", url="y1", event_date="2024-06-01", full_text="recession late"),
+    ])
+    result = store.count_phrase_global(None, "recession", until="2024-03-01")
+    assert result == {"document_count": 1, "match_count": 1}
+
+
 def test_count_phrase_unknown_speaker_or_blank_phrase_is_zero(store):
     store.upsert_transcripts([_transcript()])
     assert store.count_phrase("nobody", None, "recession")["document_count"] == 0
