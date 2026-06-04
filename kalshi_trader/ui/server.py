@@ -172,15 +172,17 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
                     remaining = float(raw_order.get("remaining_count_fp", "0") or 0)
                     if remaining <= 0:
                         continue
-                    outcome_side = raw_order.get("outcome_side") or raw_order.get("side") or "yes"
+                    contract_side = raw_order.get("side") or raw_order.get("outcome_side") or "yes"
+                    action = raw_order.get("action", "buy")
                     price_dollars = float(
-                        raw_order.get("no_price_dollars") if outcome_side == "no"
+                        raw_order.get("no_price_dollars") if contract_side == "no"
                         else (raw_order.get("yes_price_dollars") or 0)
                     )
                     mapped_orders.append({
                         "order_id": raw_order.get("order_id", ""),
                         "ticker": raw_order.get("ticker", ""),
-                        "side": outcome_side,
+                        "side": contract_side,
+                        "action": action,
                         "price_cents": round(price_dollars * 100.0, 2),
                         "remaining": int(remaining),
                         "filled": int(float(raw_order.get("fill_count_fp", "0") or 0)),

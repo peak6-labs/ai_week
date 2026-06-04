@@ -751,7 +751,6 @@
 <nav id="tab-bar">
   <span class="app-title">Kalshi</span>
   <button class="tab-btn active" data-tab="monitor">Live Monitor</button>
-  <button class="tab-btn" data-tab="ideas">Trade Ideas</button>
   <button class="tab-btn" data-tab="history">Ideas History</button>
 </nav>
 
@@ -844,7 +843,7 @@
           <thead>
             <tr>
               <th>Ticker</th>
-              <th>Side</th>
+              <th>Order</th>
               <th>Order ¢</th>
               <th>Bid ¢</th>
               <th>Ask ¢</th>
@@ -924,45 +923,6 @@
         </div>
       </div>
     </div><!-- /two-col -->
-  </div>
-
-  <!-- -------------------------------------------------------------------- -->
-  <!-- Tab 4: Trade Ideas                                                     -->
-  <!-- -------------------------------------------------------------------- -->
-  <div id="tab-ideas" class="tab-pane">
-    <!-- Pending Review -->
-    <div class="panel" style="margin-bottom:12px;">
-      <div class="panel-header">Pending Review</div>
-      <div class="panel-body">
-        <div class="ideas-pending-grid" id="pending-ideas-grid">
-          <!-- Cards rendered by JS -->
-        </div>
-        <div class="ideas-empty hidden" id="pending-ideas-empty">No pending ideas</div>
-      </div>
-    </div>
-
-    <!-- Reviewed Ideas -->
-    <div class="panel">
-      <div class="panel-header">Reviewed Ideas</div>
-      <div class="panel-body" style="padding:0">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Ticker</th>
-              <th>Side</th>
-              <th>Conf.</th>
-              <th>Size</th>
-              <th>Decision</th>
-              <th>Agent</th>
-            </tr>
-          </thead>
-          <tbody id="reviewed-ideas-tbody">
-            <tr class="empty-row"><td colspan="7">No reviewed ideas yet</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
   <!-- -------------------------------------------------------------------- -->
@@ -1255,14 +1215,16 @@ function renderOrders(orders) {
     return;
   }
   tbody.innerHTML = orders.map(o => {
-    const sideBadge = String(o.side || '').toUpperCase() === 'YES'
-      ? '<span class="badge badge-yes">YES</span>'
-      : '<span class="badge badge-no">NO</span>';
+    const isYesSide = String(o.side || '').toUpperCase() === 'YES';
+    const actionLabel = String(o.action || 'buy').toUpperCase();
+    const sideLabel = isYesSide ? 'YES' : 'NO';
+    const sideBadge = isYesSide
+      ? `<span class="badge badge-yes">${actionLabel} YES</span>`
+      : `<span class="badge badge-no">${actionLabel} NO</span>`;
     const url = o.ticker ? `https://kalshi.com/markets/${o.ticker.split('-')[0].toLowerCase()}` : null;
     const tickerEl = url
       ? `<a class="text-mono kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(o.ticker ?? '')}</a>`
       : `<span class="text-mono">${escHtml(o.ticker ?? '')}</span>`;
-    const isYesSide = String(o.side || '').toUpperCase() === 'YES';
     const sideBid = (o.yes_bid != null && o.yes_ask != null)
       ? (isYesSide ? o.yes_bid : 100 - o.yes_ask) : null;
     const sideAsk = (o.yes_bid != null && o.yes_ask != null)
@@ -1364,9 +1326,6 @@ async function poll() {
       renderOrders(state.orders || []);
       renderIdeas(state.recent_ideas);
       renderEventLog(state.event_log);
-    } else if (activeTab === 'ideas') {
-      renderPendingIdeas(state.pending_ideas || []);
-      renderReviewedIdeas(state.reviewed_ideas || []);
     }
   } catch (err) {
     console.warn('Poll error:', err);
@@ -1379,141 +1338,7 @@ async function poll() {
   setInterval(poll, 2000);
 })();
 
-// ---------------------------------------------------------------------------
-// Trade Ideas tab
-// ---------------------------------------------------------------------------
 
-function renderPendingIdeas(ideas) {
-  const grid = document.getElementById('pending-ideas-grid');
-  const empty = document.getElementById('pending-ideas-empty');
-  if (!ideas || ideas.length === 0) {
-    grid.innerHTML = '';
-    empty.classList.remove('hidden');
-    return;
-  }
-  empty.classList.add('hidden');
-  grid.innerHTML = ideas.map(idea => {
-    const sideBadge = String(idea.side || '').toUpperCase() === 'YES'
-      ? '<span class="badge badge-yes">YES</span>'
-      : '<span class="badge badge-no">NO</span>';
-    const confPct = idea.confidence !== undefined ? Math.round(idea.confidence * 100) + '%' : '—';
-    const confBadge = `<span class="badge badge-conf">${confPct}</span>`;
-    const size = idea.suggested_size_dollars !== undefined ? '$' + Number(idea.suggested_size_dollars).toFixed(0) : '—';
-    const sizeBadge = `<span class="badge badge-conf">${escHtml(size)}</span>`;
-    const sources = (idea.signal_sources || []).map(s =>
-      `<span class="signal-tag">${escHtml(String(s))}</span>`
-    ).join('');
-    const marketPrice = idea.market_price !== undefined ? `Market: ${Number(idea.market_price)}¢` : '';
-    const kalshiUrl = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
-    const tickerEl = kalshiUrl
-      ? `<a class="idea-ticker" href="${kalshiUrl}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
-      : `<span class="idea-ticker">${escHtml(idea.ticker ?? '')}</span>`;
-    return `<div class="idea-card" id="idea-card-${escHtml(idea.id)}">
-      <div class="idea-card-header">
-        ${tickerEl}
-        ${sideBadge}
-        ${confBadge}
-        ${sizeBadge}
-        <span class="idea-agent">${escHtml(idea.agent_id ?? '')}</span>
-      </div>
-      <div class="idea-card-body">
-        ${idea.selection_summary ? `<div class="idea-selection-summary">${escHtml(idea.selection_summary)}</div>` : ''}
-        <div class="idea-reasoning">${escHtml(idea.reasoning ?? '')}</div>
-        ${sources ? `<div class="idea-signals">${sources}</div>` : ''}
-        ${marketPrice ? `<div class="idea-market-price">${escHtml(marketPrice)}</div>` : ''}
-        <div class="idea-price-row">
-          <label>Exec. price ¢</label>
-          <input type="number" class="idea-price-input" data-id="${escHtml(idea.id)}"
-            value="${idea.market_price != null ? Math.round(idea.market_price) : ''}"
-            min="1" max="99" step="1" placeholder="—" />
-        </div>
-        <div class="idea-card-actions">
-          <button class="btn-approve" data-id="${escHtml(idea.id)}">Approve</button>
-          <button class="btn-reject" data-id="${escHtml(idea.id)}">Reject</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Attach approve/reject handlers
-  grid.querySelectorAll('.btn-approve').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const priceInput = grid.querySelector(`.idea-price-input[data-id="${btn.dataset.id}"]`);
-      const priceCents = priceInput && priceInput.value !== '' ? parseFloat(priceInput.value) : null;
-      reviewIdea(btn.dataset.id, 'approve', isNaN(priceCents) ? null : priceCents);
-    });
-  });
-  grid.querySelectorAll('.btn-reject').forEach(btn => {
-    btn.addEventListener('click', () => reviewIdea(btn.dataset.id, 'reject', null));
-  });
-}
-
-async function reviewIdea(ideaId, action, priceCents) {
-  // Optimistic: remove card immediately
-  const card = document.getElementById('idea-card-' + ideaId);
-  if (card) card.remove();
-
-  // If grid is now empty, show empty state
-  const grid = document.getElementById('pending-ideas-grid');
-  if (grid && grid.children.length === 0) {
-    document.getElementById('pending-ideas-empty').classList.remove('hidden');
-  }
-
-  try {
-    const fetchOpts = { method: 'POST' };
-    if (action === 'approve' && priceCents !== null && priceCents !== undefined) {
-      fetchOpts.headers = { 'Content-Type': 'application/json' };
-      fetchOpts.body = JSON.stringify({ price_cents: priceCents });
-    }
-    const resp = await fetch(`/api/ideas/${encodeURIComponent(ideaId)}/${action}`, fetchOpts);
-    if (!resp.ok) {
-      console.warn('reviewIdea failed, HTTP', resp.status);
-    }
-  } catch (err) {
-    console.warn('reviewIdea fetch error:', err);
-  }
-
-  // Refresh reviewed section from next poll — or force an immediate partial refresh
-  try {
-    const resp = await fetch('/api/state');
-    if (resp.ok) {
-      const state = await resp.json();
-      renderReviewedIdeas(state.reviewed_ideas || []);
-    }
-  } catch (_) {}
-}
-
-function renderReviewedIdeas(ideas) {
-  const tbody = document.getElementById('reviewed-ideas-tbody');
-  if (!ideas || ideas.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No reviewed ideas yet</td></tr>';
-    return;
-  }
-  tbody.innerHTML = ideas.map(idea => {
-    const sideBadge = String(idea.side || '').toUpperCase() === 'YES'
-      ? '<span class="badge badge-yes">YES</span>'
-      : '<span class="badge badge-no">NO</span>';
-    const confPct = idea.confidence !== undefined ? Math.round(idea.confidence * 100) + '%' : '—';
-    const size = idea.suggested_size_dollars !== undefined ? '$' + Number(idea.suggested_size_dollars).toFixed(0) : '—';
-    const decisionBadge = idea.decision === 'approved'
-      ? '<span class="badge badge-approved">Approved</span>'
-      : '<span class="badge badge-rejected">Rejected</span>';
-    const ts = idea.reviewed_at ? timeShort(idea.reviewed_at) : '—';
-    const rvUrl = idea.ticker ? `https://kalshi.com/markets/${idea.ticker.split('-')[0].toLowerCase()}` : null;
-    const rvTickerEl = rvUrl
-      ? `<a class="kalshi-link" href="${rvUrl}" target="_blank" rel="noopener">${escHtml(idea.ticker ?? '')}</a>`
-      : escHtml(idea.ticker ?? '');
-    return `<tr>
-      <td class="text-xs">${escHtml(ts)}</td>
-      <td class="text-mono">${rvTickerEl}</td>
-      <td>${sideBadge}</td>
-      <td>${escHtml(confPct)}</td>
-      <td>${escHtml(size)}</td>
-      <td>${decisionBadge}</td>
-      <td class="text-xs">${escHtml(idea.agent_id ?? '')}</td>
-    </tr>`;
-  }).join('');
-}
 
 // ---------------------------------------------------------------------------
 // Ideas History tab
