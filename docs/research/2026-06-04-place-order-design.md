@@ -46,7 +46,7 @@ python scripts/place_order.py --ticker KXATL-26JUN-A1 "cancel and replace at 65"
 | `--side` | structured override | `yes` or `no` |
 | `--quantity` | structured override | Integer or the literal `all` |
 | `--amount` | structured override | Dollar amount for buys (e.g. `10`) |
-| `--pricing` | structured override | `midmarket_maker` (default), `join_bid`, `join_ask` |
+| `--pricing` | structured override | `midmarket_maker` (default), `join_bid`, `join_ask`, `cross_spread` |
 | `--yes-price` | structured override | Explicit cent price (1–99); skips orderbook fetch |
 | `--dry-run` | optional | Print intent, no order placed |
 
@@ -68,7 +68,7 @@ The intent string is sent to `claude-haiku-4-5-20251001` with a tight system pro
   "side": "yes" | "no" | null,
   "quantity": <integer> | "all" | null,
   "amount_dollars": <float> | null,
-  "pricing": "midmarket_maker" | "join_bid" | "join_ask" | null,
+  "pricing": "midmarket_maker" | "join_bid" | "join_ask" | "cross_spread" | null,
   "yes_price": <integer 1-99> | null,
   "cancel_first": true | false,
   "cancel_only": true | false
@@ -76,16 +76,20 @@ The intent string is sent to `claude-haiku-4-5-20251001` with a tight system pro
 ```
 
 **Recognized vocabulary:**
-- `buy` / `sell` / `exit` / `close` → `action`
+- `buy` / `sell` / `exit` / `close` / `get out of` → `action: "sell"` (exit); `action: "buy"` (entry)
 - `yes` / `no` → `side`
-- `all` / `full position` / `everything` → `quantity: "all"`
-- `midmarket` / `no fees` / `mid` → `pricing: "midmarket_maker"`
+- `all` / `full position` / `everything` / `the trade` → `quantity: "all"`
+- `midmarket` / `mid` / `no fees` / `without fees` / `get filled without fees` → `pricing: "midmarket_maker"`
+- `best price` / `best price without fees` → `pricing: "join_ask"` (sells) or `pricing: "join_bid"` (buys)
 - `join ask` → `pricing: "join_ask"`
 - `join bid` → `pricing: "join_bid"`
+- `need to get filled` / `just get me out` / `urgently` / `cross the spread` → `pricing: "cross_spread"`
 - `at N cents` / `at N` → `yes_price: N`
 - `N dollars` / `$N` → `amount_dollars: N`
-- `cancel and replace` → `cancel_first: true`
+- `cancel and replace` / `reprice` / `move my order` → `cancel_first: true`
 - `cancel` (alone) → `cancel_only: true`
+
+**Disambiguation rule baked into system prompt:** "no fees" or "without fees" always takes precedence over urgency phrasing. `"get filled without fees"` → `midmarket_maker`, never `cross_spread`.
 
 ---
 
@@ -111,25 +115,36 @@ The intent string is sent to `claude-haiku-4-5-20251001` with a tight system pro
 
 ## Pricing Logic
 
-All three strategies guarantee maker status (zero fees) by ensuring the limit price does not immediately cross the spread.
+**Maker strategies** (zero fees — order rests in the book):
 
 **`midmarket_maker` (default)**
 - Compute `midpoint = (best_bid + best_ask) / 2`
-- Sell: `ceil(midpoint)` — if result equals `best_bid`, use `best_bid + 1`
-- Buy: `floor(midpoint)` — if result equals `best_ask`, use `best_ask - 1`
+- Sell: `max(ceil(midpoint), best_bid + 1)` — sits inside spread above the bid
+- Buy: `min(floor(midpoint), best_ask - 1)` — sits inside spread below the ask
 - Fallback if spread == 1: `join_ask` for sells, `join_bid` for buys
+- Use when: you want the most aggressive maker price with the highest fill probability
 
 **`join_ask`**
 - Use `best_ask` directly (rests on the ask side, never crosses)
+- Use when: selling and want the best (highest) maker price, willing to wait longer for a fill
 
 **`join_bid`**
 - Use `best_bid` directly (rests on the bid side, never crosses)
+- Use when: buying and want the best (lowest) maker price, willing to wait longer for a fill
+
+**Taker strategy** (fees apply — order crosses the spread immediately):
+
+**`cross_spread`**
+- Sell: use `best_bid` as limit price — immediately fills against top of bid stack
+- Buy: use `best_ask` as limit price — immediately fills against bottom of ask stack
+- Script prints a visible warning: `WARNING: cross_spread incurs taker fees (~7% of profit)`
+- Use when: immediate execution matters more than fees
 
 **Explicit `yes_price`**
 - Skips orderbook fetch entirely; uses the provided value directly
-- Still placed as a limit order — no fee guarantee (caller's responsibility)
+- Placed as a limit order — no fee guarantee (caller's responsibility)
 
-**Empty book:** if either side of the book is empty and a computed strategy is requested, the script exits with a clear error: `ERROR: No best_bid/best_ask available for <ticker> — use --yes-price to set price explicitly`.
+**Empty book:** if either side of the book is empty and a computed strategy is requested, the script exits: `ERROR: No best_bid/best_ask available for <ticker> — use --yes-price to set price explicitly`.
 
 ---
 
@@ -183,6 +198,6 @@ The skill fires immediately — no clarifying questions, no orderbook lookups, n
 
 ## Testing
 
-- Unit tests for pricing logic: midmarket rounding (spread > 1, spread == 1, empty side)
-- Unit tests for NL parser output: standard phrases, cancel-and-replace, explicit price
+- Unit tests for pricing logic: midmarket rounding (spread > 1, spread == 1, empty side), cross_spread prices
+- Unit tests for NL parser: standard phrases, cancel-and-replace, explicit price, "need to get filled" → cross_spread, "get filled without fees" → midmarket_maker, "best price" → join_ask/join_bid
 - Integration test (dry-run): verify correct price computation and `create_order` args without live placement
