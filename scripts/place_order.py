@@ -21,7 +21,7 @@ sys.path.insert(0, ".")
 
 import kalshi_trader.config  # noqa: F401 — loads .env
 from kalshi_trader.client import KalshiClient
-from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
+from kalshi_trader.fixed_point import parse_fixed_point
 
 
 def compute_limit_price(orderbook_data: dict, action: str, pricing: str) -> int:

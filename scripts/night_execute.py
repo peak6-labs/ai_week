@@ -44,7 +44,7 @@ sys.path.insert(0, ".")
 import kalshi_trader.config  # noqa: F401 — loads .env
 from kalshi_trader import db, paper
 from kalshi_trader.client import KalshiClient
-from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
+from kalshi_trader.fixed_point import parse_fixed_point
 from kalshi_trader.models import OrderAction, PortfolioState, Side, TradeIdea
 from kalshi_trader.risk import RiskManager
 
