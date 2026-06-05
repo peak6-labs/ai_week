@@ -37,15 +37,27 @@ You need the caller to supply:
   JSON object (`rules_primary`, `settlement_sources`, `contract_terms_url`, …)
   from `market_rules.py`. When supplied, pass it through so the forecast is built
   off the contract's settlement source/station (e.g. AccuWeather vs NOAA).
+- `OUTPUT_FILE` *(optional)* — absolute path where the JSON array should be written
+  (e.g. `/tmp/weather_signals_TS/TICKER.json`). When supplied, write the array to
+  this file so `build_signals.py` can pick it up without Claude constructing the
+  signals JSON in-context.
 
 ## Workflow
 
 1. **Run the pipeline CLI** from the repo root (your launch working directory —
    do not hard-code an absolute path; invoke the project's `.venv` relatively).
-   Add `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it:
+   Add `--settlement-json 'SETTLEMENT_JSON'` only when the caller supplied it.
+   When `OUTPUT_FILE` was supplied, tee the output to that path:
 
    ```bash
    PYTHONPATH=. .venv/bin/python scripts/ui_log.py "weather-signal: fetching forecast for TICKER"
+   # With OUTPUT_FILE:
+   PYTHONPATH=. .venv/bin/python \
+     -m kalshi_trader.pipelines.weather \
+     --ticker TICKER \
+     --title "TITLE" \
+     --settlement-json 'SETTLEMENT_JSON' | tee OUTPUT_FILE
+   # Without OUTPUT_FILE (omit the tee):
    PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.weather \
      --ticker TICKER \
@@ -57,7 +69,8 @@ You need the caller to supply:
    `SignalEstimate` objects to stdout.
 
 2. **Check the output.**
-   - If the array is empty (`[]`): log and report.
+   - If the array is empty (`[]`): log and report. When OUTPUT_FILE was supplied,
+     still write `[]` to the file so `build_signals.py` skips it cleanly.
      ```bash
      PYTHONPATH=. .venv/bin/python scripts/ui_log.py "weather-signal: TICKER → no signal (GEFS: market type not supported, beyond 16-day horizon, or title unparseable)" warning
      ```

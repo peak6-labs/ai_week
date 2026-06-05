@@ -556,7 +556,7 @@ def create_app(
             except Exception as local_exception:  # never let a bad store break the page
                 logger.warning("ideas history local read failed: %s", local_exception)
                 ideas = []
-        return JSONResponse({"ideas": ideas})
+        return JSONResponse({"ideas": ideas[:100]})
 
     @app.post("/api/ideas")
     async def post_ideas(request: Request) -> JSONResponse:

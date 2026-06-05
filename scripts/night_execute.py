@@ -2,7 +2,8 @@
 """Execute approved night-mode trades: weather-only, sized, no double-down.
 
 Rules applied per candidate (in order):
-  1. Session cap:          trades_placed >= 10 or dollars_spent >= $100 → stop all
+  1. Session cap:          trades_placed >= 10 or dollars_spent >= $200 → stop all
+  1.5. Cycle cap:          cycle_trades_placed >= 3 → stop this cycle
   2. Duplicate guard:      ticker already attempted this session/run → skip
   3. Love island filter:   category contains "love island" → skip (always excluded)
   4. Weather-only filter:  non-weather category → skip
@@ -48,9 +49,10 @@ from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
 from kalshi_trader.models import OrderAction, PortfolioState, Side, TradeIdea
 from kalshi_trader.risk import RiskManager
 
-SESSION_TRADE_CAP = 10
-SESSION_DOLLAR_CAP = 100.0
-MAX_TRADE_SIZE_DOLLARS = 10.0
+SESSION_TRADE_CAP = 9999  # effectively unlimited; dollar cap is the binding constraint
+SESSION_DOLLAR_CAP = 200.0
+CYCLE_TRADE_CAP = 3
+MAX_TRADE_SIZE_DOLLARS = 20.0
 MIN_ENTRY_PRICE_CENTS = 20.0
 MAX_ENTRY_PRICE_CENTS = 80.0
 EDGE_MINIMUM = 0.05
@@ -124,12 +126,17 @@ def _load_portfolio_state(balance_response: dict, positions_response: dict) -> P
     )
 
 
-def apply_rules(candidate: dict, session: dict, seen_tickers: set[str] | None = None) -> str | None:
+def apply_rules(
+    candidate: dict,
+    session: dict,
+    seen_tickers: set[str] | None = None,
+    cycle_trades_placed: int = 0,
+) -> str | None:
     """Return rejection_reason if candidate should not be executed, else None.
 
     Pure function — no I/O. Checks rules in priority order:
-    session cap → duplicate guard → love island → weather-only → edge → unquoted
-    → entry band → settlement proximity.
+    session cap → cycle cap → duplicate guard → love island → weather-only → edge
+    → unquoted → entry band → settlement proximity.
     """
     session = _normalize_session(session)
     if (
@@ -137,6 +144,9 @@ def apply_rules(candidate: dict, session: dict, seen_tickers: set[str] | None = 
         or session["dollars_spent"] >= SESSION_DOLLAR_CAP
     ):
         return "session_cap_reached"
+
+    if cycle_trades_placed >= CYCLE_TRADE_CAP:
+        return "cycle_cap_reached"
 
     ticker = candidate.get("ticker", "")
     if ticker and (ticker in session["tickers_traded"] or (seen_tickers and ticker in seen_tickers)):
@@ -208,14 +218,32 @@ def _build_trade_idea(candidate: dict) -> TradeIdea:
     )
 
 
-def _resolve_size_dollars(candidate: dict, risk: RiskManager, portfolio: PortfolioState) -> tuple[float, str | None]:
+def _resolve_size_dollars(
+    candidate: dict,
+    risk: RiskManager,
+    portfolio: PortfolioState,
+    session: dict,
+) -> tuple[float, str | None]:
     explicit_size = _size_from_candidate(candidate)
     if explicit_size is not None:
         return explicit_size, None
 
+    # Scale Kelly to the remaining session budget, not the full account balance.
+    # This keeps trade sizes proportional to what the session can actually absorb —
+    # a 15% Kelly fraction against a $100 session cap gives ~$15, not $55 capped
+    # to the flat $20 max that erases Kelly differentiation across trade quality.
+    session_remaining = max(
+        SESSION_DOLLAR_CAP - float(session.get("dollars_spent", 0.0)), 0.0
+    )
+    kelly_base = min(portfolio.balance_dollars, session_remaining)
+    session_scaled_portfolio = PortfolioState(
+        balance_dollars=kelly_base,
+        total_exposure_dollars=portfolio.total_exposure_dollars,
+        exposure_by_category=portfolio.exposure_by_category,
+    )
     decision = risk.check_trade(
         _build_trade_idea(candidate),
-        portfolio,
+        session_scaled_portfolio,
         close_time=_close_time_from_candidate(candidate),
     )
     if not decision.approved:
@@ -304,6 +332,29 @@ async def _record_executed_trade(record: dict, cycle_ts: str) -> None:
         print(f"WARN: recommendation write failed for {record['ticker']}: {write_exception}", file=sys.stderr)
 
 
+async def _fetch_live_midmarket_yes_price(
+    client: KalshiClient, ticker: str
+) -> int | None:
+    """Fetch current midmarket yes_price for maker order placement (zero fees).
+
+    Returns round((yes_bid + yes_ask) / 2), or None if the fetch fails or the
+    market is one-sided.  Callers fall back to the stale candidate price on None.
+    """
+    try:
+        response = await client.get_market(ticker)
+        market = response.get("market", response)
+        yes_bid = market.get("yes_bid")
+        yes_ask = market.get("yes_ask")
+        if yes_bid is not None and yes_ask is not None and float(yes_ask) > float(yes_bid):
+            return round((float(yes_bid) + float(yes_ask)) / 2.0)
+    except Exception as fetch_exception:
+        print(
+            f"WARN: live price fetch failed for {ticker}: {fetch_exception}",
+            file=sys.stderr,
+        )
+    return None
+
+
 async def run(
     candidates: list[dict],
     session_file: str,
@@ -324,17 +375,23 @@ async def run(
         positions_response = await client.get_positions()
         portfolio = _load_portfolio_state(balance_response, positions_response)
 
+        cycle_trades_placed = 0
+
         for index, candidate in enumerate(ordered_candidates):
-            rejection_reason = apply_rules(candidate, session, seen_tickers=seen_tickers)
+            rejection_reason = apply_rules(
+                candidate, session,
+                seen_tickers=seen_tickers,
+                cycle_trades_placed=cycle_trades_placed,
+            )
             size_dollars = 0.0
             if rejection_reason is None:
-                size_dollars, rejection_reason = _resolve_size_dollars(candidate, risk, portfolio)
+                size_dollars, rejection_reason = _resolve_size_dollars(candidate, risk, portfolio, session)
 
             record = _build_record(
                 candidate, cycle_ts, dry_run, rejection_reason, session, size_dollars
             )
 
-            if rejection_reason == "session_cap_reached":
+            if rejection_reason in ("session_cap_reached", "cycle_cap_reached"):
                 _append_jsonl(log_dir, date_str, record)
                 results.append(record)
                 for remaining_candidate in ordered_candidates[index + 1:]:
@@ -342,7 +399,7 @@ async def run(
                         remaining_candidate,
                         cycle_ts,
                         dry_run,
-                        "session_cap_reached",
+                        rejection_reason,
                         session,
                         0.0,
                     )
@@ -356,6 +413,17 @@ async def run(
                 continue
 
             seen_tickers.add(record["ticker"])
+
+            # Refresh price to midmarket so the order rests as a maker (no fees).
+            # yes_price = round((yes_bid + yes_ask) / 2) for both YES and NO sides.
+            live_mid = await _fetch_live_midmarket_yes_price(client, record["ticker"])
+            if live_mid is not None:
+                record["yes_price"] = live_mid
+                cost_cents = live_mid if record["side"] == "yes" else (100 - live_mid)
+                if cost_cents > 0:
+                    record["contract_count"] = math.floor(
+                        size_dollars / (cost_cents / 100.0)
+                    )
 
             if dry_run:
                 print(
@@ -394,6 +462,7 @@ async def run(
             session["tickers_traded"].append(record["ticker"])
             record["session_trade_number"] = session["trades_placed"]
             record["session_dollars_spent"] = round(session["dollars_spent"], 2)
+            cycle_trades_placed += 1
 
             portfolio.total_exposure_dollars += float(record["suggested_size_dollars"])
             category = record.get("category", "")
@@ -437,7 +506,9 @@ def _main() -> None:
     Path(args.out).write_text(json.dumps(results, indent=2, default=str))
 
     executed = sum(1 for record in results if record["rejection_reason"] is None)
-    capped = sum(1 for record in results if record["rejection_reason"] == "session_cap_reached")
+    session_capped = sum(1 for record in results if record["rejection_reason"] == "session_cap_reached")
+    cycle_capped = sum(1 for record in results if record["rejection_reason"] == "cycle_cap_reached")
+    capped = session_capped + cycle_capped
     print(
         f"Night mode: {executed} executed, "
         f"{len(results) - executed - capped} rejected, "

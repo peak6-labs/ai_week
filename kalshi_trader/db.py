@@ -743,7 +743,13 @@ async def recommendations_with_marks() -> list[dict]:
     ``paper_only`` — that flag is data, never a filter.
     """
     client = await _get_client()
-    recommendation_response = await client.table("recommendations").select("*").execute()
+    recommendation_response = await (
+        client.table("recommendations")
+        .select("*")
+        .order("created_at", desc=True)
+        .limit(2000)
+        .execute()
+    )
     mark_response = await client.table("recommendation_marks").select("*").execute()
 
     recommendations = [

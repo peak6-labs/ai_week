@@ -55,12 +55,20 @@ def _candidate(
     return candidate
 
 
-def _make_client(order_id: str = "ord_night1", status: str = "resting") -> MagicMock:
+def _make_client(
+    order_id: str = "ord_night1",
+    status: str = "resting",
+    yes_bid: float = 54.0,
+    yes_ask: float = 56.0,
+) -> MagicMock:
     client = MagicMock()
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=None)
     client.get_balance = AsyncMock(return_value={"balance_dollars": "200.00"})
     client.get_positions = AsyncMock(return_value={"market_positions": []})
+    client.get_market = AsyncMock(
+        return_value={"market": {"yes_bid": yes_bid, "yes_ask": yes_ask}}
+    )
     client.create_order = AsyncMock(
         return_value={"order": {"order_id": order_id, "status": status}}
     )
@@ -80,13 +88,28 @@ def test_apply_rules_rejects_on_trade_cap():
 
 
 def test_apply_rules_rejects_on_dollar_cap():
-    assert apply_rules(_candidate(), _session(dollars_spent=100.0)) == "session_cap_reached"
+    assert apply_rules(_candidate(), _session(dollars_spent=200.0)) == "session_cap_reached"
 
 
 def test_apply_rules_session_cap_checked_before_edge():
     """Session cap takes priority — even a bad-edge idea is rejected with cap reason."""
     low_edge = _candidate(confidence=0.55, market_price=55.0)  # edge=0
     assert apply_rules(low_edge, _session(trades_placed=10)) == "session_cap_reached"
+
+
+def test_apply_rules_rejects_on_cycle_cap():
+    assert apply_rules(_candidate(), _session(), cycle_trades_placed=3) == "cycle_cap_reached"
+
+
+def test_apply_rules_cycle_cap_below_limit_passes():
+    assert apply_rules(_candidate(), _session(), cycle_trades_placed=2) is None
+
+
+def test_apply_rules_session_cap_takes_priority_over_cycle_cap():
+    """Session cap fires first — both limits hit simultaneously."""
+    assert apply_rules(
+        _candidate(), _session(trades_placed=10), cycle_trades_placed=3
+    ) == "session_cap_reached"
 
 
 def test_apply_rules_rejects_insufficient_edge():
@@ -211,15 +234,16 @@ async def test_run_executes_valid_candidate(tmp_path):
     assert record["order_id"] == "ord_night1"
     assert record["order_status"] == "resting"
     assert record["session_trade_number"] == 1
-    assert record["session_dollars_spent"] == 10.0
-    assert record["suggested_size_dollars"] == 10.0
+    assert record["session_dollars_spent"] == 11.11
+    assert record["suggested_size_dollars"] == 11.11
 
-    # 200-dollar balance fallback sizing would be $11.11, but night mode caps it at $10.
+    # Kelly base = min(balance=$200, session_remaining=$200) = $200.
+    # Quarter-Kelly fraction ≈ 5.56%, so size = 0.0556 × $200 = $11.11 → 20 contracts at 55¢.
     client.create_order.assert_awaited_once_with(
         ticker="KXTEST-1",
         action="buy",
         side="yes",
-        count=18,
+        count=20,
         order_type="limit",
         yes_price=55,
     )
@@ -227,10 +251,15 @@ async def test_run_executes_valid_candidate(tmp_path):
 
 @pytest.mark.asyncio
 async def test_run_no_side_yes_price_complement(tmp_path):
-    """NO-side order: yes_price = round(100 - market_price)."""
-    client = _make_client()
+    """NO-side order uses live midmarket yes_price.
+
+    market_price=40 means NO taker price is 40¢ → yes_bid≈60.
+    Mock returns yes_bid=59, yes_ask=61 → live_mid=60 → yes_price=60 → NO costs 40¢.
+    Kelly base = min($200 balance, $200 session_remaining) = $200.
+    Quarter-Kelly fraction = 12.5%, size = 0.125 × $200 = $25 → capped at $20 → 50 contracts at 40¢.
+    """
+    client = _make_client(yes_bid=59.0, yes_ask=61.0)
     session_file = str(tmp_path / "session.json")
-    # NO side: fallback sizing would be $25.00, but night mode caps it at $10.
     candidate = _candidate(side="no", market_price=40.0, confidence=0.70)
 
     with patch("scripts.night_execute.KalshiClient", return_value=client):
@@ -246,7 +275,7 @@ async def test_run_no_side_yes_price_complement(tmp_path):
         ticker="KXTEST-1",
         action="buy",
         side="no",
-        count=25,
+        count=50,
         order_type="limit",
         yes_price=60,
     )
@@ -257,6 +286,7 @@ async def test_run_scales_below_10_when_kelly_size_is_smaller(tmp_path):
     client = _make_client()
     session_file = str(tmp_path / "session.json")
 
+    # confidence=0.61, market_price=55: quarter-Kelly ≈ 3.33% × $200 session base = $6.67.
     with patch("scripts.night_execute.KalshiClient", return_value=client):
         results = await night_execute.run(
             candidates=[_candidate(confidence=0.61, market_price=55.0)],
@@ -295,6 +325,29 @@ async def test_run_dry_run_no_order(tmp_path):
 
     client.create_order.assert_not_awaited()
     assert results[0]["dry_run"] is True
+
+
+@pytest.mark.asyncio
+async def test_run_cycle_cap_stops_at_3_trades(tmp_path):
+    """Cycle cap: 4th candidate in the same run gets cycle_cap_reached."""
+    session_file = str(tmp_path / "session.json")
+    client = _make_client()
+    candidates = [
+        _candidate(ticker=f"KXTEST-{i}", suggested_size_dollars=5.0) for i in range(4)
+    ]
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        results = await night_execute.run(
+            candidates=candidates,
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    assert client.create_order.await_count == 3
+    assert all(r["rejection_reason"] is None for r in results[:3])
+    assert results[3]["rejection_reason"] == "cycle_cap_reached"
 
 
 @pytest.mark.asyncio
@@ -340,7 +393,7 @@ async def test_run_session_state_persisted(tmp_path):
 
     saved = json.loads(Path(session_file).read_text())
     assert saved["trades_placed"] == 1
-    assert saved["dollars_spent"] == 10.0
+    assert saved["dollars_spent"] == 11.11
     assert "KXTEST-1" in saved["tickers_traded"]
 
 
@@ -468,3 +521,91 @@ async def test_run_order_failure_continues(tmp_path):
     assert "order_failed" in results[0]["rejection_reason"]
     assert results[1]["order_id"] == "ord_2"
     assert client.create_order.await_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Live midmarket pricing
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_run_uses_live_midmarket_not_stale_ask(tmp_path):
+    """Order is placed at live midmarket, not the stale candidate ask price."""
+    # Candidate market_price=55 (stale ask), but live market has bid=58, ask=62 → mid=60.
+    client = _make_client(yes_bid=58.0, yes_ask=62.0)
+    session_file = str(tmp_path / "session.json")
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        await night_execute.run(
+            candidates=[_candidate(market_price=55.0, suggested_size_dollars=5.0)],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    # Should use live midmarket=60, not stale ask=55
+    client.create_order.assert_awaited_once_with(
+        ticker="KXTEST-1",
+        action="buy",
+        side="yes",
+        count=8,           # floor(5.00 / 0.60) = 8 contracts at 60¢
+        order_type="limit",
+        yes_price=60,
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_falls_back_to_stale_price_on_fetch_failure(tmp_path):
+    """If get_market raises, order still placed at stale candidate price."""
+    client = _make_client()
+    client.get_market = AsyncMock(side_effect=Exception("network error"))
+    session_file = str(tmp_path / "session.json")
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        await night_execute.run(
+            candidates=[_candidate(market_price=55.0, suggested_size_dollars=5.0)],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    # Falls back to stale ask=55
+    client.create_order.assert_awaited_once_with(
+        ticker="KXTEST-1",
+        action="buy",
+        side="yes",
+        count=9,           # floor(5.00 / 0.55) = 9 contracts at 55¢
+        order_type="limit",
+        yes_price=55,
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_fetch_midmarket_uses_yes_mid_for_no_side(tmp_path):
+    """NO-side live midmarket: yes_price = round((yes_bid + yes_ask) / 2).
+
+    Live market: yes_bid=57, yes_ask=63 → yes_mid=60 → yes_price=60 → NO costs 40¢.
+    """
+    client = _make_client(yes_bid=57.0, yes_ask=63.0)
+    session_file = str(tmp_path / "session.json")
+
+    with patch("scripts.night_execute.KalshiClient", return_value=client):
+        await night_execute.run(
+            candidates=[_candidate(side="no", market_price=40.0, confidence=0.70,
+                                   suggested_size_dollars=8.0)],
+            session_file=session_file,
+            cycle_ts="20260603T220000Z",
+            dry_run=False,
+            log_dir=str(tmp_path),
+        )
+
+    # NO mid = 40¢ (100 - 60), contracts = floor(8.00 / 0.40) = 20
+    client.create_order.assert_awaited_once_with(
+        ticker="KXTEST-1",
+        action="buy",
+        side="no",
+        count=20,
+        order_type="limit",
+        yes_price=60,
+    )

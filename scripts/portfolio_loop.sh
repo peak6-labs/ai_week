@@ -7,7 +7,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 readonly SLEEP_SECONDS=30
-readonly CMD=(.venv/bin/python scripts/evaluate_portfolio.py --execute "$@")
+readonly CMD=(.venv/bin/python scripts/evaluate_portfolio.py --execute)
 
 echo "Portfolio loop started (PID $$) — press Ctrl-C or kill $$ to stop"
 

@@ -82,7 +82,12 @@ class OpenMeteoClient:
         days_ahead = (target_date - datetime.now(tz=timezone.utc).date()).days
         if days_ahead < 0 or days_ahead >= _MAX_FORECAST_DAYS:
             return {"members": [], "member_count": 0, "field": daily_field, "units": ""}
-        forecast_days = max(1, min(days_ahead + 1, _MAX_FORECAST_DAYS))
+        # Add +2 (not +1) so that when timezone=auto shifts the API response to
+        # local time, the target date still falls within the requested range even
+        # when local time lags UTC by up to one calendar day (e.g. UTC midnight
+        # to UTC+14 at most; practically up to ~-12 hours means local date can
+        # be one day behind UTC).
+        forecast_days = max(1, min(days_ahead + 2, _MAX_FORECAST_DAYS))
 
         params = {
             "latitude": f"{lat:.4f}",

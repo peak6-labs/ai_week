@@ -31,7 +31,9 @@ def _profit_target_multiple(entry_price_cents: float) -> float:
         return 1.50   # +50%
     if entry_price_cents < 50:
         return 1.35   # +35%
-    return 1.25       # +25% — higher entry, take profits sooner
+    if entry_price_cents < 65:
+        return 1.25   # +25%
+    return 1.15       # +15% — high confidence, limited upside, exit sooner
 
 
 def check_stop_loss(position: dict) -> ExitSignal | None:

@@ -29,13 +29,24 @@ You need the caller to supply:
 - `TITLE` — the full market title string (quoted)
 - `YES_BID` *(optional)* — live yes_bid from the orchestrator's live_prices fetch (float, cents). When provided, pass as `--yes-bid` to anchor probability to the same price the scorer will use.
 - `YES_ASK` *(optional)* — live yes_ask from the orchestrator's live_prices fetch (float, cents). When provided, pass as `--yes-ask`.
+- `OUTPUT_FILE` *(optional)* — absolute path where the JSON array should be written
+  (e.g. `/tmp/mm_signals_TS/TICKER.json`). When supplied, write the array to this
+  file so `build_signals.py` can pick it up without Claude constructing the signals
+  JSON in-context.
 
 ## Workflow
 
-1. **Run the pipeline CLI.** From the repo root (your project checkout). Add `--yes-bid` and `--yes-ask` only when the caller supplied them:
+1. **Run the pipeline CLI.** From the repo root (your project checkout). Add `--yes-bid` and `--yes-ask` only when the caller supplied them. When `OUTPUT_FILE` was supplied, tee the output to that path:
 
    ```bash
    PYTHONPATH=. .venv/bin/python scripts/ui_log.py "market-maker-signal: analyzing orderbook spread for TICKER"
+   # With OUTPUT_FILE:
+   PYTHONPATH=. .venv/bin/python \
+     -m kalshi_trader.pipelines.market_maker \
+     --ticker TICKER \
+     --title "TITLE" \
+     --yes-bid YES_BID --yes-ask YES_ASK | tee OUTPUT_FILE
+   # Without OUTPUT_FILE (omit the tee):
    PYTHONPATH=. .venv/bin/python \
      -m kalshi_trader.pipelines.market_maker \
      --ticker TICKER \

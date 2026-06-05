@@ -138,6 +138,29 @@ async def test_get_ensemble_members_unknown_metric_skips_http():
 
 
 @pytest.mark.asyncio
+async def test_get_ensemble_members_same_day_utc_finds_members_when_api_starts_with_prior_local_day():
+    # Regression: when days_ahead=0 (target == UTC today), timezone=auto causes
+    # the API to return dates starting at the *local* date (e.g. still June 4 in
+    # US timezones when UTC has already ticked to June 5). The fix requests
+    # forecast_days = days_ahead + 2 so the UTC target date always falls inside
+    # the returned window.
+    target = _utc_today()  # days_ahead = 0
+    prior_day = (target - timedelta(days=1)).isoformat()
+    target_iso = target.isoformat()
+    dates = [prior_day, target_iso]
+    target_values = [70.0 + index for index in range(31)]
+    values_by_date = {prior_day: [0.0] * 31, target_iso: target_values}
+    payload = _build_daily_payload("temperature_2m_max", dates, values_by_date)
+
+    client = OpenMeteoClient()
+    client._get = AsyncMock(return_value=payload)
+    result = await client.get_ensemble_members(41.8781, -87.6298, target, "temp_high")
+
+    assert result["member_count"] == 31
+    assert result["members"] == target_values
+
+
+@pytest.mark.asyncio
 async def test_close_without_session_is_noop():
     client = OpenMeteoClient()
     await client.close()  # must not raise when no session was ever opened

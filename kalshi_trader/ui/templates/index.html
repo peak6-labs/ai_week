@@ -1351,7 +1351,7 @@ let liveHistoryPollTimer = null;
 
 async function fetchLivePricesForHistory() {
   if (!ideasHistory || ideasHistory.length === 0) return;
-  const openIdeas = ideasHistory.filter(idea => idea.status !== 'resolved' && idea.ticker);
+  const openIdeas = ideasHistory.filter(idea => idea.disposition === 'approved' && idea.status !== 'resolved' && idea.ticker);
   const uniqueTickers = [...new Set(openIdeas.map(idea => idea.ticker))];
   if (uniqueTickers.length === 0) return;
   try {

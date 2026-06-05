@@ -1154,6 +1154,167 @@
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/COUNTRYACTION.pdf",
     "fetched_at": "2026-06-03T19:43:10.014199+00:00"
   },
+  "KXLIUKCOUPLE": {
+    "settlement_sources": [
+      {
+        "name": "itv",
+        "url": "https://www.itv.com/"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUK.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUK.pdf",
+    "fetched_at": "2026-06-04T21:33:23.603450+00:00"
+  },
+  "KXLIUKELIMINATION": {
+    "settlement_sources": [
+      {
+        "name": "itv",
+        "url": "https://www.itv.com/"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUKELIMINATION.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUKELIMINATION.pdf",
+    "fetched_at": "2026-06-04T21:33:23.603473+00:00"
+  },
+  "KXLIUKELIMINATIONW": {
+    "settlement_sources": [
+      {
+        "name": "itv",
+        "url": "https://www.itv.com/"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUKELIMINATIONWEEKLY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUKELIMINATIONWEEKLY.pdf",
+    "fetched_at": "2026-06-04T21:33:23.603335+00:00"
+  },
+  "KXLIUKWINNERS": {
+    "settlement_sources": [
+      {
+        "name": "ITV News",
+        "url": "https://www.itv.com/news"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUKWINNERS.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUKWINNERS.pdf",
+    "fetched_at": "2026-06-04T21:33:23.603459+00:00"
+  },
+  "KXLIUSABOMBSHELL": {
+    "settlement_sources": [
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      },
+      {
+        "name": "itv",
+        "url": "https://www.itv.com/"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/ROLEATEVENTLOVEISLAND.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/ROLEATEVENTLOVEISLAND.pdf",
+    "fetched_at": "2026-06-04T21:33:23.758969+00:00"
+  },
+  "KXLIUSACASAAMOR": {
+    "settlement_sources": [
+      {
+        "name": "Semafor",
+        "url": "https://www.semafor.com/"
+      },
+      {
+        "name": "ABC",
+        "url": "https://abcnews.go.com/"
+      },
+      {
+        "name": "Bloomberg",
+        "url": "https://www.bloomberg.com/"
+      },
+      {
+        "name": "NBC",
+        "url": "https://www.nbcnews.com/"
+      },
+      {
+        "name": "The Washington Post",
+        "url": "https://www.washingtonpost.com/"
+      },
+      {
+        "name": "Associated Press",
+        "url": "https://apnews.com"
+      },
+      {
+        "name": "The Wall Street Journal",
+        "url": "https://www.wsj.com/"
+      },
+      {
+        "name": "Fox News",
+        "url": "https://www.foxnews.com"
+      },
+      {
+        "name": "Reuters",
+        "url": "https://www.reuters.com/"
+      },
+      {
+        "name": "The Information",
+        "url": "https://www.theinformation.com/"
+      },
+      {
+        "name": "Politico",
+        "url": "https://www.politico.com"
+      },
+      {
+        "name": "Axios",
+        "url": "https://www.axios.com"
+      },
+      {
+        "name": "MSNBC",
+        "url": "https://www.msnbc.com"
+      },
+      {
+        "name": "CNN",
+        "url": "https://www.cnn.com"
+      },
+      {
+        "name": "the New York Times",
+        "url": "https://www.nytimes.com"
+      },
+      {
+        "name": "CBS",
+        "url": "https://www.cbsnews.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/EVENTCONFIRMEDCULTURE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/EVENTCONFIRMEDCULTURE.pdf",
+    "fetched_at": "2026-06-04T21:33:23.758942+00:00"
+  },
+  "KXLIUSACOUPLE": {
+    "settlement_sources": [
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUSA.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUSA.pdf",
+    "fetched_at": "2026-06-04T21:33:23.603467+00:00"
+  },
   "KXLIUSAELIMINATION": {
     "settlement_sources": [
       {
@@ -1164,6 +1325,32 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUSAELIMINATION.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUSAELIMINATION.pdf",
     "fetched_at": "2026-06-03T21:34:49.206545+00:00"
+  },
+  "KXLIUSAELIMINATIONW": {
+    "settlement_sources": [
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUSAELIMINATIONWEEKLY.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUSAELIMINATIONWEEKLY.pdf",
+    "fetched_at": "2026-06-04T21:33:23.603439+00:00"
+  },
+  "KXLIUSAWINNERS": {
+    "settlement_sources": [
+      {
+        "name": " San Francisco Unified School District",
+        "url": "https://www.sfusd.edu/"
+      },
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/LOVEISLANDUSAWINNERS.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/LOVEISLANDUSAWINNERS.pdf",
+    "fetched_at": "2026-06-04T21:33:23.758998+00:00"
   },
   "KXLLM1": {
     "settlement_sources": [
@@ -1202,6 +1389,33 @@
     "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/COMPETITIONREALITYPLACE.pdf",
     "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/COMPETITIONREALITYPLACE.pdf",
     "fetched_at": "2026-06-03T21:16:54.804541+00:00"
+  },
+  "KXLOVEISLANDUSARANK": {
+    "settlement_sources": [
+      {
+        "name": "BBC",
+        "url": "https://www.bbc.co.uk"
+      },
+      {
+        "name": "NBC",
+        "url": "https://www.nbcnews.com/"
+      },
+      {
+        "name": "Peacock",
+        "url": "https://www.peacocktv.com/watch/home?orig_ref=https://www.google.com/"
+      },
+      {
+        "name": "itv",
+        "url": "https://www.itv.com/"
+      },
+      {
+        "name": "Hulu",
+        "url": "https://www.hulu.com/"
+      }
+    ],
+    "contract_terms_url": "https://kalshi-public-docs.s3.amazonaws.com/contract_terms/COMPETITIONREALITYPLACE.pdf",
+    "contract_url": "https://kalshi-public-docs.s3.us-east-1.amazonaws.com/regulatory/product-certifications/COMPETITIONREALITYPLACE.pdf",
+    "fetched_at": "2026-06-04T21:33:23.758054+00:00"
   },
   "KXLOVEISLMENTION": {
     "settlement_sources": [
