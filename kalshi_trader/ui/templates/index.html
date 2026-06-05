@@ -268,6 +268,12 @@
     }
     #tab-pnl .pnl-card-value { font-size: 20px; font-weight: 600; margin-top: 4px; }
     #tab-pnl .pnl-card-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+    #tab-pnl .pnl-card-defined { cursor: help; }
+    #tab-pnl .pnl-card-defined .pnl-card-label {
+      display: inline-block;
+      border-bottom: 1px dotted var(--text-tertiary);
+      padding-bottom: 1px;
+    }
     #tab-pnl .pnl-caption { margin-top: 12px; font-size: 11px; color: var(--text-tertiary); }
     #tab-pnl #pnl-curve { width: 100%; }
     #tab-pnl #pnl-curve svg { width: 100%; height: auto; display: block; }
@@ -1720,8 +1726,9 @@ async function loadPnlAnalytics() {
 
 function renderPnlSummary(summary) {
   if (!summary) return;
-  const card = (label, valueHtml, sub) =>
-    `<div class="pnl-card"><div class="pnl-card-label">${label}</div>` +
+  const card = (label, valueHtml, sub, tooltip) =>
+    `<div class="pnl-card${tooltip ? ' pnl-card-defined' : ''}"${tooltip ? ` title="${escHtml(tooltip)}"` : ''}>` +
+    `<div class="pnl-card-label">${label}</div>` +
     `<div class="pnl-card-value">${valueHtml}</div>` +
     (sub ? `<div class="pnl-card-sub">${sub}</div>` : '') + `</div>`;
 
@@ -1739,11 +1746,16 @@ function renderPnlSummary(summary) {
   const roiHtml = roi === null || roi === undefined
     ? '—' : `<span class="${pnlClass(roi)}">${(roi >= 0 ? '+' : '') + (roi * 100).toFixed(1) + '%'}</span>`;
   document.getElementById('pnl-cards-quality').innerHTML =
-    card('Win rate', `<span>${winRate}</span>`, `W${summary.winning_trade_count} / L${summary.losing_trade_count}`) +
-    card('Profit factor', `<span>${profitFactor}</span>`) +
-    card('Expectancy /trade', signedMoney(summary.expectancy_dollars)) +
-    card('Realized ROI', roiHtml) +
-    card('Max drawdown', signedMoney(summary.max_drawdown_dollars));
+    card('Win rate', `<span>${winRate}</span>`, `W${summary.winning_trade_count} / L${summary.losing_trade_count}`,
+         'Share of closed trades that ended profitable (winners ÷ closed trades). Read it alongside payoff ratio — a high win rate can still lose money when the payoffs are small.') +
+    card('Profit factor', `<span>${profitFactor}</span>`, 'gross profit ÷ gross loss',
+         'Gross profit divided by gross loss across closed trades. Above 1.0 is net profitable, below 1.0 loses. Shows “—” until there is at least one losing trade.') +
+    card('Expectancy /trade', signedMoney(summary.expectancy_dollars), 'avg realized $ per closed trade',
+         'Expectancy per trade = total realized P&L ÷ number of closed trades. The average profit or loss you bank on a typical closed trade — i.e. the per-bet expected value. Positive means each trade adds edge on average; negative means the strategy is losing per trade. Computed on closed trades only (open positions have no settled outcome yet).') +
+    card('Realized ROI', roiHtml, 'realized P&L ÷ capital deployed',
+         'Realized P&L divided by capital deployed on closed trades (entry price × contracts — the dollars actually put at risk).') +
+    card('Max drawdown', signedMoney(summary.max_drawdown_dollars), 'largest peak-to-trough drop',
+         'The largest peak-to-trough decline of the cumulative realized-P&L curve — the worst losing streak measured from a high-water mark.');
 
   const payoff = summary.payoff_ratio === null || summary.payoff_ratio === undefined
     ? '—' : summary.payoff_ratio.toFixed(2);
