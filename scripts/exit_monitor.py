@@ -21,7 +21,7 @@ from kalshi_trader.external.kalshi_ws import KalshiWebSocketClient
 from kalshi_trader.orderbook import OrderBookState
 from kalshi_trader.portfolio_checks import EXIT_CHECKS
 from kalshi_trader import db as _db
-from kalshi_trader.dashboard.portfolio_mapping import parse_fixed_point
+from kalshi_trader.fixed_point import parse_fixed_point
 
 log = logging.getLogger("exit_monitor")
 

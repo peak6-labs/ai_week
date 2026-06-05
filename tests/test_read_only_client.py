@@ -7,7 +7,7 @@ import asyncio
 
 import pytest
 
-from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+from kalshi_trader.read_only_client import ReadOnlyKalshiClient
 
 
 class _FakeClient:

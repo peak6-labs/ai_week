@@ -1,0 +1,1233 @@
+{
+  "name": "Kalshi Market Scorer",
+  "description": "A Python system that scores live Kalshi prediction-market contracts for trade ideas, pulling signals from many sources (weather/GEFS ensembles, polls/FiveThirtyEight, Polymarket prices and whale wallets, X/Twitter via Grok, sportsbook odds, order-flow microstructure, GDELT mentions base rates, Love Island teasers), scoring edge deterministically, then applying adversarial challenge and Kelly risk sizing before publishing ideas to a FastAPI dashboard. It also places and cancels Kalshi orders (demo by default; prod gated) and manages open positions. Note: this project has over 100 source files; consider scoping analysis to a subdirectory for faster results.",
+  "languages": [
+    "html",
+    "json",
+    "markdown",
+    "python",
+    "sql"
+  ],
+  "frameworks": [
+    "FastAPI",
+    "Pydantic",
+    "aiohttp",
+    "Anthropic SDK",
+    "Uvicorn",
+    "pytest"
+  ],
+  "files": [
+    {
+      "path": ".understand-anything/.understandignore",
+      "language": "unknown",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "sizeLines": 48,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_auth.py",
+      "language": "python",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "KALSHI_SETUP.md",
+      "language": "markdown",
+      "sizeLines": 50,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/_retry.py",
+      "language": "python",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/actionability/__init__.py",
+      "language": "python",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/actionability/EXAMPLE_SCORE.md",
+      "language": "markdown",
+      "sizeLines": 65,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/actionability/README.md",
+      "language": "markdown",
+      "sizeLines": 130,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/actionability/scorer.py",
+      "language": "python",
+      "sizeLines": 193,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/actionability/signals.py",
+      "language": "python",
+      "sizeLines": 261,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/actionability/store.py",
+      "language": "python",
+      "sizeLines": 281,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/base.py",
+      "language": "python",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/data_orchestrator_agent.py",
+      "language": "python",
+      "sizeLines": 211,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/kalshi_bias_agent.py",
+      "language": "python",
+      "sizeLines": 288,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/love_island_agent.py",
+      "language": "python",
+      "sizeLines": 222,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/market_maker_agent.py",
+      "language": "python",
+      "sizeLines": 282,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/market_scout.py",
+      "language": "python",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/order_flow_agent.py",
+      "language": "python",
+      "sizeLines": 275,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/parsing.py",
+      "language": "python",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/polymarket_price_agent.py",
+      "language": "python",
+      "sizeLines": 212,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/polymarket_whale_agent.py",
+      "language": "python",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/data_orchestrator.md",
+      "language": "markdown",
+      "sizeLines": 80,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/kalshi_bias.md",
+      "language": "markdown",
+      "sizeLines": 58,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/love_island.md",
+      "language": "markdown",
+      "sizeLines": 99,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/market_maker.md",
+      "language": "markdown",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/order_flow.md",
+      "language": "markdown",
+      "sizeLines": 52,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/polymarket_price.md",
+      "language": "markdown",
+      "sizeLines": 36,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/polymarket_whale.md",
+      "language": "markdown",
+      "sizeLines": 40,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/weather.md",
+      "language": "markdown",
+      "sizeLines": 84,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/prompts/x.md",
+      "language": "markdown",
+      "sizeLines": 52,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "kalshi_trader/agents/settlement_context.py",
+      "language": "python",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/weather_agent.py",
+      "language": "python",
+      "sizeLines": 381,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/agents/x_agent.py",
+      "language": "python",
+      "sizeLines": 146,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/client.py",
+      "language": "python",
+      "sizeLines": 217,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/config.py",
+      "language": "python",
+      "sizeLines": 112,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/consensus.py",
+      "language": "python",
+      "sizeLines": 57,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/contract_terms.py",
+      "language": "python",
+      "sizeLines": 134,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/__init__.py",
+      "language": "python",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/app.py",
+      "language": "python",
+      "sizeLines": 98,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/portfolio_mapping.py",
+      "language": "python",
+      "sizeLines": 195,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/read_only_client.py",
+      "language": "python",
+      "sizeLines": 111,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/routes.py",
+      "language": "python",
+      "sizeLines": 197,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/scoring_loop.py",
+      "language": "python",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/state.py",
+      "language": "python",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/dashboard/static/index.html",
+      "language": "html",
+      "sizeLines": 506,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "kalshi_trader/db.py",
+      "language": "python",
+      "sizeLines": 784,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/executor.py",
+      "language": "python",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/exit_monitor.py",
+      "language": "python",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/congress_gov.py",
+      "language": "python",
+      "sizeLines": 176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/espn.py",
+      "language": "python",
+      "sizeLines": 141,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/fed.py",
+      "language": "python",
+      "sizeLines": 355,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/fivethirtyeight.py",
+      "language": "python",
+      "sizeLines": 92,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/gdelt.py",
+      "language": "python",
+      "sizeLines": 201,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/govinfo.py",
+      "language": "python",
+      "sizeLines": 245,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/kalshi_ws.py",
+      "language": "python",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/market_scorer.py",
+      "language": "python",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/mentions_parser.py",
+      "language": "python",
+      "sizeLines": 265,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/noaa.py",
+      "language": "python",
+      "sizeLines": 294,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/open_meteo.py",
+      "language": "python",
+      "sizeLines": 126,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/polls_parser.py",
+      "language": "python",
+      "sizeLines": 221,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/polymarket.py",
+      "language": "python",
+      "sizeLines": 496,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/speaker_registry.py",
+      "language": "python",
+      "sizeLines": 199,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/weather_authorities.py",
+      "language": "python",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/weather_parser.py",
+      "language": "python",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/weather_settlement.py",
+      "language": "python",
+      "sizeLines": 111,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/whitehouse.py",
+      "language": "python",
+      "sizeLines": 195,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/x_client.py",
+      "language": "python",
+      "sizeLines": 447,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/x_strategies.py",
+      "language": "python",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/external/youtube_client.py",
+      "language": "python",
+      "sizeLines": 248,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/grouping.py",
+      "language": "python",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/ideas_history.py",
+      "language": "python",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/link_resolver.py",
+      "language": "python",
+      "sizeLines": 194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/market_snapshot.py",
+      "language": "python",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/mentions_report.py",
+      "language": "python",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/mentions/__init__.py",
+      "language": "python",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/mentions/premise_backtest.py",
+      "language": "python",
+      "sizeLines": 264,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/mentions/price_study.py",
+      "language": "python",
+      "sizeLines": 236,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/mentions/store.py",
+      "language": "python",
+      "sizeLines": 472,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/models.py",
+      "language": "python",
+      "sizeLines": 168,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/orderbook.py",
+      "language": "python",
+      "sizeLines": 112,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/paper.py",
+      "language": "python",
+      "sizeLines": 300,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/kalshi_bias.py",
+      "language": "python",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/love_island.py",
+      "language": "python",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/market_maker.py",
+      "language": "python",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/mentions.py",
+      "language": "python",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/order_flow.py",
+      "language": "python",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/polls.py",
+      "language": "python",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/polymarket_price.py",
+      "language": "python",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/polymarket_whale.py",
+      "language": "python",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/sportsbook.py",
+      "language": "python",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/weather.py",
+      "language": "python",
+      "sizeLines": 49,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/pipelines/x.py",
+      "language": "python",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/portfolio_checks.py",
+      "language": "python",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/refresh_mentions_archive.py",
+      "language": "python",
+      "sizeLines": 242,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/refresh_targets.py",
+      "language": "python",
+      "sizeLines": 52,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/risk.py",
+      "language": "python",
+      "sizeLines": 129,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/scanner.py",
+      "language": "python",
+      "sizeLines": 440,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/schema.py",
+      "language": "python",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/series_contract_terms.json",
+      "language": "json",
+      "sizeLines": 3001,
+      "fileCategory": "config"
+    },
+    {
+      "path": "kalshi_trader/series_settlement_stations.json",
+      "language": "json",
+      "sizeLines": 289,
+      "fileCategory": "config"
+    },
+    {
+      "path": "kalshi_trader/series_slugs.json",
+      "language": "json",
+      "sizeLines": 54,
+      "fileCategory": "config"
+    },
+    {
+      "path": "kalshi_trader/signals/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/love_island_lexicon.py",
+      "language": "python",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/love_island_x_accounts.py",
+      "language": "python",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/love_island.py",
+      "language": "python",
+      "sizeLines": 121,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/mentions.py",
+      "language": "python",
+      "sizeLines": 453,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/microstructure.py",
+      "language": "python",
+      "sizeLines": 192,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/polls.py",
+      "language": "python",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/polymarket.py",
+      "language": "python",
+      "sizeLines": 150,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/sportsbook.py",
+      "language": "python",
+      "sizeLines": 126,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/weather.py",
+      "language": "python",
+      "sizeLines": 566,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/signals/x.py",
+      "language": "python",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/station_coords.py",
+      "language": "python",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/ui/__init__.py",
+      "language": "python",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/ui/config_manager.py",
+      "language": "python",
+      "sizeLines": 282,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/ui/server.py",
+      "language": "python",
+      "sizeLines": 655,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/ui/state.py",
+      "language": "python",
+      "sizeLines": 131,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/ui/templates/index.html",
+      "language": "html",
+      "sizeLines": 1539,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "kalshi_trader/weather_report.py",
+      "language": "python",
+      "sizeLines": 179,
+      "fileCategory": "code"
+    },
+    {
+      "path": "kalshi_trader/web_links.py",
+      "language": "python",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "requirements.txt",
+      "language": "txt",
+      "sizeLines": 17,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "run_ui.py",
+      "language": "python",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "runtime_config.json",
+      "language": "json",
+      "sizeLines": 68,
+      "fileCategory": "config"
+    },
+    {
+      "path": "sql/001_pipeline_schema.sql",
+      "language": "sql",
+      "sizeLines": 182,
+      "fileCategory": "data"
+    },
+    {
+      "path": "sql/002_recommendation_disposition.sql",
+      "language": "sql",
+      "sizeLines": 18,
+      "fileCategory": "data"
+    },
+    {
+      "path": "sql/003_add_reasoning_to_recommendations.sql",
+      "language": "sql",
+      "sizeLines": 7,
+      "fileCategory": "data"
+    }
+  ],
+  "totalFiles": 130,
+  "filteredByIgnore": 191,
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    ".understand-anything/.understandignore": [],
+    "CLAUDE.md": [],
+    "kalshi_auth.py": [],
+    "KALSHI_SETUP.md": [],
+    "kalshi_trader/__init__.py": [],
+    "kalshi_trader/_retry.py": [],
+    "kalshi_trader/actionability/__init__.py": [
+      "kalshi_trader/actionability/scorer.py",
+      "kalshi_trader/actionability/signals.py",
+      "kalshi_trader/actionability/store.py"
+    ],
+    "kalshi_trader/actionability/EXAMPLE_SCORE.md": [],
+    "kalshi_trader/actionability/README.md": [],
+    "kalshi_trader/actionability/scorer.py": [
+      "kalshi_trader/actionability/signals.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/microstructure.py"
+    ],
+    "kalshi_trader/actionability/signals.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/actionability/store.py": [
+      "kalshi_trader/_retry.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/agents/__init__.py": [],
+    "kalshi_trader/agents/base.py": [],
+    "kalshi_trader/agents/data_orchestrator_agent.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/agents/kalshi_bias_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/agents/love_island_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/external/x_client.py",
+      "kalshi_trader/external/youtube_client.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/love_island_lexicon.py",
+      "kalshi_trader/signals/love_island_x_accounts.py",
+      "kalshi_trader/signals/love_island.py"
+    ],
+    "kalshi_trader/agents/market_maker_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/agents/market_scout.py": [
+      "kalshi_trader/grouping.py"
+    ],
+    "kalshi_trader/agents/order_flow_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/agents/parsing.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/agents/polymarket_price_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/external/market_scorer.py",
+      "kalshi_trader/external/polymarket.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/polymarket.py"
+    ],
+    "kalshi_trader/agents/polymarket_whale_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/external/polymarket.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/polymarket.py"
+    ],
+    "kalshi_trader/agents/prompts/data_orchestrator.md": [],
+    "kalshi_trader/agents/prompts/kalshi_bias.md": [],
+    "kalshi_trader/agents/prompts/love_island.md": [],
+    "kalshi_trader/agents/prompts/market_maker.md": [],
+    "kalshi_trader/agents/prompts/order_flow.md": [],
+    "kalshi_trader/agents/prompts/polymarket_price.md": [],
+    "kalshi_trader/agents/prompts/polymarket_whale.md": [],
+    "kalshi_trader/agents/prompts/weather.md": [],
+    "kalshi_trader/agents/prompts/x.md": [],
+    "kalshi_trader/agents/settlement_context.py": [],
+    "kalshi_trader/agents/weather_agent.py": [
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/contract_terms.py",
+      "kalshi_trader/external/noaa.py",
+      "kalshi_trader/external/open_meteo.py",
+      "kalshi_trader/external/weather_authorities.py",
+      "kalshi_trader/external/weather_parser.py",
+      "kalshi_trader/external/weather_settlement.py",
+      "kalshi_trader/external/x_client.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/weather.py",
+      "kalshi_trader/station_coords.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/agents/x_agent.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/agents/base.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/x_client.py",
+      "kalshi_trader/external/x_strategies.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/x.py"
+    ],
+    "kalshi_trader/client.py": [
+      "kalshi_auth.py",
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/_retry.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/schema.py"
+    ],
+    "kalshi_trader/config.py": [],
+    "kalshi_trader/consensus.py": [
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/contract_terms.py": [
+      "kalshi_trader/_retry.py"
+    ],
+    "kalshi_trader/dashboard/__init__.py": [
+      "kalshi_trader/dashboard/app.py"
+    ],
+    "kalshi_trader/dashboard/app.py": [
+      "kalshi_trader/dashboard/routes.py",
+      "kalshi_trader/dashboard/scoring_loop.py",
+      "kalshi_trader/dashboard/state.py"
+    ],
+    "kalshi_trader/dashboard/portfolio_mapping.py": [
+      "kalshi_trader/config.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/web_links.py"
+    ],
+    "kalshi_trader/dashboard/read_only_client.py": [
+      "kalshi_trader/client.py"
+    ],
+    "kalshi_trader/dashboard/routes.py": [
+      "kalshi_trader/dashboard/__init__.py",
+      "kalshi_trader/dashboard/portfolio_mapping.py",
+      "kalshi_trader/dashboard/state.py",
+      "kalshi_trader/grouping.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/dashboard/scoring_loop.py": [
+      "kalshi_trader/dashboard/state.py",
+      "kalshi_trader/grouping.py",
+      "kalshi_trader/market_snapshot.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/dashboard/state.py": [
+      "kalshi_trader/actionability/__init__.py",
+      "kalshi_trader/client.py",
+      "kalshi_trader/dashboard/read_only_client.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/scanner.py"
+    ],
+    "kalshi_trader/dashboard/static/index.html": [],
+    "kalshi_trader/db.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/ideas_history.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/executor.py": [
+      "kalshi_trader/models.py",
+      "kalshi_trader/risk.py"
+    ],
+    "kalshi_trader/exit_monitor.py": [
+      "kalshi_trader/external/market_scorer.py",
+      "kalshi_trader/external/polymarket.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/external/__init__.py": [],
+    "kalshi_trader/external/congress_gov.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/external/espn.py": [],
+    "kalshi_trader/external/fed.py": [
+      "kalshi_trader/external/speaker_registry.py"
+    ],
+    "kalshi_trader/external/fivethirtyeight.py": [],
+    "kalshi_trader/external/gdelt.py": [],
+    "kalshi_trader/external/govinfo.py": [
+      "kalshi_trader/external/speaker_registry.py"
+    ],
+    "kalshi_trader/external/kalshi_ws.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/orderbook.py"
+    ],
+    "kalshi_trader/external/market_scorer.py": [
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/external/mentions_parser.py": [],
+    "kalshi_trader/external/noaa.py": [],
+    "kalshi_trader/external/open_meteo.py": [],
+    "kalshi_trader/external/polls_parser.py": [],
+    "kalshi_trader/external/polymarket.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/external/speaker_registry.py": [],
+    "kalshi_trader/external/weather_authorities.py": [],
+    "kalshi_trader/external/weather_parser.py": [],
+    "kalshi_trader/external/weather_settlement.py": [],
+    "kalshi_trader/external/whitehouse.py": [
+      "kalshi_trader/external/speaker_registry.py"
+    ],
+    "kalshi_trader/external/x_client.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/external/x_strategies.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/x_client.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/external/youtube_client.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/grouping.py": [
+      "kalshi_trader/actionability/scorer.py",
+      "kalshi_trader/agents/kalshi_bias_agent.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/signals/microstructure.py",
+      "kalshi_trader/web_links.py"
+    ],
+    "kalshi_trader/ideas_history.py": [],
+    "kalshi_trader/link_resolver.py": [
+      "kalshi_trader/web_links.py"
+    ],
+    "kalshi_trader/market_snapshot.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/mentions_report.py": [
+      "kalshi_trader/web_links.py"
+    ],
+    "kalshi_trader/mentions/__init__.py": [],
+    "kalshi_trader/mentions/premise_backtest.py": [
+      "kalshi_trader/external/mentions_parser.py"
+    ],
+    "kalshi_trader/mentions/price_study.py": [],
+    "kalshi_trader/mentions/store.py": [
+      "kalshi_trader/external/mentions_parser.py"
+    ],
+    "kalshi_trader/models.py": [],
+    "kalshi_trader/orderbook.py": [],
+    "kalshi_trader/paper.py": [
+      "kalshi_trader/ideas_history.py"
+    ],
+    "kalshi_trader/pipelines/__init__.py": [],
+    "kalshi_trader/pipelines/kalshi_bias.py": [
+      "kalshi_trader/agents/kalshi_bias_agent.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/client.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/love_island.py": [
+      "kalshi_trader/agents/love_island_agent.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/market_maker.py": [
+      "kalshi_trader/agents/market_maker_agent.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/client.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/mentions.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/agents/settlement_context.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/gdelt.py",
+      "kalshi_trader/external/mentions_parser.py",
+      "kalshi_trader/signals/mentions.py"
+    ],
+    "kalshi_trader/pipelines/order_flow.py": [
+      "kalshi_trader/agents/order_flow_agent.py",
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/client.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/polls.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/agents/settlement_context.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/fivethirtyeight.py",
+      "kalshi_trader/external/polls_parser.py",
+      "kalshi_trader/signals/polls.py"
+    ],
+    "kalshi_trader/pipelines/polymarket_price.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/agents/polymarket_price_agent.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/polymarket_whale.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/agents/polymarket_whale_agent.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/sportsbook.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/signals/sportsbook.py"
+    ],
+    "kalshi_trader/pipelines/weather.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/agents/settlement_context.py",
+      "kalshi_trader/agents/weather_agent.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/pipelines/x.py": [
+      "kalshi_trader/agents/parsing.py",
+      "kalshi_trader/agents/x_agent.py",
+      "kalshi_trader/config.py"
+    ],
+    "kalshi_trader/portfolio_checks.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/refresh_mentions_archive.py": [
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/congress_gov.py",
+      "kalshi_trader/external/fed.py",
+      "kalshi_trader/external/govinfo.py",
+      "kalshi_trader/external/mentions_parser.py",
+      "kalshi_trader/external/speaker_registry.py",
+      "kalshi_trader/external/whitehouse.py",
+      "kalshi_trader/mentions/store.py"
+    ],
+    "kalshi_trader/refresh_targets.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/polymarket.py"
+    ],
+    "kalshi_trader/risk.py": [
+      "kalshi_trader/__init__.py",
+      "kalshi_trader/config.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/scanner.py": [
+      "kalshi_trader/_retry.py",
+      "kalshi_trader/actionability/__init__.py",
+      "kalshi_trader/actionability/signals.py",
+      "kalshi_trader/market_snapshot.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/schema.py": [],
+    "kalshi_trader/series_contract_terms.json": [],
+    "kalshi_trader/series_settlement_stations.json": [],
+    "kalshi_trader/series_slugs.json": [],
+    "kalshi_trader/signals/__init__.py": [],
+    "kalshi_trader/signals/love_island_lexicon.py": [],
+    "kalshi_trader/signals/love_island_x_accounts.py": [],
+    "kalshi_trader/signals/love_island.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/signals/mentions.py": [
+      "kalshi_trader/config.py",
+      "kalshi_trader/external/congress_gov.py",
+      "kalshi_trader/external/mentions_parser.py",
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/signals/microstructure.py": [
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/signals/polls.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/signals/polymarket.py": [
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/signals/sportsbook.py": [
+      "kalshi_trader/external/espn.py",
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/signals/weather.py": [
+      "kalshi_trader/models.py",
+      "kalshi_trader/ui/config_manager.py"
+    ],
+    "kalshi_trader/signals/x.py": [
+      "kalshi_trader/models.py"
+    ],
+    "kalshi_trader/station_coords.py": [
+      "kalshi_trader/contract_terms.py",
+      "kalshi_trader/external/weather_settlement.py"
+    ],
+    "kalshi_trader/ui/__init__.py": [],
+    "kalshi_trader/ui/config_manager.py": [],
+    "kalshi_trader/ui/server.py": [
+      "kalshi_trader/db.py",
+      "kalshi_trader/ui/config_manager.py",
+      "kalshi_trader/ui/state.py"
+    ],
+    "kalshi_trader/ui/state.py": [],
+    "kalshi_trader/ui/templates/index.html": [],
+    "kalshi_trader/weather_report.py": [
+      "kalshi_trader/web_links.py"
+    ],
+    "kalshi_trader/web_links.py": [],
+    "requirements.txt": [],
+    "run_ui.py": [],
+    "runtime_config.json": [],
+    "sql/001_pipeline_schema.sql": [],
+    "sql/002_recommendation_disposition.sql": [],
+    "sql/003_add_reasoning_to_recommendations.sql": []
+  }
+}

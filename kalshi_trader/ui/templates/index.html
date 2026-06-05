@@ -240,6 +240,76 @@
     .badge-idle    { background: var(--bg-tertiary); color: var(--text-secondary); }
 
     /* ------------------------------------------------------------------ */
+    /* P&L tab                                                              */
+    /* ------------------------------------------------------------------ */
+    .panel-header.pnl-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    #tab-pnl .pnl-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    #tab-pnl .pnl-cards-quality { margin-top: 10px; }
+    #tab-pnl .pnl-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    #tab-pnl .pnl-card-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+    #tab-pnl .pnl-card-value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+    #tab-pnl .pnl-card-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+    #tab-pnl .pnl-card-defined { cursor: help; }
+    #tab-pnl .pnl-card-defined .pnl-card-label {
+      display: inline-block;
+      border-bottom: 1px dotted var(--text-tertiary);
+      padding-bottom: 1px;
+    }
+    #tab-pnl .pnl-caption { margin-top: 12px; font-size: 11px; color: var(--text-tertiary); }
+    #tab-pnl #pnl-curve { width: 100%; }
+    #tab-pnl #pnl-curve svg { width: 100%; height: auto; display: block; }
+    #tab-pnl .pnl-empty {
+      padding: 24px; text-align: center;
+      color: var(--text-tertiary); font-style: italic;
+    }
+    #tab-pnl .pnl-two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 900px) { #tab-pnl .pnl-two-col { grid-template-columns: 1fr; } }
+    #tab-pnl .pnl-bar-cell { width: 110px; }
+    #tab-pnl .pnl-bar { display: inline-block; height: 10px; border-radius: 3px; min-width: 2px; }
+    #tab-pnl .pnl-subcount, #tab-pnl .pnl-sub { color: var(--text-tertiary); font-size: 11px; }
+    #tab-pnl .pnl-mark { color: var(--accent); font-weight: 700; }
+    #tab-pnl .pnl-type { color: var(--text-secondary); font-size: 12px; }
+    #tab-pnl .pnl-controls {
+      display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+      font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0;
+      color: var(--text-secondary);
+    }
+    #tab-pnl .pnl-controls select,
+    #tab-pnl #pnl-basis,
+    #tab-pnl .pnl-dir-btn {
+      background: var(--bg-primary); color: var(--text-primary);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 3px 8px; font-size: 12px; cursor: pointer; text-transform: none;
+    }
+    #tab-pnl tfoot td {
+      padding: 8px 10px; font-weight: 600;
+      border-top: 2px solid var(--border);
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Event log                                                            */
     /* ------------------------------------------------------------------ */
     #event-log-panel .panel-body {
@@ -752,6 +822,7 @@
   <span class="app-title">Kalshi</span>
   <button class="tab-btn active" data-tab="monitor">Live Monitor</button>
   <button class="tab-btn" data-tab="history">Ideas History</button>
+  <button class="tab-btn" data-tab="pnl">P&amp;L</button>
 </nav>
 
 <!-- ====================================================================== -->
@@ -979,6 +1050,98 @@
     </div>
   </div>
 
+  <!-- ================================================================== -->
+  <!-- P&L tab                                                             -->
+  <!-- ================================================================== -->
+  <div id="tab-pnl" class="tab-pane">
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header pnl-panel-header">
+        <span>P&amp;L Summary</span>
+        <select id="pnl-basis" title="Net subtracts fees; gross does not">
+          <option value="net">Net of fees</option>
+          <option value="gross">Gross</option>
+        </select>
+      </div>
+      <div class="panel-body">
+        <div id="pnl-cards" class="pnl-cards"></div>
+        <div id="pnl-cards-quality" class="pnl-cards pnl-cards-quality"></div>
+        <div id="pnl-caption" class="pnl-caption"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header">Cumulative P&amp;L Over Time</div>
+      <div class="panel-body"><div id="pnl-curve"></div></div>
+    </div>
+
+    <div class="pnl-two-col">
+      <div class="panel">
+        <div class="panel-header">By Market Type</div>
+        <div class="panel-body" style="padding:0"><div id="pnl-by-type"></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">By Days to Settlement (at entry)</div>
+        <div class="panel-body" style="padding:0"><div id="pnl-by-dts"></div></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px">
+      <div class="panel-header pnl-panel-header">
+        <span>Per-Trade (open + closed)</span>
+        <span class="pnl-controls">
+          <label>Sort by
+            <select id="pnl-sort-col">
+              <option value="pnl_dollars">P&amp;L</option>
+              <option value="entry_price_cents">Entry ¢</option>
+              <option value="exit_or_mark_price_cents">Exit/Mark ¢</option>
+              <option value="contracts">Contracts</option>
+              <option value="days_to_settlement">Days to settle</option>
+              <option value="holding_days">Holding</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="pnl-sort-abs"> Absolute |x|</label>
+          <button id="pnl-sort-dir" type="button" class="pnl-dir-btn" data-dir="desc">&darr; Desc</button>
+          <label>Show
+            <select id="pnl-status-filter">
+              <option value="all">All</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        </span>
+      </div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Status</th>
+              <th>Type</th>
+              <th>Side</th>
+              <th data-col="contracts">Contracts</th>
+              <th data-col="entry_price_cents">Entry ¢</th>
+              <th data-col="exit_or_mark_price_cents">Exit/Mark ¢</th>
+              <th data-col="days_to_settlement">To settle</th>
+              <th data-col="holding_days">Hold</th>
+              <th data-col="pnl_dollars">P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody id="pnl-trades-tbody">
+            <tr class="empty-row"><td colspan="10">Loading…</td></tr>
+          </tbody>
+          <tfoot id="pnl-trades-tfoot" style="display:none">
+            <tr>
+              <td colspan="4" id="pnl-total-summary"></td>
+              <td id="pnl-total-count" style="color:var(--text-secondary)"></td>
+              <td colspan="4"></td>
+              <td id="pnl-total-pnl"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /main-content -->
 
 <!-- ====================================================================== -->
@@ -1010,6 +1173,9 @@ tabBtns.forEach(btn => {
 
     if (tab === 'history') {
       loadIdeasHistory();
+    }
+    if (tab === 'pnl') {
+      loadPnlAnalytics();
     }
   });
 });
@@ -1528,6 +1694,258 @@ function renderIdeasHistory() {
 
 document.getElementById('history-disposition-filter').addEventListener('change', renderIdeasHistory);
 document.getElementById('history-sort').addEventListener('change', renderIdeasHistory);
+
+// ---------------------------------------------------------------------------
+// P&L tab
+// ---------------------------------------------------------------------------
+let pnlData = null;
+const pnlSortState = { column: 'pnl_dollars', absolute: false, direction: 'desc', statusFilter: 'all' };
+
+function signedMoney(value) {
+  if (value === null || value === undefined) return '<span style="color:var(--text-tertiary)">—</span>';
+  return `<span class="${pnlClass(value)}">${(value >= 0 ? '+' : '') + fmt$(value)}</span>`;
+}
+
+function pnlDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+async function loadPnlAnalytics() {
+  const basis = document.getElementById('pnl-basis').value;
+  try {
+    const resp = await fetch('/api/pnl/analytics?basis=' + basis);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    pnlData = await resp.json();
+    renderPnlSummary(pnlData.summary);
+    renderPnlCurve(pnlData.pnl_over_time, pnlData.current_total_pnl_dollars);
+    renderPnlBreakdown(pnlData.by_market_type, 'pnl-by-type', 'market_type');
+    renderPnlBreakdown(pnlData.by_days_to_settlement, 'pnl-by-dts', 'bucket_label');
+    renderPnlTrades();
+  } catch (err) {
+    console.error('Failed to load P&L analytics:', err);
+    document.getElementById('pnl-trades-tbody').innerHTML =
+      '<tr class="empty-row"><td colspan="10">Failed to load P&L analytics</td></tr>';
+  }
+}
+
+function renderPnlSummary(summary) {
+  if (!summary) return;
+  const card = (label, valueHtml, sub, tooltip) =>
+    `<div class="pnl-card${tooltip ? ' pnl-card-defined' : ''}"${tooltip ? ` title="${escHtml(tooltip)}"` : ''}>` +
+    `<div class="pnl-card-label">${label}</div>` +
+    `<div class="pnl-card-value">${valueHtml}</div>` +
+    (sub ? `<div class="pnl-card-sub">${sub}</div>` : '') + `</div>`;
+
+  document.getElementById('pnl-cards').innerHTML =
+    card('Realized P&L', signedMoney(summary.realized_pnl_dollars)) +
+    card('Unrealized (open)', signedMoney(summary.unrealized_pnl_dollars)) +
+    card('Total (incl. open)', signedMoney(summary.total_pnl_dollars),
+         `${summary.open_trade_count} open · ${summary.closed_trade_count} closed`);
+
+  const winRate = summary.win_rate === null || summary.win_rate === undefined
+    ? '—' : Math.round(summary.win_rate * 100) + '%';
+  const profitFactor = summary.profit_factor === null || summary.profit_factor === undefined
+    ? '—' : summary.profit_factor.toFixed(2);
+  const roi = summary.realized_return_on_capital;
+  const roiHtml = roi === null || roi === undefined
+    ? '—' : `<span class="${pnlClass(roi)}">${(roi >= 0 ? '+' : '') + (roi * 100).toFixed(1) + '%'}</span>`;
+  document.getElementById('pnl-cards-quality').innerHTML =
+    card('Win rate', `<span>${winRate}</span>`, `W${summary.winning_trade_count} / L${summary.losing_trade_count}`,
+         'Share of closed trades that ended profitable (winners ÷ closed trades). Read it alongside payoff ratio — a high win rate can still lose money when the payoffs are small.') +
+    card('Profit factor', `<span>${profitFactor}</span>`, 'gross profit ÷ gross loss',
+         'Gross profit divided by gross loss across closed trades. Above 1.0 is net profitable, below 1.0 loses. Shows “—” until there is at least one losing trade.') +
+    card('Expectancy /trade', signedMoney(summary.expectancy_dollars), 'avg realized $ per closed trade',
+         'Expectancy per trade = total realized P&L ÷ number of closed trades. The average profit or loss you bank on a typical closed trade — i.e. the per-bet expected value. Positive means each trade adds edge on average; negative means the strategy is losing per trade. Computed on closed trades only (open positions have no settled outcome yet).') +
+    card('Realized ROI', roiHtml, 'realized P&L ÷ capital deployed',
+         'Realized P&L divided by capital deployed on closed trades (entry price × contracts — the dollars actually put at risk).') +
+    card('Max drawdown', signedMoney(summary.max_drawdown_dollars), 'largest peak-to-trough drop',
+         'The largest peak-to-trough decline of the cumulative realized-P&L curve — the worst losing streak measured from a high-water mark.');
+
+  const payoff = summary.payoff_ratio === null || summary.payoff_ratio === undefined
+    ? '—' : summary.payoff_ratio.toFixed(2);
+  const hold = summary.average_holding_days === null || summary.average_holding_days === undefined
+    ? '—' : summary.average_holding_days.toFixed(1) + 'd';
+  document.getElementById('pnl-caption').textContent =
+    `payoff ratio ${payoff} · avg hold ${hold} · ${fmt$(summary.capital_deployed_dollars)} deployed · ` +
+    `quality metrics (win rate, profit factor, expectancy, ROI, drawdown) are on closed trades only`;
+}
+
+function renderPnlCurve(series, currentTotal) {
+  const host = document.getElementById('pnl-curve');
+  if (!series || series.length === 0) {
+    host.innerHTML = '<div class="pnl-empty">No closed trades yet — nothing to chart.</div>';
+    return;
+  }
+  const width = 1000, height = 320, padL = 58, padR = 16, padT = 14, padB = 26;
+  const plotWidth = width - padL - padR, plotHeight = height - padT - padB;
+  const pointCount = series.length;
+
+  const cumulative = series.map(point => point.cumulative_pnl_dollars);
+  const peak = series.map(point => point.cumulative_pnl_dollars - point.drawdown_dollars);
+
+  const allValues = cumulative.concat(peak).concat([0, currentTotal ?? 0]);
+  let yMin = Math.min(...allValues), yMax = Math.max(...allValues);
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const yPad = (yMax - yMin) * 0.08; yMin -= yPad; yMax += yPad;
+
+  // Leave the far-right 10% for the dashed "incl. open" marker.
+  const xMain = i => padL + (pointCount <= 1 ? plotWidth * 0.45 : (i / (pointCount - 1)) * plotWidth * 0.9);
+  const xExtension = padL + plotWidth;
+  const yAt = value => padT + plotHeight * (1 - (value - yMin) / (yMax - yMin));
+
+  const cumulativePoints = cumulative.map((value, i) => `${xMain(i).toFixed(1)},${yAt(value).toFixed(1)}`).join(' ');
+  // Underwater (drawdown) polygon: peak line left→right, then cumulative right→left.
+  const underwaterPoints =
+    peak.map((value, i) => `${xMain(i).toFixed(1)},${yAt(value).toFixed(1)}`).join(' ') + ' ' +
+    cumulative.map((value, i) => `${xMain(pointCount - 1 - i).toFixed(1)},${yAt(cumulative[pointCount - 1 - i]).toFixed(1)}`).join(' ');
+  // Faint fill under the cumulative line down to the zero baseline.
+  const areaPoints = cumulativePoints + ` ${xMain(pointCount - 1).toFixed(1)},${yAt(0).toFixed(1)} ${xMain(0).toFixed(1)},${yAt(0).toFixed(1)}`;
+
+  const zeroY = yAt(0).toFixed(1);
+  const lastX = xMain(pointCount - 1), lastY = yAt(cumulative[pointCount - 1]);
+  const extY = yAt(currentTotal ?? cumulative[pointCount - 1]);
+  const fmtAxis = value => (value >= 0 ? '+$' : '-$') + Math.abs(value).toFixed(0);
+
+  host.innerHTML =
+    `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Cumulative P&L over time">` +
+      `<line x1="${padL}" y1="${zeroY}" x2="${width - padR}" y2="${zeroY}" stroke="var(--border)" stroke-dasharray="3 3"/>` +
+      `<polygon points="${areaPoints}" fill="var(--accent)" opacity="0.08"/>` +
+      `<polygon points="${underwaterPoints}" fill="var(--error)" opacity="0.16"/>` +
+      `<polyline points="${cumulativePoints}" fill="none" stroke="var(--accent)" stroke-width="2"/>` +
+      `<line x1="${lastX.toFixed(1)}" y1="${lastY.toFixed(1)}" x2="${xExtension.toFixed(1)}" y2="${extY.toFixed(1)}" ` +
+        `stroke="var(--text-secondary)" stroke-width="1.5" stroke-dasharray="4 3"/>` +
+      `<circle cx="${xExtension.toFixed(1)}" cy="${extY.toFixed(1)}" r="3.5" fill="var(--text-secondary)"/>` +
+      `<text x="${(xExtension - 4).toFixed(1)}" y="${(extY - 8).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-secondary)">incl. open</text>` +
+      `<text x="${padL - 6}" y="${(yAt(yMax) + 10).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-tertiary)">${fmtAxis(yMax)}</text>` +
+      `<text x="${padL - 6}" y="${(parseFloat(zeroY) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-tertiary)">$0</text>` +
+      `<text x="${padL - 6}" y="${(yAt(yMin) - 2).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-tertiary)">${fmtAxis(yMin)}</text>` +
+      `<text x="${padL}" y="${height - 8}" font-size="11" fill="var(--text-tertiary)">${pnlDate(series[0].timestamp)}</text>` +
+      `<text x="${(padL + plotWidth * 0.9).toFixed(1)}" y="${height - 8}" text-anchor="end" font-size="11" fill="var(--text-tertiary)">${pnlDate(series[pointCount - 1].timestamp)}</text>` +
+    `</svg>`;
+}
+
+function renderPnlBreakdown(rows, containerId, labelKey) {
+  const host = document.getElementById(containerId);
+  if (!rows || rows.length === 0) {
+    host.innerHTML = '<div class="pnl-empty">No data.</div>';
+    return;
+  }
+  const maxAbsTotal = Math.max(1e-9, ...rows.map(row => Math.abs(row.total_pnl_dollars)));
+  const body = rows.map(row => {
+    const total = row.total_pnl_dollars;
+    const barWidthPct = Math.round(Math.abs(total) / maxAbsTotal * 100);
+    const barColor = total >= 0 ? 'var(--success)' : 'var(--error)';
+    const label = labelKey === 'market_type' ? row.market_type : row.bucket_label;
+    const tradeCount = row.closed_count + row.open_count;
+    return `<tr>
+      <td class="text-mono">${escHtml(label)}</td>
+      <td>${tradeCount}<span class="pnl-subcount"> (${row.closed_count}c/${row.open_count}o)</span></td>
+      <td>${signedMoney(row.realized_pnl_dollars)}</td>
+      <td>${signedMoney(row.unrealized_pnl_dollars)}</td>
+      <td>${signedMoney(total)}</td>
+      <td class="pnl-bar-cell"><span class="pnl-bar" style="width:${barWidthPct}%;background:${barColor}"></span></td>
+    </tr>`;
+  }).join('');
+  host.innerHTML =
+    `<table class="data-table"><thead><tr>` +
+    `<th>${labelKey === 'market_type' ? 'Type' : 'Bucket'}</th><th>Trades</th>` +
+    `<th>Realized</th><th>Unreal.</th><th>Total</th><th></th>` +
+    `</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function getSortedPnlTrades() {
+  let rows = (pnlData && pnlData.trades ? pnlData.trades : []).slice();
+  if (pnlSortState.statusFilter !== 'all') {
+    rows = rows.filter(row => row.status === pnlSortState.statusFilter);
+  }
+  const column = pnlSortState.column;
+  const useAbsolute = pnlSortState.absolute;
+  const directionSign = pnlSortState.direction === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    let aValue = a[column], bValue = b[column];
+    aValue = (aValue === null || aValue === undefined) ? -Infinity : aValue;
+    bValue = (bValue === null || bValue === undefined) ? -Infinity : bValue;
+    if (useAbsolute) { aValue = Math.abs(aValue); bValue = Math.abs(bValue); }
+    return (aValue - bValue) * directionSign;
+  });
+  return rows;
+}
+
+function renderPnlTrades() {
+  const tbody = document.getElementById('pnl-trades-tbody');
+  const tfoot = document.getElementById('pnl-trades-tfoot');
+  const rows = getSortedPnlTrades();
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No trades</td></tr>';
+    tfoot.style.display = 'none';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => {
+    const sideBadge = String(row.side || '').toUpperCase() === 'YES'
+      ? '<span class="badge badge-yes">YES</span>' : '<span class="badge badge-no">NO</span>';
+    const statusBadge = row.status === 'open'
+      ? '<span class="badge badge-running">OPEN</span>' : '<span class="badge badge-approved">CLOSED</span>';
+    const url = row.ticker ? `https://kalshi.com/markets/${row.ticker.split('-')[0].toLowerCase()}` : null;
+    const tickerEl = url
+      ? `<a class="text-mono kalshi-link" href="${url}" target="_blank" rel="noopener">${escHtml(row.ticker)}</a>`
+      : `<span class="text-mono">${escHtml(row.ticker || '')}</span>`;
+    const entry = row.entry_price_cents != null ? Math.round(row.entry_price_cents) + '¢' : '—';
+    const exitMark = row.exit_or_mark_price_cents != null
+      ? Math.round(row.exit_or_mark_price_cents) + '¢' + (row.is_mark ? '<span class="pnl-mark"> mark</span>' : '')
+      : '—';
+    const daysToSettle = row.days_to_settlement != null ? row.days_to_settlement + 'd' : '—';
+    const hold = row.holding_days != null ? row.holding_days.toFixed(1) + 'd' : '—';
+    const lockedIn = (row.status === 'open' && row.realized_pnl_dollars)
+      ? ` <span class="pnl-sub">(+${fmt$(row.realized_pnl_dollars)} real.)</span>` : '';
+    return `<tr>
+      <td>${tickerEl}</td>
+      <td>${statusBadge}</td>
+      <td class="pnl-type">${escHtml(row.market_type || '—')}</td>
+      <td>${sideBadge}</td>
+      <td>${row.contracts ?? '—'}</td>
+      <td>${escHtml(entry)}</td>
+      <td>${exitMark}</td>
+      <td>${daysToSettle}</td>
+      <td>${hold}</td>
+      <td>${signedMoney(row.pnl_dollars)}${lockedIn}</td>
+    </tr>`;
+  }).join('');
+
+  const realizedTotal = rows.reduce((sum, row) => sum + (row.realized_pnl_dollars || 0), 0);
+  const openTotal = rows.reduce((sum, row) => sum + (row.unrealized_pnl_dollars || 0), 0);
+  document.getElementById('pnl-total-summary').innerHTML =
+    `realized ${signedMoney(realizedTotal)} &nbsp;·&nbsp; open ${signedMoney(openTotal)}`;
+  document.getElementById('pnl-total-count').textContent = rows.length + ' trades';
+  document.getElementById('pnl-total-pnl').innerHTML = signedMoney(realizedTotal + openTotal);
+  tfoot.style.display = '';
+}
+
+document.getElementById('pnl-basis').addEventListener('change', loadPnlAnalytics);
+document.getElementById('pnl-sort-col').addEventListener('change', event => {
+  pnlSortState.column = event.target.value; renderPnlTrades();
+});
+document.getElementById('pnl-sort-abs').addEventListener('change', event => {
+  pnlSortState.absolute = event.target.checked; renderPnlTrades();
+});
+document.getElementById('pnl-status-filter').addEventListener('change', event => {
+  pnlSortState.statusFilter = event.target.value; renderPnlTrades();
+});
+document.getElementById('pnl-sort-dir').addEventListener('click', event => {
+  pnlSortState.direction = pnlSortState.direction === 'desc' ? 'asc' : 'desc';
+  event.target.dataset.dir = pnlSortState.direction;
+  event.target.innerHTML = pnlSortState.direction === 'desc' ? '&darr; Desc' : '&uarr; Asc';
+  renderPnlTrades();
+});
+document.querySelectorAll('#tab-pnl th[data-col]').forEach(headerCell => {
+  headerCell.style.cursor = 'pointer';
+  headerCell.addEventListener('click', () => {
+    pnlSortState.column = headerCell.dataset.col;
+    document.getElementById('pnl-sort-col').value = headerCell.dataset.col;
+    renderPnlTrades();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Utility: HTML escaping

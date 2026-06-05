@@ -18,11 +18,20 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from kalshi_trader.ui.state import TradingState
 from kalshi_trader.ui.config_manager import cfg as _default_cfg, ConfigManager
+from kalshi_trader.ui.pnl_analytics import build_analytics
 from kalshi_trader.db import insert_reviewed_idea
 
 logger = logging.getLogger(__name__)
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# Slow-changing per-ticker data backing the P&L analytics tab. Maintained by the
+# _poll_fills task and read by the /api/pnl/analytics endpoint. Kept at module
+# level so the faster account poller (which rewrites trading_state.positions
+# every 10s) can never clobber them.
+_market_metadata_by_ticker: dict[str, dict] = {}   # ticker -> {"market_type", "close_time"}
+_opened_at_by_ticker: dict[str, str] = {}           # ticker -> earliest buy-fill ISO time
+_category_by_event_ticker: dict[str, str] = {}      # event_ticker -> category (deduped across markets)
 
 
 def _avco_price(fill_list: list[dict], use_no_price: bool) -> float:
@@ -202,7 +211,7 @@ async def _fetch_yes_price_cents(client: Any, ticker: str, concurrency_semaphore
 async def _poll_kalshi_account(trading_state: TradingState) -> None:
     """Poll Kalshi every 10 s for balance, live position prices, unrealized P&L, and fees."""
     from kalshi_trader.client import KalshiClient
-    from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+    from kalshi_trader.read_only_client import ReadOnlyKalshiClient
 
     await asyncio.sleep(2)
     trading_state.log("Account poller started")
@@ -346,6 +355,70 @@ async def _poll_kalshi_account(trading_state: TradingState) -> None:
             await asyncio.sleep(10)
 
 
+def _update_opened_at_lookup(fills_cache: dict[str, list[dict]]) -> None:
+    """Record the earliest buy-fill time per ticker into _opened_at_by_ticker.
+
+    Open positions have no opened_at natively, so the P&L tab derives it from the
+    first buy fill. Closed positions already carry their own opened_at; this just
+    backstops any ticker still trading.
+    """
+    for ticker, fills in fills_cache.items():
+        buy_times = [
+            fill.get("created_time") for fill in fills
+            if fill.get("action") == "buy" and fill.get("created_time")
+        ]
+        if buy_times:
+            _opened_at_by_ticker[ticker] = min(buy_times)
+
+
+async def _refresh_market_metadata(client, tickers: set[str]) -> None:
+    """Populate _market_metadata_by_ticker (category + close time) for new tickers.
+
+    The single-market endpoint carries ``close_time`` but NOT ``category`` — on
+    Kalshi the category lives on the event — so close time comes from
+    ``get_market`` and the category from ``GET /events/{event_ticker}`` (cached
+    per event so markets sharing an event cost one event call). Each ticker is
+    fetched at most once; settled/closed markets never change. Runs the missing
+    tickers concurrently under a small semaphore.
+    """
+    missing_tickers = [ticker for ticker in tickers if ticker and ticker not in _market_metadata_by_ticker]
+    if not missing_tickers:
+        return
+
+    metadata_semaphore = asyncio.Semaphore(5)
+
+    async def _category_for_event(event_ticker: str) -> str:
+        if not event_ticker:
+            return "unknown"
+        if event_ticker in _category_by_event_ticker:
+            return _category_by_event_ticker[event_ticker]
+        try:
+            response = await client.get(f"/events/{event_ticker}")
+        except Exception as caught_exception:
+            logger.debug("Event category fetch failed for %s: %s", event_ticker, caught_exception)
+            return "unknown"
+        event = response.get("event", response) or {}
+        category = event.get("category") or "unknown"
+        _category_by_event_ticker[event_ticker] = category
+        return category
+
+    async def _fetch_one(ticker: str) -> None:
+        async with metadata_semaphore:
+            try:
+                response = await client.get_market(ticker)
+            except Exception as caught_exception:
+                logger.debug("Market metadata fetch failed for %s: %s", ticker, caught_exception)
+                return
+            market = response.get("market", response) or {}
+            category = await _category_for_event(market.get("event_ticker", ""))
+        _market_metadata_by_ticker[ticker] = {
+            "market_type": category,
+            "close_time": market.get("close_time"),
+        }
+
+    await asyncio.gather(*[_fetch_one(ticker) for ticker in missing_tickers])
+
+
 async def _poll_fills(trading_state: TradingState) -> None:
     """Rebuild closed positions from Kalshi fills every 5 minutes.
 
@@ -354,7 +427,7 @@ async def _poll_fills(trading_state: TradingState) -> None:
     positions list. Replaces the Supabase-based _poll_closed_positions poller.
     """
     from kalshi_trader.client import KalshiClient
-    from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+    from kalshi_trader.read_only_client import ReadOnlyKalshiClient
 
     await asyncio.sleep(4)
     trading_state.log("Fills poller started")
@@ -406,6 +479,14 @@ async def _poll_fills(trading_state: TradingState) -> None:
                         trading_state.closed_positions = merge_with_settled_positions(
                             fills_based, settled_positions, fills_cache
                         )
+
+                        # Maintain the P&L-tab lookups: earliest buy time per
+                        # ticker, and market metadata (category + close time).
+                        _update_opened_at_lookup(fills_cache)
+                        analytics_tickers = open_tickers | {
+                            row["ticker"] for row in trading_state.closed_positions if row.get("ticker")
+                        }
+                        await _refresh_market_metadata(client, analytics_tickers)
 
                     except asyncio.CancelledError:
                         raise
@@ -470,6 +551,27 @@ def create_app(
         """Return the current TradingState as JSON."""
         state: TradingState = request.app.state.trading_state
         return JSONResponse(state.to_dict())
+
+    @app.get("/api/pnl/analytics")
+    async def get_pnl_analytics(request: Request) -> JSONResponse:
+        """Return the P&L analysis payload for the P&L tab.
+
+        Combines closed positions (realized) and open positions (mark-to-market
+        unrealized + locked-in realized) into per-trade rows, summary metrics,
+        a cumulative-P&L time series, and breakdowns by market type and
+        days-to-settlement. ``?basis=gross`` switches off fee netting.
+        """
+        state: TradingState = request.app.state.trading_state
+        basis = request.query_params.get("basis", "net")
+        payload = build_analytics(
+            state.closed_positions,
+            state.positions,
+            _market_metadata_by_ticker,
+            _opened_at_by_ticker,
+            datetime.now(tz=timezone.utc),
+            basis=basis,
+        )
+        return JSONResponse(payload)
 
     @app.get("/api/config")
     async def get_config(request: Request) -> JSONResponse:
@@ -625,7 +727,7 @@ def create_app(
         ``{ticker: {"bid": float|null, "ask": float|null, "mid": float} | null}``.
         """
         from kalshi_trader.client import KalshiClient
-        from kalshi_trader.dashboard.read_only_client import ReadOnlyKalshiClient
+        from kalshi_trader.read_only_client import ReadOnlyKalshiClient
 
         if not tickers:
             return JSONResponse({})

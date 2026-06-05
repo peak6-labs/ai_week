@@ -1,6 +1,6 @@
 """A read-only facade over KalshiClient.
 
-This dashboard runs against the **prod (real-money) account**. The web layer must
+The dashboard runs against the **prod (real-money) account**. The web layer must
 never be able to place or cancel an order. This facade is the structural guarantee:
 it exposes only GET-backed read methods and deliberately defines no
 ``post`` / ``delete`` / ``create_order`` / ``cancel_order``. The wrapped client is
